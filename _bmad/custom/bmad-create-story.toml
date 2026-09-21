@@ -1,0 +1,9 @@
+[workflow]
+
+persistent_facts = [
+  "file:{project-root}/brain/StoryProofGuardrails.md",
+  "Create Mode always leaves the story in draft; only a clean independent Validate Mode may promote it to ready-for-dev.",
+  "Technical-decision artifacts are optional. When one exists, every approved TD must map to the normative story ledger, tasks, surfaces, and owning-boundary proofs.",
+  "Validation findings are repaired by Create Story Repair Mode and must be validated again before promotion.",
+  "A dispatch acknowledgement, process spawn, or log-file observation never proves worker claim, durable state, terminal outcome, or consumer compatibility.",
+]
