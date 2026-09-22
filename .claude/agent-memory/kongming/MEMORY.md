@@ -1,0 +1,1 @@
+- [design-sync of @plane/propel](project-design-sync-propel.md) — first sync 2026-09-22; review findings on conventions.md, Button.d.ts, NOTES.md cap

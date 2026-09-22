@@ -1,0 +1,118 @@
+{
+  "projectId": "85052822-e844-4817-9eef-981c38dc9eae",
+  "pkg": "@plane/propel",
+  "globalName": "PlanePropel",
+  "shape": "storybook",
+  "storybookConfigDir": "packages/propel/.storybook",
+  "storybookStatic": ".design-sync/sb-reference",
+  "buildCmd": "pnpm -F \"@plane/propel...\" build && node .design-sync/gen-entry.mjs",
+  "entry": "packages/propel/dist/index.js",
+  "extraEntries": ["../../.design-sync/process-env-shim.mjs", "@makeplane/propel/icons"],
+  "extraFonts": [
+    "../../apps/web/node_modules/@fontsource-variable/inter/index.css",
+    "../../apps/web/node_modules/@fontsource/ibm-plex-mono/index.css",
+    "../../apps/web/node_modules/@fontsource/material-symbols-rounded/400.css"
+  ],
+  "libOverrides": {
+    "dts.mjs": "propel has subpath-only exports (no root types entry): resolve the .d.ts entry from the dist/index.d.ts barrel gen-entry.mjs writes; and normalise tsdown per-chunk React$N aliases to React in emitted prop types"
+  },
+  "storyImports": {
+    "shim": ["/packages/propel/src/"],
+    "bundle": ["/packages/propel/src/icons/constants"]
+  },
+  "titleMap": {
+    "Compact": "EmptyStateCompact",
+    "Detailed": "EmptyStateDetailed",
+    "EmptyState": null,
+    "Icons": "Icon",
+    "TabNavigation": "TabNavigationList",
+    "Philosophy": null,
+    "Separator": null
+  },
+  "overrides": {
+    "Accordion": {
+      "cardMode": "column"
+    },
+    "CircularBarSpinner": {
+      "cardMode": "column"
+    },
+    "Collapsible": {
+      "cardMode": "column"
+    },
+    "Command": {
+      "cardMode": "column"
+    },
+    "ContextMenu": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "ScrollArea": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    },
+    "Spinner": {
+      "cardMode": "column"
+    },
+    "Switch": {
+      "cardMode": "column"
+    },
+    "TabNavigationList": {
+      "cardMode": "column"
+    },
+    "Tabs": {
+      "cardMode": "column"
+    },
+    "Toast": {
+      "cardMode": "column"
+    },
+    "Toolbar": {
+      "cardMode": "column"
+    },
+    "Icon": {
+      "cardMode": "column"
+    },
+    "ModalPortal": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Dialog": {
+      "cardMode": "single",
+      "primaryStory": "Default",
+      "skip": ["components-dialog--all-widths"]
+    },
+    "Popover": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Menu": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Combobox": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "EmojiPicker": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "EmojiReactionPicker": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    }
+  },
+  "dtsPropsFor": {
+    "Icon": "/** Registry key, \"<family>.<name>\". Keys: \"sub-brand.plane\", \"sub-brand.wiki\", \"sub-brand.pi-chat\", \"workspace.analytics\", \"workspace.archive\", \"workspace.cycle\", \"workspace.dashboard\", \"workspace.draft\", \"workspace.home\", \"workspace.inbox\", \"workspace.multiple-sticky\", \"workspace.page\", \"workspace.project\", \"workspace.views\", \"workspace.your-work\", \"project.cycle\", \"project.epic\", \"project.intake\", \"project.module\", \"project.page\", \"project.view\", \"project.work-items\", \"layout.calendar\", \"layout.card\", \"layout.timeline\", \"layout.grid\", \"layout.board\", \"layout.list\", \"layout.sheet\", \"property.boolean\", \"property.dropdown\", \"property.due-date\", \"property.duplicate\", \"property.estimate\", \"property.hash\", \"property.label\", \"property.members\", \"property.overdue-date\", \"property.parent\", \"property.priority\", \"property.relates-to\", \"property.relation\", \"property.scope\", \"property.start-date\", \"property.state\", \"property.user-circle\", \"property.user\", \"property.user-square\", \"property.workflows\", \"property.label-filled\", \"action.add\", \"action.add-workitem\", \"action.add-reaction\", \"action.check\", \"action.close\", \"action.copy\", \"action.edit\", \"action.globe\", \"action.link\", \"action.lock\", \"action.new-tab\", \"action.filter\", \"action.filter-applied\", \"action.search\", \"action.plus\", \"action.preferences\", \"action.trash\", \"action.copy-link\", \"action.upgrade\", \"arrow.chevron-down\", \"arrow.chevron-left\", \"arrow.chevron-right\", \"arrow.chevron-up\", \"misc.info\", \"arrow.reply\". An unknown key renders the default icon. Individual icons are also named exports (e.g. AddIcon, CheckIcon, SearchIcon). */\nname: string;\n/** Extra classes on the <svg> (size it with size-3 / size-4 etc.). */\nclassName?: string;\nstyle?: React.CSSProperties;\n/** Fill progress for the few icons that support it (0-100). */\npercentage?: number;",
+    "Button": "className?: string;\nid?: string;\nstyle?: React.CSSProperties;\nchildren?: React.ReactNode;\n/** Visual style. */\nvariant?: \"primary\" | \"secondary\" | \"tertiary\" | \"ghost\" | \"link\" | \"error-fill\" | \"error-outline\";\nsize?: \"sm\" | \"base\" | \"lg\" | \"xl\";\n/** Shows a spinner and disables the button. */\nloading?: boolean;\ndisabled?: boolean;\n/** Icon element rendered before the label (e.g. <PlusIcon className=\"size-3\" />). */\nprependIcon?: React.ReactElement<any>;\n/** Icon element rendered after the label. */\nappendIcon?: React.ReactElement<any>;\nonClick?: React.MouseEventHandler<HTMLButtonElement>;\ntype?: \"button\" | \"submit\" | \"reset\";"
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
