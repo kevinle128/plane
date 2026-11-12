@@ -44,7 +44,12 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 ### 1.6 Set the draft pull-request default
 
 - Test first: `test_agent_git_policy.py` -> collection error (`change_request_policy` missing).
-- Green: policy 6 passed; `pytest plane/tests/contract/app -k agent` 99 passed; `makemigrations --check` clean (`0129_agent_git_policy`); web typecheck 10/10; i18n in sync.
+- Green: policy 6 passed; `pytest plane/tests/contract/app -k agent` 98 passed; `makemigrations --check` clean (`0129_agent_git_policy`); web typecheck 10/10; i18n in sync.
+
+### 1.7 Set conclusion mirroring to pull requests
+
+- Test first: 3 new cases; `test_admin_change_persists_and_the_delivery_policy_reads_it` failed (the API ignored `mirror_conclusions`). The default and member-403 cases already held because the model and the permission exist since 1.6.
+- Green: policy 9 passed; `ruff check plane` clean; web typecheck 10/10; i18n in sync.
 
 ## Deviations from the plan
 

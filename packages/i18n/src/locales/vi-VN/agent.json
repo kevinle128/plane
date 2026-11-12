@@ -140,6 +140,12 @@
       "open_as_draft_hint": {
         "pull_request": "Reviewers see the change as a draft until a person marks it ready."
       },
+      "mirror_conclusions": {
+        "pull_request": "Post run conclusions as PR comments"
+      },
+      "mirror_conclusions_hint": {
+        "pull_request": "The conclusion of each run is also posted as a comment on the agent's pull request."
+      },
       "saved": "Setting saved.",
       "save_failed": "The setting was not saved. Try again."
     }

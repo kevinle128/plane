@@ -147,4 +147,4 @@ class AgentGitPolicySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AgentGitPolicy
-        fields = ["open_as_draft"]
+        fields = ["open_as_draft", "mirror_conclusions"]

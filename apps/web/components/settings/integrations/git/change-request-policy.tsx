@@ -95,6 +95,13 @@ export const GitChangeRequestPolicy = observer(function GitChangeRequestPolicy(p
           disabled={disabled}
           onChange={(checked) => void save({ open_as_draft: checked })}
         />
+        <SwitchRow
+          label={t(`agent_git.policy.mirror_conclusions.${term}`)}
+          hint={t(`agent_git.policy.mirror_conclusions_hint.${term}`)}
+          checked={policy.mirror_conclusions}
+          disabled={disabled}
+          onChange={(checked) => void save({ mirror_conclusions: checked })}
+        />
       </ul>
     </section>
   );

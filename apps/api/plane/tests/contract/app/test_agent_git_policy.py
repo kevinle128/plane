@@ -58,3 +58,27 @@ class TestDraftPullRequestDefault:
     @pytest.mark.django_db
     def test_unknown_provider_returns_404(self, session_client, workspace):
         assert session_client.get(policy_url(workspace.slug, provider="gitea")).status_code == 404
+
+
+@pytest.mark.contract
+class TestConclusionMirroring:
+    @pytest.mark.django_db
+    def test_mirroring_is_off_by_default(self, session_client, workspace):
+        assert session_client.get(policy_url(workspace.slug)).data["mirror_conclusions"] is False
+
+    @pytest.mark.django_db
+    def test_admin_change_persists_and_the_delivery_policy_reads_it(self, session_client, workspace):
+        patched = session_client.patch(policy_url(workspace.slug), {"mirror_conclusions": True}, format="json")
+        reloaded = session_client.get(policy_url(workspace.slug))
+
+        assert patched.status_code == status.HTTP_200_OK
+        assert reloaded.data["mirror_conclusions"] is True
+        assert reloaded.data["open_as_draft"] is True
+        assert change_request_policy(workspace.id, "github")["mirror_conclusions"] is True
+
+    @pytest.mark.django_db
+    def test_member_cannot_change(self, session_client, member_client, workspace):
+        response = member_client.patch(policy_url(workspace.slug), {"mirror_conclusions": True}, format="json")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert session_client.get(policy_url(workspace.slug)).data["mirror_conclusions"] is False
