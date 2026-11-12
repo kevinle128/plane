@@ -132,3 +132,16 @@ No browser automation is available in this session, and the check needs the loca
 9. The seam mapping cases (DNS, private IP, timeout, refused, TLS, redirect, body cap, budget, CA file) are in `test_url_security.py` as the plan says, in a new `TestAgentGitHttpSeam` class.
 10. The catalog enqueue after a GitLab connect is part of G2 (the catalog story), so its test is in `test_agent_git_catalog.py`.
 11. A GitLab connect check that is not in the G1 table was needed: an invalid base URL form (http, user info, query, fragment) returns `gitlab_url_invalid`; another base URL while connected returns `gitlab_disconnect_first` (409), following "A different base URL needs Disconnect first".
+12. Host `uv` stays at 0.10.9 (the required version is 0.12.21). Ruff and `makemigrations` ran in the locked test image (ruff 0.9.7), so the host `uv` was not changed.
+13. The API keeps `kind=organization` on device authorizations, but the UI connects an organisation through the App install URL plus "Refresh installations", which the plan allows ("a second device-flow poll or a refresh action").
+14. The generated migrations 0126-0129 have no copyright header. `COPYRIGHT_CHECK.md` and `copyright-check.yml` skip `**/migrations/**`, and `0125` has none either.
+
+## Follow-up commits after G5
+
+- `fb15bc42db` refactor: the install link reads only the App slug, so `GET connections/` no longer decrypts the App client secret. Device flow and installation tests: 49 passed.
+- `315af0db7d` docs: `apps/api/plane/agent/git_providers/README.md` documents the GitHub App setup, the GitLab token requirements and `AGENT_GIT_ALLOWED_HOSTS`/`AGENT_GIT_ALLOWED_IPS` (mitigation in the phase Risks table). Docs impact: minor.
+
+## Left for the orchestrator
+
+- `plan.md` status and the phase file checkboxes were not edited (plan state goes through `ak plan`; the uncommitted `plan.md` change in the worktree is not from this phase).
+- Open ACs owned by later phases: 1.4 AC 2 (Phase 3, 7), 1.8 AC 4 (Phase 7), G4 AC2 change-request path and G5 AC4 (Phase 7).
