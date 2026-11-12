@@ -86,13 +86,15 @@ The user accepted all recommended answers on 2026-11-12.
 - Minimum supported GitLab version: 15.5. Reason: `GET /api/v4/personal_access_tokens/self` was introduced in 15.5, and the connect check needs it for scopes, expiry and active state. All other GitLab APIs in this plan are older (group access tokens 14.7, `Draft:` title prefix 13.2, `members/all/:user_id` 12.4). Sources: [architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace).
 - Provisional (coordinator recommendation, not yet a user decision): a personal access token is accepted with a warning, not rejected. See open question 1.
 
-## Open questions (need the user)
+## GitLab decisions (2026-11-12)
 
-1. Personal GitLab token. The accepted scope says Group Access Token. The only test token now is a personal token of a human user (`bot=false`, scope `api`, no expiry). The plan warns and accepts it (pushes and merge requests then appear as that person, and Q10 has no GitLab equivalent: Plane notices that the person lost access only when GitLab returns 401 or 403). Keep warn, or reject non-bot tokens?
-2. Live write check. The Phase 7 live check (push, draft merge request, merge-request note) needs a Group Access Token with role Developer and scopes `api` and `write_repository` on a test group of git.oceanlabs.dev. Can the user create one and put it in the secret store? Without it, Phase 7 G6/G7 close on recorded responses only, and the live check stays open.
-3. Subgroups. Do the projects on git.oceanlabs.dev sit directly in the token's group or in subgroups? The plan lists group projects with `include_subgroups=true` by default; confirm or choose top level only.
-4. Scope of the `api` token for Git push. GitLab docs list `write_repository` for Git-over-HTTPS push ("not using the API"); the plan requires `api` and `write_repository`. The current test token has `api` only, so the connect check reports `gitlab_scope_missing` for it. This is correct per the docs; confirm that the real token will carry both scopes. Evidence added by the GitLab red-team pass (2026-11-12, no decision made): GitLab source (master) gives an `api` token the `push_code` ability for Git over HTTPS (`lib/gitlab/auth.rb:308-329, 350-352, 475-486`), so `write_repository` is likely not technically needed for push; requiring it is still harmless. The docs scope table (`access_token_scopes.md:41,44`) does not state this.
-5. Connect error detail versus internal-name probing (GitLab red-team pass, 2026-11-12). G1 AC4/AC5 return `gitlab_dns_failed` for a name that does not resolve and `gitlab_url_blocked` for a name that resolves to a private address. Any workspace admin can then test whether an internal host name exists (for example `db.internal`). The webhook form avoids this on purpose: both cases give one message, "Invalid or disallowed webhook URL." (`apps/api/plane/app/serializers/webhook.py:37`). Scope item 4 asks for a clear connection-failed reason. Options: (a) keep two codes (clear reason, small name oracle); (b) one code `gitlab_url_not_allowed_or_unresolved` for both, other codes unchanged; (c) two codes for instance admins only. The plan keeps (a) until the user decides.
+The user accepted the recommended answers on 2026-11-12. The answer came through a Paseo agent message that relayed the user's choice.
+
+11. Q11, personal GitLab token: warn and accept. The connect screen says that pushes and merge requests appear as that person.
+12. Q12, live write check: the user creates a Group Access Token (role Developer, scopes `api` and `write_repository`) on a test group before Phase 7. Phase 7 stops and asks for it before its live write check.
+13. Q13, subgroups: the repository catalog includes subgroup projects (`include_subgroups=true`).
+14. Q14, token scopes: the connect check requires both `api` and `write_repository`. The current test token has `api` only, so it is used only for read-only checks.
+15. Q15, connect error detail: one code `gitlab_url_not_allowed_or_unresolved` for a name that does not resolve and for a blocked address. The other connect codes stay unchanged.
 
 ## Red Team Review
 
