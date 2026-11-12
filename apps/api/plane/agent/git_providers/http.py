@@ -8,8 +8,8 @@ Every GitHub and GitLab request goes through :func:`request`. It uses
 ``pinned_fetch`` (resolve once, validate, pin the IP, no redirects, no proxy)
 with the operator allowlists ``AGENT_GIT_ALLOWED_HOSTS`` and
 ``AGENT_GIT_ALLOWED_IPS``, caps the response body, enforces per-call
-timeouts and an optional total deadline, and maps transport failures to
-fixed reason codes of the form ``<provider>_<reason>``. A connection CA
+timeouts and a total deadline that also bounds the body read, and maps
+transport failures to fixed reason codes of the form ``<provider>_<reason>``. A connection CA
 bundle is written to a private file and passed as ``verify`` for that
 request only; every other request keeps system trust. Tests replace
 :func:`request` and nothing else.
@@ -23,6 +23,7 @@ import hashlib
 import json
 import logging
 import os
+import socket
 import stat
 import tempfile
 import time
@@ -31,6 +32,7 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 # Third party imports
 import requests
+import urllib3
 from django.conf import settings
 
 # Module imports
@@ -41,6 +43,8 @@ logger = logging.getLogger("plane.agent.git_providers.http")
 
 CONNECT_TIMEOUT_SECONDS = 5
 READ_TIMEOUT_SECONDS = 10
+# Total time for one call that has no shared deadline, body read included.
+CALL_BUDGET_SECONDS = 30
 MAX_RESPONSE_BYTES = 1024 * 1024
 _CHUNK_BYTES = 64 * 1024
 
@@ -62,7 +66,8 @@ class HttpResponse:
         """Return the decoded JSON body, or ``None`` when the body is not JSON."""
         try:
             return json.loads(self.content.decode("utf-8"))
-        except (UnicodeDecodeError, ValueError):
+        except (UnicodeDecodeError, ValueError, RecursionError):
+            # A deeply nested body from a hostile server raises RecursionError.
             return None
 
 
@@ -104,14 +109,20 @@ def ca_bundle_path(pem):
     return path
 
 
-def _timeouts(provider, deadline):
-    timeout = (CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS)
-    if deadline is None:
-        return timeout
+def _timeout_error(provider):
+    return ProviderError(f"{provider}_url_unreachable", provider, "timeout", http_status=502)
+
+
+def _remaining(provider, deadline):
     remaining = deadline - time.monotonic()
     if remaining <= 0:
-        raise ProviderError(f"{provider}_url_unreachable", provider, "timeout", http_status=502)
-    return (min(timeout[0], remaining), min(timeout[1], remaining))
+        raise _timeout_error(provider)
+    return remaining
+
+
+def _timeouts(provider, deadline):
+    remaining = _remaining(provider, deadline)
+    return (min(CONNECT_TIMEOUT_SECONDS, remaining), min(READ_TIMEOUT_SECONDS, remaining))
 
 
 def _redacted_target(url):
@@ -124,15 +135,34 @@ def _redirect_origin(url, location):
     return f"{target.scheme}://{target.hostname}" if target.hostname else ""
 
 
-def _read_capped(response, provider, max_bytes):
+def _limit_socket_wait(raw, seconds):
+    """Make the next socket read wait at most ``seconds``."""
+    sock = getattr(getattr(raw, "connection", None), "sock", None)
+    if sock is not None:
+        sock.settimeout(seconds)
+
+
+def _read_capped(response, provider, max_bytes, deadline):
+    """Read the body with a size cap and stop when ``deadline`` passes.
+
+    ``read1`` makes at most one socket read, so the deadline is checked
+    between reads even when a server sends one byte at a time. A buffered
+    read (``iter_content``) would wait for a full chunk and skip the check.
+    The body is read without decoding: ``request`` asks for ``identity`` and
+    refuses an encoded body, because decoding can join many reads into one.
+    """
+    raw = response.raw
     chunks = []
     total = 0
-    for chunk in response.iter_content(chunk_size=_CHUNK_BYTES):
+    while True:
+        _limit_socket_wait(raw, min(READ_TIMEOUT_SECONDS, _remaining(provider, deadline)))
+        chunk = raw.read1(_CHUNK_BYTES, decode_content=False)
+        if not chunk:
+            return b"".join(chunks)
         total += len(chunk)
         if total > max_bytes:
             raise ProviderError(f"{provider}_unexpected_response", provider, "response_too_large", http_status=502)
         chunks.append(chunk)
-    return b"".join(chunks)
 
 
 def request(
@@ -151,12 +181,17 @@ def request(
 ):
     """Send one provider request and return an :class:`HttpResponse`.
 
-    Raises :class:`ProviderError` for transport failures, a redirect, or a
-    body larger than ``max_bytes``. HTTP error statuses are returned, not
-    raised, so each caller maps them to its own reason codes.
+    Raises :class:`ProviderError` for transport failures, a redirect, an
+    encoded body, or a body larger than ``max_bytes``. A call without a
+    shared ``deadline`` gets its own budget of ``CALL_BUDGET_SECONDS``. HTTP
+    error statuses are returned, not raised, so each caller maps them to its
+    own reason codes.
     """
+    if deadline is None:
+        deadline = new_deadline(CALL_BUDGET_SECONDS)
     timeout = _timeouts(provider, deadline)
     target = f"{url}?{urlencode(params)}" if params else url
+    headers = {**(headers or {}), "Accept-Encoding": "identity"}
     extra = {}
     if data is not None:
         extra["data"] = data
@@ -195,12 +230,15 @@ def request(
             origin = _redirect_origin(url, response.headers.get("Location"))
             logger.warning("provider redirect refused: %s %s -> %s", method, _redacted_target(url), origin)
             raise ProviderError(f"{provider}_url_redirected", provider, origin, http_status=502)
-        content = _read_capped(response, provider, max_bytes)
+        if (response.headers.get("Content-Encoding") or "identity").strip().lower() != "identity":
+            raise ProviderError(f"{provider}_unexpected_response", provider, "content_encoding", http_status=502)
         # pinned_fetch tries each resolved address with the full timeout, so the
-        # shared budget is checked again after the call returns.
-        if deadline is not None and time.monotonic() > deadline:
-            raise ProviderError(f"{provider}_url_unreachable", provider, "timeout", http_status=502)
-    except requests.exceptions.RequestException:
+        # budget is checked again before and during the body read.
+        content = _read_capped(response, provider, max_bytes, deadline)
+    except (requests.exceptions.Timeout, urllib3.exceptions.TimeoutError, socket.timeout):
+        logger.warning("provider body read timeout: %s %s", method, _redacted_target(url))
+        raise _timeout_error(provider)
+    except (requests.exceptions.RequestException, urllib3.exceptions.HTTPError, OSError):
         raise ProviderError(f"{provider}_url_unreachable", provider, "connection", http_status=502)
     finally:
         response.close()

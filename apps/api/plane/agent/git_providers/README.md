@@ -38,5 +38,6 @@ AGENT_GIT_ALLOWED_HOSTS="gitlab.internal.example"
 AGENT_GIT_ALLOWED_IPS="10.20.0.0/16"
 ```
 
-A workspace admin cannot change these values. The Plane host itself and the domains in
-`WEBHOOK_DISALLOWED_DOMAINS` are always refused.
+A workspace admin cannot change these values. The Plane host itself is always refused, also when it is
+listed in `AGENT_GIT_ALLOWED_HOSTS`. The domains in `WEBHOOK_DISALLOWED_DOMAINS` are refused unless the
+host is listed in `AGENT_GIT_ALLOWED_HOSTS`.

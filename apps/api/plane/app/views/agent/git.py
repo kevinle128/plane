@@ -194,7 +194,18 @@ class AgentGithubAccountsSyncEndpoint(BaseAPIView):
 class AgentGitAccountAttachEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def post(self, request, slug, provider, pk):
+        """Attach one GitHub installation to the workspace.
+
+        A GitLab connection has one group per token, chosen on connect, so a
+        GitLab group is never attached here: an old group attached with a new
+        token would read that group with a token that was not made for it.
+        """
         require_provider(provider)
+        if provider != AgentGitProvider.GITHUB:
+            return Response(
+                {"error": "account_attach_not_supported", "provider": provider, "detail": "connect"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         with transaction.atomic():
             account = AgentGitAccount.objects.select_for_update().get(pk=pk, workspace__slug=slug, provider=provider)
             account.state = AgentGitAccountState.ATTACHED

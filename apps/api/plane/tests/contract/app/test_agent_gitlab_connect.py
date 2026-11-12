@@ -391,6 +391,30 @@ class TestGitlabConnectFailures:
         assert fake_http.calls == []
 
     @pytest.mark.django_db
+    def test_plane_request_host_is_refused_even_when_allowlisted(
+        self, session_client, workspace, fake_http, mock_celery, settings
+    ):
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["testserver"]
+
+        response = connect(session_client, workspace.slug, base_url="https://testserver")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["error"] == "gitlab_url_not_allowed_or_unresolved"
+        assert fake_http.calls == []
+
+    @pytest.mark.django_db
+    def test_allowlisted_host_skips_the_disallowed_domains(
+        self, session_client, workspace, fake_http, mock_celery, settings
+    ):
+        settings.WEBHOOK_DISALLOWED_DOMAINS = ["example.com"]
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["git.example.com"]
+        add_gitlab_connect_routes(fake_http)
+
+        response = connect(session_client, workspace.slug)
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+
+    @pytest.mark.django_db
     def test_disallowed_domain_is_refused_without_a_call(
         self, session_client, workspace, fake_http, mock_celery, settings
     ):
@@ -503,6 +527,32 @@ class TestGitlabReconnect:
 
         binding = ProjectRepositoryBinding.objects.get(project_id=created.data["id"])
         assert binding_availability(binding) == {"available": False, "reason": "repository_unavailable"}
+
+    @pytest.mark.django_db
+    def test_old_group_cannot_be_attached_again_with_the_new_token(
+        self, session_client, workspace, fake_http, mock_celery
+    ):
+        add_gitlab_connect_routes(fake_http)
+        connect(session_client, workspace.slug)
+        connection = AgentGitConnection.objects.get(workspace=workspace, provider="gitlab")
+        old_group = AgentGitAccount.objects.get(connection=connection)
+        add_gitlab_connect_routes(
+            fake_http,
+            group=json_response(200, {**gitlab_fixture("group.json"), "id": 20, "full_path": "data"}),
+            group_path="data",
+        )
+        assert connect(session_client, workspace.slug, group_path="data").status_code == status.HTTP_201_CREATED
+        mock_celery.reset_mock()
+
+        response = session_client.post(
+            f"/api/workspaces/{workspace.slug}/agent-git/gitlab/accounts/{old_group.id}/attach/", {}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data == {"error": "account_attach_not_supported", "provider": "gitlab", "detail": "connect"}
+        states = dict(AgentGitAccount.objects.filter(connection=connection).values_list("login", "state"))
+        assert states == {"platform": "detached", "data": "attached"}
+        mock_celery.assert_not_called()
 
     @pytest.mark.django_db
     def test_another_base_url_needs_disconnect_first(self, session_client, workspace, fake_http, mock_celery):

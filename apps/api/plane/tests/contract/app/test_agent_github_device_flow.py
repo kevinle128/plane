@@ -14,7 +14,7 @@ from rest_framework import status
 
 from plane.agent.git_providers.base import ProviderError
 from plane.agent.services import github_connection
-from plane.db.models import AgentGitConnection, AgentGithubDeviceAuthorization, WorkspaceMember
+from plane.db.models import AgentGitAccount, AgentGitConnection, AgentGithubDeviceAuthorization, WorkspaceMember
 from plane.license.models import InstanceConfiguration
 from plane.license.utils.encryption import decrypt_data, encrypt_data
 from plane.tests.agent_git_fixtures import (
@@ -28,7 +28,10 @@ from plane.tests.agent_git_fixtures import (
     device_authorization_url,
     expire_connection_token,
     github_device_code_response,
+    accounts_url,
     github_error_response,
+    github_installation,
+    github_installations_response,
     github_token_response,
     github_user_response,
     make_workspace_user,
@@ -517,6 +520,72 @@ class TestConnectingAdminLeaves:
         assert connection.last_error == ""
         assert connection.connected_by_id == second_admin.id
         assert AgentGitConnection.objects.filter(workspace=workspace, provider="github").count() == 1
+
+
+def reconnect_as(client, slug, fake, login, user_id, *installations):
+    """Run the device flow again where GitHub identifies the token as ``login``."""
+    add_github_connect_routes(fake)
+    fake.add("POST", "github.com/login/device/code", github_device_code_response(interval=0))
+    fake.add("GET", "api.github.com/user", github_user_response(login=login, user_id=user_id))
+    fake.add("GET", "api.github.com/user/installations", github_installations_response(*installations))
+    auth_id = start(client, slug).data["id"]
+    return poll(client, slug, auth_id)
+
+
+@pytest.mark.contract
+class TestReconnectAsAnotherGithubUser:
+    def _attached(self, session_client, workspace, fake_http, mock_celery):
+        connect_github(session_client, workspace.slug, fake_http, installations=[github_installation(111, "acme")])
+        account = AgentGitAccount.objects.get(workspace=workspace, external_id="111")
+        attached = session_client.post(
+            accounts_url(workspace.slug, account_id=account.id, action="attach"), {}, format="json"
+        )
+        assert attached.data["state"] == "attached"
+        return account
+
+    @pytest.mark.django_db
+    def test_installations_of_the_previous_github_user_become_candidates(
+        self, session_client, workspace, fake_http, github_app_env, mock_celery
+    ):
+        account = self._attached(session_client, workspace, fake_http, mock_celery)
+        second_admin = client_for_user(make_workspace_user(workspace, 20))
+
+        response = reconnect_as(
+            second_admin, workspace.slug, fake_http, "second-admin", 202, github_installation(222, "beta")
+        )
+
+        assert response.data["status"] == "completed", response.data
+        connection = AgentGitConnection.objects.get(workspace=workspace, provider="github")
+        assert (connection.account_login, connection.account_external_id) == ("second-admin", "202")
+        account.refresh_from_db()
+        assert account.state == "candidate"
+        assert AgentGitAccount.objects.get(workspace=workspace, external_id="222").state == "candidate"
+
+    @pytest.mark.django_db
+    def test_reconnect_as_the_same_github_user_keeps_installations_attached(
+        self, session_client, workspace, fake_http, github_app_env, mock_celery
+    ):
+        account = self._attached(session_client, workspace, fake_http, mock_celery)
+
+        response = reconnect_as(
+            session_client, workspace.slug, fake_http, "octo-admin", 101, github_installation(111, "acme")
+        )
+
+        assert response.data["status"] == "completed", response.data
+        account.refresh_from_db()
+        assert account.state == "attached"
+
+    @pytest.mark.django_db
+    def test_detached_installation_stays_detached_after_reconnect_as_another_user(
+        self, session_client, workspace, fake_http, github_app_env, mock_celery
+    ):
+        account = self._attached(session_client, workspace, fake_http, mock_celery)
+        session_client.delete(accounts_url(workspace.slug, account_id=account.id))
+
+        reconnect_as(session_client, workspace.slug, fake_http, "second-admin", 202, github_installation(111, "acme"))
+
+        account.refresh_from_db()
+        assert account.state == "detached"
 
 
 @pytest.mark.contract

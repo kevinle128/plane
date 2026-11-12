@@ -248,10 +248,13 @@ def _store_connection(workspace, user, token_body):
     connection = AgentGitConnection.objects.select_for_update().filter(
         workspace=workspace, provider=PROVIDER
     ).first() or AgentGitConnection(workspace=workspace, provider=PROVIDER)
+    external_id = str(identity.get("id") or "")
+    if connection.pk and connection.account_external_id and connection.account_external_id != external_id:
+        _release_attached_installations(connection)
     _apply_token_body(connection, token_body)
     connection.base_url = GITHUB_BASE_URL
     connection.host = GITHUB_HOST
-    connection.account_external_id = str(identity.get("id") or "")
+    connection.account_external_id = external_id
     connection.account_login = str(identity["login"])[:255]
     connection.account_is_bot = False
     connection.token_scopes = [scope for scope in str(token_body.get("scope") or "").split(",") if scope]
@@ -263,6 +266,19 @@ def _store_connection(workspace, user, token_body):
     connection.save()
     logger.info("github connection %s connected for workspace %s", connection.id, workspace.id)
     return connection
+
+
+def _release_attached_installations(connection):
+    """Set the attached installations back to ``candidate`` when another GitHub user connects.
+
+    An attachment is backed by what the connecting token can see. The new
+    token may not see the old installations, so an admin attaches again
+    explicitly; sync never does it. Detached installations stay detached.
+    """
+    released = AgentGitAccount.objects.filter(connection=connection, state=AgentGitAccountState.ATTACHED).update(
+        state=AgentGitAccountState.CANDIDATE, updated_at=timezone.now()
+    )
+    logger.info("github connection %s changed GitHub user: %s installations set to candidate", connection.id, released)
 
 
 # Installations

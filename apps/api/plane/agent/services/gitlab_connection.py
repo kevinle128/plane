@@ -89,14 +89,22 @@ def normalize_base_url(raw):
     return f"https://{netloc}{parts.path.rstrip('/')}", host
 
 
+def _matches(host, domain):
+    return host == domain or host.endswith(f".{domain}")
+
+
 def _check_host_allowed(host, request_host):
-    """Refuse the Plane host itself and operator-disallowed domains, as webhooks do."""
+    """Refuse the Plane host itself always, and operator-disallowed domains unless allowlisted.
+
+    ``AGENT_GIT_ALLOWED_HOSTS`` lifts ``WEBHOOK_DISALLOWED_DOMAINS`` only; it
+    never lets a workspace point the connection back at Plane.
+    """
+    plane_host = (request_host or "").split(":")[0].rstrip(".").lower()
+    if plane_host and _matches(host, plane_host):
+        raise _error("gitlab_url_not_allowed_or_unresolved")
     if host in settings.AGENT_GIT_ALLOWED_HOSTS:
         return
-    disallowed = list(settings.WEBHOOK_DISALLOWED_DOMAINS)
-    if request_host:
-        disallowed.append(request_host.split(":")[0].rstrip(".").lower())
-    if any(host == domain or host.endswith(f".{domain}") for domain in disallowed):
+    if any(_matches(host, domain) for domain in settings.WEBHOOK_DISALLOWED_DOMAINS):
         raise _error("gitlab_url_not_allowed_or_unresolved")
 
 

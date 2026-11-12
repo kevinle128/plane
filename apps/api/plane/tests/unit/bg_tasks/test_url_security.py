@@ -440,8 +440,54 @@ def _streamed(status_code=200, headers=None, chunks=(b"{}",)):
     response = MagicMock()
     response.status_code = status_code
     response.headers = headers or {"Content-Type": "application/json"}
-    response.iter_content.return_value = iter(chunks)
+    pending = list(chunks)
+    response.raw.read1.side_effect = lambda *args, **kwargs: pending.pop(0) if pending else b""
     return response
+
+
+class _DrippingServer:
+    """A local HTTP server that sends the headers, then one body byte per ``interval`` seconds."""
+
+    def __init__(self, interval, body_length):
+        import socket
+        import threading
+
+        self.interval = interval
+        self.body_length = body_length
+        self._stop = threading.Event()
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.bind(("127.0.0.1", 0))
+        self._socket.listen(1)
+        self.port = self._socket.getsockname()[1]
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+
+    def _serve(self):
+        try:
+            connection, _ = self._socket.accept()
+        except OSError:
+            return
+        with connection:
+            try:
+                connection.recv(65536)
+                connection.sendall(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                    + f"Content-Length: {self.body_length}\r\n\r\n".encode()
+                )
+                for _ in range(self.body_length):
+                    if self._stop.wait(self.interval):
+                        return
+                    connection.sendall(b" ")
+            except OSError:
+                return
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._socket.close()
+        self._thread.join(timeout=5)
 
 
 @pytest.mark.unit
@@ -533,6 +579,50 @@ class TestAgentGitHttpSeam:
                 self._request(deadline=130.0)
 
         assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+
+    @pytest.mark.parametrize("use_shared_deadline", [True, False], ids=["shared-deadline", "own-call-budget"])
+    def test_slowly_dripping_body_stops_at_the_budget(self, settings, monkeypatch, use_shared_deadline):
+        import time
+
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["127.0.0.1"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        budget = 1.0
+        monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
+        # Each byte arrives well inside the read timeout, and the whole body needs about 4 s.
+        with _DrippingServer(interval=0.1, body_length=40) as server:
+            started = time.monotonic()
+            with pytest.raises(ProviderError) as raised:
+                http.request(
+                    "GET",
+                    f"http://127.0.0.1:{server.port}/api/v4/version",
+                    provider="gitlab",
+                    deadline=http.new_deadline(budget) if use_shared_deadline else None,
+                )
+            elapsed = time.monotonic() - started
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        assert elapsed < budget + 0.5
+
+    def test_identity_encoding_is_requested_and_an_encoded_body_is_refused(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        response = _streamed(headers={"Content-Type": "application/json", "Content-Encoding": "gzip"})
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response) as fetch:
+            with pytest.raises(ProviderError) as raised:
+                self._request(headers={"Accept": "application/json"})
+
+        assert fetch.call_args.kwargs["headers"]["Accept-Encoding"] == "identity"
+        assert fetch.call_args.kwargs["headers"]["Accept"] == "application/json"
+        assert (raised.value.code, raised.value.detail) == ("gitlab_unexpected_response", "content_encoding")
+        response.close.assert_called_once()
+
+    def test_deeply_nested_json_is_not_json(self):
+        from plane.agent.git_providers.http import HttpResponse
+
+        assert HttpResponse(status_code=200, content=b"[" * 100000 + b"]" * 100000).json() is None
 
     def test_timeouts_never_exceed_the_remaining_budget(self):
         response = _streamed()
