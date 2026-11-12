@@ -21,7 +21,7 @@ An administrator sees four Harness cards, configures each workspace Agent (name,
 
 ## Dependency rationale
 
-Phase 1 must merge first. Both phases change `apps/web/app/routes/core.ts`, `packages/constants/src/settings/workspace.ts`, the Integrations index page and `packages/blocks/package.json`. The Integrations index shows GitHub (Phase 1) above the Harness group (this phase).
+Phase 1 must merge first. Both phases change `apps/web/app/routes/core.ts`, `packages/constants/src/settings/workspace.ts`, the Integrations index page and `packages/blocks/package.json`. The Integrations index shows the Git providers GitHub and GitLab (Phase 1) above the Harness group (this phase).
 
 ## Key decisions
 

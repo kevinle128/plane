@@ -6,7 +6,7 @@ Every `file:line` below was read in this worktree on 2026-11-12.
 
 ## 1. Authority
 
-- Acceptance authority: [epics.md](../2026-09-28-plane-local-cli-agents-epics/epics.md) (43 stories).
+- Acceptance authority: [epics.md](../2026-09-28-plane-local-cli-agents-epics/epics.md) (43 stories) and the plan-level GitLab stories G1-G7 ([Phase 1](./phase-01-github-connection-and-repository.md#gitlab-stories-and-acceptance-criteria), [Phase 7](./phase-07-code-jobs-and-draft-pr.md#gitlab-stories-and-acceptance-criteria)) under [gitlab-scope-decisions.md](./gitlab-scope-decisions.md).
 - Governing documents: [PRD](../2026-09-27-local-cli-agents-prd/prd.md), [Architecture Spine](../2026-09-27-local-cli-agents-architecture/ARCHITECTURE-SPINE.md) AD-1..AD-11, [design handoff](../../claude-design/design_handoff_local_cli_agents/README.md).
 - The PRD and Spine govern when the older SPEC or the prototype differs (epics.md:28).
 - Mockup coverage: 65 `CHANGE_FEATURE` rows in [mockup inventory](../reports/mockup-inventory-260928-0020-local-cli-agents.json). Each phase lists its rows.
@@ -22,7 +22,7 @@ Every `file:line` below was read in this worktree on 2026-11-12.
 | Browser e2e | Ad hoc `.mjs` browser scripts | No Playwright config in the repo | Browser acceptance is recorded evidence, not a committed suite (decision Q5: Vitest for UI logic plus a manual browser check script per phase) |
 | Migrations | Up to `0144_agent_run_questions` | Latest is `apps/api/plane/db/migrations/0125_reset_project_deploy_board_identity.py`; lockfile `apps/api/migrations_lockfile.txt` lists `db: 0125_...` | First new migration is `0126_*`. Generate with `makemigrations`; never edit the lockfile |
 | Integrations page | Existing GitHub/Slack page to extend | `app/(all)/[workspaceSlug]/(settings)/settings/(workspace)/integrations/page.tsx` exists but has no route in `apps/web/app/routes/core.ts:258-285` and no entry in `packages/constants/src/settings/workspace.ts:29-81`. It returns `NotAuthorizedView` for non-admins (`page.tsx:39`) and calls a backend list with no URL in `plane/app/urls/` | Phase 1 routes and rewrites this page. Members get read access; admins get write access |
-| Legacy GitHub models | Reuse `plane/db/models/integration/github.py` | `GithubRepository*` models have no consumer outside the model package; credentials sit in a plain JSONField | Add new agent-owned models. Do not touch the legacy models |
+| Legacy GitHub models | Reuse `plane/db/models/integration/github.py` | `GithubRepository*` models have no consumer outside the model package; credentials sit in a plain JSONField | Add new provider-neutral agent-owned models (§3). Do not touch the legacy models |
 | Trigram search | `pg_trgm` GIN index on the catalog | No `pg_trgm` or `GinIndex` in current code | Use B-tree indexes and `icontains`; measure before adding an extension |
 | Comment create | Assumed atomic | `IssueCommentViewSet.create` (`plane/app/views/issue/comment.py:94-145`) has no `transaction.atomic`; `ATOMIC_REQUESTS` and Celery eager mode are not set in `plane/settings/` | Phase 3 saves the comment and its Runs inside one `transaction.atomic` block and keeps both `.delay` calls after the block, as today. The Worker polls, so no new dispatch is needed |
 | Mention parsing | Not analysed | `notification_task.py:123,137` filter `entity_name="user_mention"`; `email_notification_task.py:130-138` (`process_mention`) treats every `mention-component` as a user | Phase 3 adds an `entity_name` filter to `process_mention` before agent mentions exist |
@@ -33,10 +33,10 @@ Every `file:line` below was read in this worktree on 2026-11-12.
 | Panel width store | Not analysed | `useLocalStorage` (`apps/web/hooks/use-local-storage.tsx:31-64`) is per browser | Key panel and disclosure preferences by user ID |
 | i18n | Not analysed | `packages/i18n/package.json:19-20` has `sync:check` and `check:sync` only; no fill script | Each UI story adds keys to every locale with the `translate` skill |
 | API CI | Not analysed | `pull-request-build-lint-api.yml:43-48` runs ruff only on `apps/api` | A new `apps/agent-worker` gets no CI unless added (decision Q6: add an `apps/agent-worker` CI job) |
-| Encryption | Not analysed | `encrypt_data`/`decrypt_data` (`plane/license/utils/encryption.py:20,34`) use Fernet from `SECRET_KEY` | Use them for GitHub tokens and device codes |
+| Encryption | Not analysed | `encrypt_data`/`decrypt_data` (`plane/license/utils/encryption.py:20,34`) use Fernet from `SECRET_KEY`; both return `""` on any error | Use them for GitHub and GitLab tokens and device codes; check for an empty result (red-team F5) |
 | Instance config | Not analysed | `get_configuration_value` (`plane/license/utils/instance_value.py:17-39`); GitHub login keys at `plane/utils/instance_config_variables/core.py:73` | Add GitHub App keys beside them (decision Q3) |
-| Safe HTTP | Not analysed | `pinned_fetch` (`plane/utils/url_security.py`, used at `bgtasks/webhook_task.py:55,317`) | GitHub host is fixed; the GitHub client uses `requests` with timeouts. No new HTTP library |
-| Celery | Beat scan for stale | `beat_schedule` in `plane/celery.py:46-101` with `DatabaseScheduler` (`:124`) | Derive Stale at read time from lease expiry. Use Celery only for catalog refresh and PR comment mirroring |
+| Safe HTTP | Not analysed | `pinned_fetch` (`plane/utils/url_security.py:198`, used at `bgtasks/webhook_task.py:55,317`) pins the resolved IP, follows no redirect, ignores proxies, and hard-codes `verify=True` in `_request_to_ip` (`:133`) | All provider HTTP (GitHub and the admin-supplied GitLab URL) goes through one seam on `pinned_fetch`. Phase 1 adds a `verify` parameter (default `True`) for the GitLab CA bundle and an operator allowlist `AGENT_GIT_ALLOWED_HOSTS`/`AGENT_GIT_ALLOWED_IPS`. No new HTTP library |
+| Celery | Beat scan for stale | `beat_schedule` in `plane/celery.py:46-101` with `DatabaseScheduler` (`:124`) | Derive Stale at read time from lease expiry. Use Celery only for catalog refresh and change-request comment mirroring |
 | Test markers | Not analysed | `apps/api/pytest.ini` uses `--strict-markers --reuse-db --nomigrations` | Register any new marker. Use `--create-db` after a model change in a reused local database Concurrency tests (row locks, `IntegrityError` races) use `@pytest.mark.django_db(transaction=True)` and real threads; inside the default per-test transaction they prove nothing <!-- red-team 2026-11-12 --> |
 
 ## 3. Data model (Plane API, PostgreSQL)
@@ -45,33 +45,34 @@ Plane API is the only writer of Run state (AD-1). All new models extend the exis
 
 | Model (file) | Owner phase | Key fields and constraints |
 | --- | --- | --- |
-| `AgentGithubConnection` (`agent_github.py`) | 1 | workspace 1:1, `github_user_id`, `github_login`, encrypted access and refresh tokens, `token_expires_at`, `connected_by`, `status` (`connected`/`disconnected`), `last_error` |
-| `AgentGithubDeviceAuthorization` | 1 | workspace, encrypted `device_code`, `user_code`, `verification_uri`, `expires_at`, `interval`, `status` (`pending`/`completed`/`cancelled`/`expired`/`denied`), `kind` (`user`/`organization`) |
-| `AgentGithubInstallation` | 1 | workspace, `installation_id`, `account_login`, `account_type`, `repository_selection`, `removed_at`; unique active (workspace, installation_id) |
-| `AgentGithubRepository` | 1 | installation FK, `github_repository_id`, `full_name`, `owner_login`, `private`, `default_branch`, `clone_url`; index (workspace, owner_login, full_name) |
-| `ProjectRepositoryBinding` | 1 | project 1:1, workspace, `github_repository_id`, `full_name`, `clone_url`, `base_ref`, installation FK (nullable, `SET_NULL`); unique (workspace, github_repository_id) where not deleted. Availability is derived from a live grant |
-| `AgentGithubPolicy` | 1 | workspace 1:1, `open_as_draft` (default true), `mirror_conclusions` (default false), `branch_format` enum (`issue` default, `project_issue`) |
+| `AgentGitConnection` (`agent_git.py`) | 1 | workspace, `provider` (`github`/`gitlab`), unique (workspace, provider) where not deleted; `base_url` (GitHub fixed `https://github.com`; GitLab per workspace, `https` only), `host` (normalized from `base_url`), `ca_bundle` (text, GitLab only, nullable), `account_external_id`, `account_login`, `account_is_bot`, encrypted `access_token`, encrypted `refresh_token` (GitHub only), `token_expires_at`, `token_name`, `token_scopes` JSON, `server_version` (GitLab), `connected_by`, `status` (`connected`/`disconnected`/`reconnect_required`), `last_error`, `warnings` JSON (for example `gitlab_token_not_bot`), `worker_last_error`, `worker_checked_at` (written in Phase 3) |
+| `AgentGithubDeviceAuthorization` | 1 | GitHub only. workspace, encrypted `device_code`, `user_code`, `verification_uri`, `expires_at`, `interval`, `status` (`pending`/`completed`/`cancelled`/`expired`/`denied`), `kind` (`user`/`organization`) |
+| `AgentGitAccount` | 1 | connection FK, workspace, `provider`, `external_id` (GitHub installation ID or GitLab group ID), `login` (organization login or group full path), `account_type`, `repository_selection` (GitHub), `state` (`candidate`/`attached`/`detached`, decision Q9), `attached_by`, `attached_at`, `removed_at`; unique (connection, external_id) |
+| `AgentGitRepository` | 1 | account FK, workspace, `provider`, `external_id` (GitHub repository ID or GitLab project ID), `full_name`, `owner_login`, `private`, `default_branch`, `clone_url` (host must equal the connection host), `web_url`; unique (account, external_id); index (workspace, owner_login, full_name) |
+| `ProjectRepositoryBinding` | 1 | project 1:1, workspace, `provider`, `host`, `external_repository_id`, `full_name`, `clone_url`, `web_url`, `default_branch`, `base_ref`, account FK (nullable, `SET_NULL`); unique (workspace, provider, host, external_repository_id) where not deleted. Availability is derived: account `attached`, connection `connected`, binding host equals connection host |
+| `AgentGitPolicy` | 1 | workspace, `provider`, unique (workspace, provider); `open_as_draft` (default true), `mirror_conclusions` (default false), `branch_format` enum (`issue` default, `project_issue`) |
 | `Agent` (`agent.py`) | 2 | workspace, `harness` enum (`claude_code`, `codex`, `grok`, `omp`) unique per workspace, `name`, `handle` unique per workspace case-insensitive, `instructions`, `mentionable`, `selected_model`, `bot_user` FK (`is_bot=True`, `bot_type="AGENT"`) |
 | `AgentConnection` | 2 | agent 1:1, `state` (`not_connected`/`connecting`/`connected`/`failed`), `probe_generation`, `probe_requested_at`, `harness_version`, `location`, `models` JSON, `capabilities` JSON (versioned report), `missing_action`, `failure_hint`, `verified_at` |
 | `AgentWorker` | 2 | `name`, SHA-256 `token_hash`, `last_seen_at`, `revoked_at`. Token is created by a management command and stored only on the Mini |
-| `AgentRun` | 3 | workspace, project, issue, agent, requester, `trigger_comment` (unique with agent), `short_id`, `kind` (`qa`/`code`), `status` (`created`, `in_progress`, `awaiting`, `approval`, `completed`, `failed`, `stopped`; Stale is derived), repository snapshot, `model`, `instructions_snapshot`, `clone_path`, `worktree_path`, `active_workspace`, `branch_name` (unique, nullable), lease fields (`lease_generation`, `lease_worker`, `lease_expires_at`), `last_progress_at`, `next_event_seq`, stop and fail actor/time/reason, `conclusion_comment` FK |
+| `AgentRun` | 3 | workspace, project, issue, agent, requester, `trigger_comment` (unique with agent), `short_id`, `kind` (`qa`/`code`), `status` (`created`, `in_progress`, `awaiting`, `approval`, `completed`, `failed`, `stopped`; Stale is derived), repository snapshot (`provider`, `host`, `external_repository_id`, `full_name`, `clone_url`, `default_branch`, `base_ref`), policy snapshot (`open_as_draft`, `mirror_conclusions`, `branch_format` of the binding's provider), `model`, `instructions_snapshot`, `clone_path`, `worktree_path`, `active_workspace`, `branch_name` (unique, nullable), lease fields (`lease_generation`, `lease_worker`, `lease_expires_at`), `last_progress_at`, `next_event_seq`, stop and fail actor/time/reason, `conclusion_comment` FK |
 | `AgentRunContextSnapshot` | 3 | run, `version`, `payload` JSON, `omitted_comment_count` |
 | `AgentRunTurn` | 3 | run, `index`, `status`, `lease_generation`, `started_at`, `ended_at`, `driver_session_ref` |
-| `AgentRunEvent` | 3 | run, `seq` unique per run, `source_key` unique per run, `turn`, `kind` (message, thought, tool_call, tool_result, plan, question, permission, error, pr, status, conclusion), `payload` JSON; index (run, seq) |
+| `AgentRunEvent` | 3 | run, `seq` unique per run, `source_key` unique per run, `turn`, `kind` (message, thought, tool_call, tool_result, plan, question, permission, error, change_request, status, conclusion), `payload` JSON; index (run, seq) |
 | `AgentRunMessage` | 4/5 | run, author, `text`, `state` (`queued`/`dispatching`/`accepted`/`cancelled`/`interrupted`), `position`, `send_now_requested_at`, `idempotency_key`, `question` FK (nullable) |
 | `AgentRunQuestion` | 4 | run, turn, `kind` (`repository`/`harness`), `prompt`, `options` JSON, `answered_by`, `answer` |
 | `AgentPermissionRequest` | 7 | run, turn, `lease_generation`, `action`, normalized `scope` JSON, `effect_hash`, `command`, `risk`, `decision` (`pending`/`allow_once`/`allow_run`/`deny`), `decided_by`/`decided_at`, `grant_source` FK (self), `consumed_at`, `result` JSON |
 | `AgentCodeSlot` | 7 | `slot_index` (1..N, global), `run` (nullable), `container_id`, `acquired_at`; Run gains `code_enqueued_at` |
-| `AgentRunPullRequest` | 7 | run 1:1, `number`, `url`, `title`, `draft`, `head_branch`, `head_sha`, `diff_summary`, `test_summary` |
-| `AgentPrCommentMirror` | 7 | run, turn, `state` (`pending`/`posted`/`failed`), `github_comment_id`, `error` |
+| `AgentRunChangeRequest` | 7 | run 1:1, `provider`, `number` (GitHub pull-request number or GitLab merge-request IID), `url`, `title`, `draft`, `head_branch`, `head_sha`, `diff_summary`, `test_summary` |
+| `AgentChangeRequestCommentMirror` | 7 | run, turn, `state` (`pending`/`posted`/`failed`), `external_comment_id` (GitHub issue comment ID or GitLab note ID), `error` |
 
-One migration per story that changes models. Name it `<next>_<domain>`, for example `<next>_agent_github_connection`; `makemigrations` assigns the number at implementation time. The first new number as of 2026-11-12 is `0126`. Phase files show domain names only.
+One migration per story that changes models. Name it `<next>_<domain>`, for example `<next>_agent_git_connection`; `makemigrations` assigns the number at implementation time. The first new number as of 2026-11-12 is `0126`. Phase files show domain names only.
 
 ## 4. API surfaces
 
-- Member API (session auth, `plane/app/urls/agent.py`, views in `plane/app/views/agent/`): settings, GitHub, repository catalog, Runs, events, messages, questions, permissions. Use `allow_permission` (`plane/app/permissions/base.py:19`). Comment-permission checks reuse the guest rule from `comment.py:103-118`.
+- Member API (session auth, `plane/app/urls/agent.py`, views in `plane/app/views/agent/`): settings, Git providers (`agent-git/`), repository catalog, Runs, events, messages, questions, permissions. Use `allow_permission` (`plane/app/permissions/base.py:19`). Comment-permission checks reuse the guest rule from `comment.py:103-118`.
 - Worker API (`plane/agent/worker_api/`, mounted at `api/agent-worker/v1/` in `plane/urls.py:18-25`): own `APIView` base with explicit `authentication_classes`, `permission_classes` and `throttle_classes = []` (not `BaseAPIView`, `plane/app/views/base.py:279-284`). The authentication class returns an authenticated principal as `request.user`, so the default `AnonRateThrottle` (`plane/settings/common.py:141`) never applies. Every mutation carries `run_id`, `lease_generation` and an `idempotency_key`. Plane rejects an older generation with HTTP 409.
-- Domain services (`plane/agent/services/`): run creation, context snapshot, lease, event append, queue, branch name, GitHub client. Views stay thin.
+- Domain services (`plane/agent/services/`): run creation, context snapshot, lease, event append, queue, branch name, Git connections. Provider HTTP lives only in `plane/agent/git_providers/` (§11). Views stay thin.
+- Error codes for a missing or broken provider are neutral with a `provider` field: `provider_disconnected`, `provider_reconnect_required`, `repository_unavailable`. Provider-specific causes keep their own codes (for example `gitlab_tls_failed`).
 
 ## 5. Worker (`apps/agent-worker`, Python 3.12, uv)
 
@@ -87,6 +88,7 @@ apps/agent-worker/
     loop.py              # poll, claim, renew, dispatch
     process_registry.py  # per-Run process group records, reconcile at start
     workspace.py         # Run-ID clone, remote check, Worktree (phase 7)
+    git_transport.py     # per-provider credential mode, CA bundle file, git -c options, transport error codes (§11)
     sandbox_macos.py     # read-only OS boundary for Harness processes (+ .sb profile)
     prompt.py            # context envelope formatter
     mcp_server.py        # per-turn stdio MCP server with Plane tools
@@ -115,10 +117,11 @@ New `.py` files need the `COPYRIGHT.txt` header (the CI check runs on all tracke
 
 | External dependency | Real use | How tests run without it |
 | --- | --- | --- |
-| GitHub App (device flow, installations, PRs) | Phase 1, 7 | `plane/agent/github/client.py` is the only HTTP seam; contract tests patch it with `pytest-mock`. One opt-in live check per phase with operator credentials |
+| GitHub App (device flow, installations, pull requests) | Phase 1, 7 | `plane/agent/git_providers/http.py` is the only HTTP seam; contract tests patch it with `pytest-mock`. One opt-in live check per phase with operator credentials |
+| Self-hosted GitLab (connect, catalog, merge requests, notes, Git over HTTPS) | Phase 1, 3, 7 | Same seam, patched with recorded responses in `apps/api/plane/tests/fixtures/gitlab/` (recorded from git.oceanlabs.dev 18.10.3-ee; tokens, e-mails and IPs scrubbed). Worker git transport tests use a local bare repository behind a test-only HTTPS server with a self-signed CA; they run in the default Worker unit tests. One optional read-only live check in `plane/tests/smoke/test_agent_gitlab_live.py`, skipped unless `PLANE_TEST_GITLAB_TOKEN` is set. Live writes (push, merge request, note) need a Group Access Token and run only in the Phase 7 opt-in live check |
 | Harness CLIs (Claude, Codex, Grok, Omp) | Phase 2-7 | Scripted fakes in `apps/agent-worker/tests/fakes/` replay committed JSONL transcripts. Native tests use marker `native` and run only on the Mini |
 | Docker | Phase 7 | Unit tests mock the Docker CLI seam. Real container tests use marker `docker` |
-| Git remote | Phase 3-7 | A local bare repository served through a test-only `file` transport switch in `config.py`. Production config rejects `file` |
+| Git remote | Phase 3-7 | A local bare repository served through a test-only `file` transport switch in `config.py`. Production config rejects `file`. GitLab credential and CA paths use the local HTTPS test server above |
 | macOS sandbox | Phase 2-7 | Profile unit tests run on macOS only (`skipif` other OS); boundary tests use marker `native` |
 
 Worker markers `native` and `docker` go in `apps/agent-worker/pytest.ini` with `--strict-markers`.
@@ -179,3 +182,64 @@ These came from prior implementation work, not from user decisions. Each phase r
 | RabbitMQ health check created a root-owned cookie | capacity report §Test stack startup repair | `test-mq` unhealthy with `eacces` | Fix `docker-compose-test.yml` only if it reproduces |
 | Network grants pin literal IPs; hostname/DNS is undecided | [network report](../2026-09-28-plane-local-cli-agents-implementation/reports/2026-09-29-network-boundary-progress.md) | A grant for a hostname resolves to a new IP | Phase 7 uses literal-IP pins; hostname approvals resolve and pin IPs at approval time (decision Q2) |
 | Nested native buttons in sidebar, menus and breadcrumbs broke keyboard access | page control, menu, breadcrumb reports | Axe or keyboard check finds a button in a button | Each UI phase runs a nested-interactive check |
+
+## 11. Git provider boundary and extension trace
+
+GitHub and GitLab are two real cases (user scope 2026-11-12), so the plan has one small provider interface. There is no registry, plugin loader, factory class or provider config layer.
+
+### API side (`apps/api/plane/agent/git_providers/`)
+
+| File | Content |
+| --- | --- |
+| `base.py` | `GitProviderClient` (`typing.Protocol`), neutral dataclasses `RepositoryInfo`, `ChangeRequestInfo`, `CommentInfo`, and `ProviderError(code, provider, detail)` |
+| `http.py` | The only HTTP seam: `pinned_fetch` with timeouts, `verify` from the connection CA bundle, operator allowlist, no redirects; maps transport failures to codes |
+| `github.py`, `gitlab.py` | One client class each |
+| `__init__.py` | `client_for(connection)`: one `if` per provider; unknown provider raises |
+
+`GitProviderClient` has six methods. Each is used by both providers:
+
+| Method | Phase | GitHub | GitLab |
+| --- | --- | --- | --- |
+| `list_repositories(account, cursor)` | 1 | installation repositories | `GET /groups/:id/projects?include_subgroups=true` |
+| `get_repository(external_id)` | 7 | `GET /repos/{owner}/{repo}` | `GET /projects/:id` |
+| `is_protected_ref(repository, ref)` | 7 | `GET /repos/{owner}/{repo}/rules/branches/{branch}` (GitHub docs, "Get rules for a branch": "The branch does not need to exist"); protected when an active rule of type `creation`, `update` or `pull_request` applies. Classic branch-protection patterns are `[UNVERIFIED]` in this endpoint (the docs mention only rulesets); for them GitHub rejects the push server-side and the Worker reports `git_push_rejected` | `GET /projects/:id/protected_branches`, match name and wildcard patterns (works for a branch that does not exist yet) |
+| `create_change_request(repository, source, target, title, body, draft)` | 7 | `POST /repos/{owner}/{repo}/pulls` with `draft` | `POST /projects/:id/merge_requests`; draft by `Draft: ` title prefix (the create API has no `draft` attribute); reads `draft` back from the response |
+| `find_comment(repository, number, marker)` | 7 | list issue comments | `GET /projects/:id/merge_requests/:iid/notes` |
+| `post_comment(repository, number, body)` | 7 | `POST /repos/{owner}/{repo}/issues/{number}/comments` | `POST /projects/:id/merge_requests/:iid/notes` |
+
+Connect and disconnect are not in the interface, because the two flows have no shared shape (device flow and refresh lock versus token paste and revoke-free). They live in `services/github_connection.py` and `services/gitlab_connection.py`. `services/git_connection.py` holds the shared parts: encryption result checks, status, availability and `usable_token(connection)`, which calls the provider service (GitHub: locked refresh and the Q10 admin check; GitLab: decrypt and expiry check).
+
+### Worker side (`apps/agent-worker/plane_agent_worker/git_transport.py`)
+
+`is_protected_ref` is called when the Worker posts a push permission request, never inside the consume transaction, because consume holds a row lock.
+
+Plane gives the Worker a neutral clone spec with each claim: `provider`, `clone_url`, `host`, `credential_mode`, and `ca_bundle` (PEM or null).
+
+| `credential_mode` | Provider | Behaviour |
+| --- | --- | --- |
+| `host` | GitHub | Git uses the Mini-held credentials (operator setup, unchanged from the GitHub-only plan) |
+| `plane_token` | GitLab | The Worker asks Plane for the token with `POST api/agent-worker/v1/runs/<id>/git-credential/` (Worker token, lease and purpose `fetch` or `push`; `push` needs a consumed push grant). Plane returns the token and the username. The Worker keeps it in memory for one git command and gives it to git through a credential helper that reads from an inherited pipe. The token is never in argv, environment, the remote URL, `.git/config`, a file, a Run event or a log. The Harness process and the Code container never receive it |
+
+CA bundle: the Worker writes it to `<run_root>/<run_id>/git-ca.pem` (mode 0600) and passes `-c http.<base_url>/.sslCAInfo=<file>`, so the bundle applies to that URL only. Git transport failures map to fixed codes: `git_dns_failed`, `git_unreachable`, `git_tls_failed`, `git_auth_failed`, `git_not_found`, `git_push_rejected`.
+
+### Minimum GitLab version: 15.5
+
+| API used | Introduced | Source (GitLab docs at the stated tag) |
+| --- | --- | --- |
+| `GET /personal_access_tokens/self` | 15.5 | v15.5.0-ee `doc/api/personal_access_tokens.md`, "Using a request header: Introduced in GitLab 15.5" |
+| Group access tokens | 14.7 | v16.0.0-ee `doc/user/group/settings/group_access_tokens.md:49` |
+| `Draft:` title prefix for draft merge requests | 13.2 (WIP support removed 14.8) | v15.5.0-ee `doc/user/project/merge_requests/drafts.md:20-21,28` |
+| `GET /groups/:id/members/all/:user_id` | 12.4 | v15.5.0-ee `doc/api/members.md:263-268` |
+| `bot` field on `GET /user` | present in 15.5 | v15.5.0-ee `doc/api/users.md` example responses |
+| `GET /groups/:id/projects` with `include_subgroups`, `GET /projects/:id/protected_branches`, merge requests, notes, `GET /version` | before 15.5 | v15.5.0-ee `doc/api/groups.md:277,296`, `protected_branches.md:25` |
+| Create merge request has no `draft` attribute | current | master `doc/api/merge_requests.md` "Create a merge request" attribute table |
+| `write_repository` needed for Git-over-HTTPS push | current | v15.5.0-ee `doc/user/profile/personal_access_tokens.md` scope table |
+
+The highest requirement is 15.5, from the token self endpoint that the connect check needs. The target instance runs 18.10.3-ee.
+
+### Extension trace
+
+- Stable contract: the neutral models (§3), the six-method `GitProviderClient`, the neutral error codes, the Worker clone spec with `credential_mode`, and the Run snapshot fields. Phases 3-7 depend only on these.
+- What changes per provider: the connect and disconnect service, the client class, the policy labels (`provider-terms.ts`), the icon, and possibly a new `credential_mode`.
+- Next credible variant: a further self-hosted forge (for example Gitea). It would need one connect service, one client class with the same six methods, one `client_for` branch and one label set. It is not in scope and the plan adds nothing for it.
+- Proof: `plane/tests/unit/test_agent_git_provider_contract.py` runs the same assertions on the GitHub and the GitLab fake (neutral shapes, error codes, draft flag read back, comment marker search). Phase 7 adds its methods to the same suite. A third provider would have to pass the same suite.

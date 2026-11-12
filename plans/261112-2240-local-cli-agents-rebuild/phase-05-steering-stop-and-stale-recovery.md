@@ -29,8 +29,8 @@ Members queue messages during active work, send a queued message now, remove an 
 - Drain: the Worker takes the lowest `position` queued message at a safe point, sets `dispatching` through the API, sends it, then reports `accepted` after the driver acknowledgement.
 - Send now: Plane records `send_now_requested_at` on the selected message. If the driver capability `midturn_input=true`, the Worker injects it into the active turn. Otherwise it cancels the turn, waits for process exit or a 30 s timeout, then sends the message as the next turn. On timeout it reports an actionable error and does not start a second process in the CWD.
 - Stop: member confirms; Plane records a Stop command with actor and time and cancels all `queued` messages (count stored). The Worker interrupts the Harness, blocks later tool calls in that turn, waits for exit, then acknowledges. Status becomes `stopped` with discarded count. Clone is kept.
-- Resume from stopped: reply creates a new turn on the same Run; the Worker verifies clone path, remote and inode before launch; failure is a recoverable error with Retry.
-- Retry pickup: allowed only when derived Stale. Plane increments `lease_generation`, clears the lease owner, and returns the Run to pickup. The claiming Worker reconciles the process registry (stop old process group) before it starts. Accepted messages and completed effects are never replayed without a new user command.
+- Resume from stopped: reply creates a new turn on the same Run; the Worker verifies clone path, remote and inode before launch; the remote check compares with the snapshot `clone_url` (stored without credentials for every provider); failure is a recoverable error with Retry.
+- Retry pickup: allowed only when derived Stale. Plane increments `lease_generation`, clears the lease owner, and returns the Run to pickup. A GitLab `git-credential` request with the old generation returns 409, so a stale Worker cannot fetch or push after Retry. The claiming Worker reconciles the process registry (stop old process group) before it starts. Accepted messages and completed effects are never replayed without a new user command.
 - Mark failed: allowed only when Stale; records actor, time, reason; old-generation writes return 409 and do not change the conclusion.
 - Permission for all commands: work-item comment permission (same guest rule as `comment.py:103-118`).
 
@@ -74,7 +74,7 @@ Protected by Tests Before 1-2: `lease.py` gains a generation bump for Retry pick
 | 2.16 | Remove queued, conflict for dispatching/accepted | API: queued -> cancelled and never claimed; dispatching/accepted returns 409 with actual state; audit event kept, waiting count excludes it |
 | 2.17 | Stop confirm, fenced command, interrupt, discarded count | API: guest without comment right 403 and state unchanged; stop records actor, time, count; Worker: interrupt stops process group and blocks later tool calls; browser: confirm and Cancel paths, scene 10 |
 | 2.18 | Resume stopped Run | Worker: same clone path and inode; unverifiable clone gives recoverable error and no launch; API: new turn on same Run ID with history |
-| 2.19 | Derived Stale with last progress, Retry pickup with new generation, reconcile | API (freezegun): 5 min without renewal reads Stale; retry increments generation; old generation 409; Worker: reconcile stops old process before resume; no replay of an accepted message; Worker absent keeps Stale/waiting |
+| 2.19 | Derived Stale with last progress, Retry pickup with new generation, reconcile | API (freezegun): 5 min without renewal reads Stale; retry increments generation; old generation 409 (events and `git-credential`); Worker: reconcile stops old process before resume; no replay of an accepted message; Worker absent keeps Stale/waiting |
 | 2.20 | Mark failed | API: records actor, time, reason; later old-generation event 409 and conclusion unchanged; guest 403 |
 
 ## Verification

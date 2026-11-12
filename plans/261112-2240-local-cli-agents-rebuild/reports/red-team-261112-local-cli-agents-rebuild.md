@@ -174,3 +174,8 @@ Severity: Critical blocks success; High is significant risk; Medium is notable. 
 - Proven by reading: every Phase 1 path and parent, migration number, script names, vitest include globs, blocks export build, settings access key helper, test container `working_dir` and `exec "$@"`.
 - Proven by GitHub docs fetch: single-use refresh tokens; grant vs token revoke scope; uninstall needs JWT; token-delete documents only 204/422.
 - Not proven: no pytest, docker, pnpm or typecheck run (plan review only). Local `uv run python manage.py ...` could not start because host uv is 0.10.9 and `apps/api/pyproject.toml` requires 0.12.21 (environment, not plan).
+
+## Addendum (2026-11-12, after the review)
+
+- F13 and F14 were decided by the user on 2026-11-12: plan.md User decisions Q9 (admin selects attached installations; sync never attaches) and Q10 (connecting admin leaves or is demoted: GitHub connection becomes `reconnect_required`). Both are applied with tests in phase-01. GitLab: Q10 does not apply to a Group Access Token.
+- The GitLab scope is now in the phase files (provider-neutral model in Phase 1, provider boundary in architecture-contracts §11). The `phase-01:NN` line citations above refer to the file before that change. This red-team gate has not run on the GitLab additions yet.

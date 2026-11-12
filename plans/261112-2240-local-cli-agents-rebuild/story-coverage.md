@@ -2,7 +2,7 @@
 
 Each story from [epics.md](../2026-09-28-plane-local-cli-agents-epics/epics.md) is in exactly one phase.
 The acceptance criteria are the Given/When/Then blocks at the cited lines. Phase files cite them again per story.
-Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43.
+Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43. Plus 7 plan-level GitLab stories G1-G7 (table below), so the plan delivers 50 stories.
 
 | Story | Title | epics.md lines | Phase | Mockup rows |
 | --- | --- | --- | --- | --- |
@@ -50,7 +50,25 @@ Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43.
 | 3.8 | Resume a stopped Code job in its Worktree | 1487-1507 | 7 | I031 (Code variant) |
 | 3.9 | Mirror a Run conclusion to its pull request | 1509-1529 | 7 | I052 (consumer) |
 
-Phase totals: 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 9 (sum 43).
+Phase totals (epics.md): 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 9 (sum 43).
+
+## GitLab stories (plan-level)
+
+epics.md has no GitLab story. These stories come from [gitlab-scope-decisions.md](./gitlab-scope-decisions.md) (user-accepted 2026-11-12). Their acceptance criteria are in the owning phase file. Mockup rows are the GitHub rows, reused with the GitLab name, icon and terms only.
+
+| Story | Title | Acceptance criteria | Phase | Mockup rows (reused) |
+| --- | --- | --- | --- | --- |
+| G1 | Connect a self-hosted GitLab with a Group Access Token | [phase-01 G1](./phase-01-github-connection-and-repository.md#g1-connect-a-self-hosted-gitlab-with-a-group-access-token) (AC1-AC10) | 1 | I046, I054-I057, I077 |
+| G2 | List the group's projects as repositories | [phase-01 G2](./phase-01-github-connection-and-repository.md#g2-list-the-groups-projects-as-repositories) | 1 | I047, I050 |
+| G3 | Bind a GitLab repository while creating a project | [phase-01 G3](./phase-01-github-connection-and-repository.md#g3-bind-a-gitlab-repository-while-creating-a-project) | 1 | I068-I071, I076 |
+| G4 | Disconnect GitLab (revoke-free) | [phase-01 G4](./phase-01-github-connection-and-repository.md#g4-disconnect-gitlab-revoke-free) | 1 (AC2 change-request path closes in 7) | I048 |
+| G5 | Set GitLab merge-request policy | [phase-01 G5](./phase-01-github-connection-and-repository.md#g5-set-gitlab-merge-request-policy) | 1 (AC4 closes in 3 and 7) | I051, I052, I053 |
+| G6 | Deliver a draft merge request from a Code job | [phase-07 G6](./phase-07-code-jobs-and-draft-pr.md#g6-deliver-a-draft-merge-request-from-a-code-job) | 7 | I037-I041 |
+| G7 | Mirror a Run conclusion to its merge request | [phase-07 G7](./phase-07-code-jobs-and-draft-pr.md#g7-mirror-a-run-conclusion-to-its-merge-request) | 7 | I052 (consumer) |
+
+Phase totals with GitLab: 1 = 13, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 11 (sum 50).
+
+Provider-neutral consumers of Epic 1 behavior (no new story): Phase 3 (Run snapshot with provider and policy, Worker clone through `git_transport.py`), Phase 4 (2.11 options from both providers), Phase 5 (resume remote check, `git-credential` fencing), Phase 7 (3.1 and 3.9 through `GitProviderClient`).
 
 ## Mockup scenes to phases
 
@@ -60,15 +78,15 @@ Phase totals: 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 9 (sum 43).
 | 2 | In progress | 3, 4 (plan), 5 (queue, Stop) |
 | 3 | Elicit | 4 |
 | 4 | Completed | 3 |
-| 5 | Code job + PR | 7 |
+| 5 | Code job + PR | 7 (GitLab: same scene with a merge request) |
 | 6 | Permission | 7 |
 | 7 | Failed | 3 |
 | 8 | Stale | 5 |
 | 9 | Capacity | 7 |
 | 10 | Stopped to steer | 5 |
-| 11 | Integrations | 1 (GitHub), 2 (Harnesses) |
+| 11 | Integrations | 1 (GitHub and GitLab), 2 (Harnesses) |
 | 12 | New project | 1 |
 
 Row I070 shows clone progress at project creation. UX-DR16 (epics.md:309) forbids a shared Mirror clone state, so Phase 1 implements the selection part of I070 and omits clone progress.
 
-<!-- red-team 2026-11-12 --> Two Epic 1 criteria need a Run and close in later phases: 1.4 AC 2 (epics.md:472) in Phase 3 (new launches) and Phase 7 (pending PR delivery); 1.8 AC 4 (epics.md:588) in Phase 7 (3.1). Stories 1.4 and 1.8 are "done" only after those tests pass.
+<!-- red-team 2026-11-12 --> Two Epic 1 criteria need a Run and close in later phases: 1.4 AC 2 (epics.md:472) in Phase 3 (new launches) and Phase 7 (pending change-request delivery); 1.8 AC 4 (epics.md:588) in Phase 7 (3.1). Stories 1.4 and 1.8 are "done" only after those tests pass. The same applies to G4 AC2 (Phase 3 launch, Phase 7 delivery) and G5 AC4 (Phase 3 snapshot, Phase 7 G6). The missing-connection code is `provider_disconnected` with a `provider` field for both providers.

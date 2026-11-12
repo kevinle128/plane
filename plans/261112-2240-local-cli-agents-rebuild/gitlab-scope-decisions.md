@@ -17,6 +17,8 @@ The user added self-hosted GitLab to the scope on 2026-11-12 and accepted all re
 - URL: `https://git.oceanlabs.dev/`. It is reachable from the development machine (HTTP 200 on the sign-in page).
 - Edition: GitLab Enterprise Edition (from the sign-in page). Group Access Tokens are available on this edition.
 - TLS: a public Let's Encrypt certificate that validates without a custom CA. The optional custom CA bundle stays in scope for other instances.
-- Version: unknown. `/api/v4/version` needs authentication (it returns 401 without a token). Read the version with a token during Phase 1.
+- Version: 18.10.3-ee (Enterprise Edition, KAS enabled), read on 2026-11-12 with a test token. `/api/v4/version` needs authentication (it returns 401 without a token).
+- Verified endpoints (2026-11-12, test token): `/api/v4/version`, `/api/v4/personal_access_tokens/self` (returns name, scopes, active, revoked, expires_at, user_id) and `/api/v4/user` (has the `bot` field).
+- The available test token is a personal access token of a human user (`bot=false`, scope `api`, no expiry), not a Group Access Token. It is suitable only for read-only live checks. Live push and merge-request checks need a dedicated Group Access Token. The user gives tokens through the secret store, never in chat.
 
-Open fact to confirm during Phase 1: the GitLab version, read with a test token. The user gives the test token through the secret store, never in chat.
+Plan consequences (added by the planner, 2026-11-12; not part of the user-accepted list above): minimum GitLab version 15.5, provisional warn-and-accept for non-bot tokens, and the open questions are in [plan.md](./plan.md#open-questions-need-the-user).
