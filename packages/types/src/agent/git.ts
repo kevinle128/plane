@@ -86,6 +86,29 @@ export type TAgentGitRepository = {
   private: boolean;
   default_branch: string;
   web_url: string;
+  /** False when another project already uses this repository. */
+  available: boolean;
+  bound_project: { id: string; name: string; identifier: string } | null;
+};
+
+/** Repository choice sent with project create. Only the catalog row ID and an optional base ref are read. */
+export type TAgentGitRepositorySelection = {
+  repository_id: string;
+  base_ref?: string;
+};
+
+/** The repository binding returned by project create. */
+export type TAgentGitRepositoryBinding = {
+  id: string;
+  provider: TAgentGitProvider;
+  host: string;
+  external_repository_id: string;
+  full_name: string;
+  web_url: string;
+  default_branch: string;
+  base_ref: string;
+  available: boolean;
+  reason: string;
 };
 
 export type TAgentGitRepositoryPage = {

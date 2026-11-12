@@ -8,6 +8,7 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import IntegrityError, transaction
 from django.db.models import Exists, F, OuterRef, Prefetch, Q, Subquery, Count
 from django.utils import timezone
 
@@ -16,6 +17,8 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from plane.agent.git_providers.base import ProviderError
+from plane.agent.services import git_connection
 from plane.app.permissions import ROLE, ProjectMemberPermission, allow_permission
 from plane.app.serializers import (
     DeployBoardSerializer,
@@ -34,6 +37,7 @@ from plane.db.models import (
     ProjectIdentifier,
     ProjectMember,
     ProjectNetwork,
+    ProjectRepositoryBinding,
     ProjectUserProperty,
     State,
     DEFAULT_STATES,
@@ -43,6 +47,10 @@ from plane.db.models import (
 from plane.db.models.intake import IntakeIssueStatus
 from plane.utils.host import base_host
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
+
+
+class _RepositoryAlreadyBound(Exception):
+    """Raised inside the project create transaction to roll it back on a bind conflict."""
 
 
 class ProjectViewSet(BaseViewSet):
@@ -259,41 +267,29 @@ class ProjectViewSet(BaseViewSet):
     def create(self, request, slug):
         workspace = Workspace.objects.get(slug=slug)
 
-        serializer = ProjectSerializer(data={**request.data}, context={"workspace_id": workspace.id})
+        project_data = {**request.data}
+        # The repository binding is not a Project field: it is validated against
+        # this workspace's catalog and stored in its own table.
+        repository_request = project_data.pop("repository", None)
+        binding_fields = None
+        if repository_request is not None:
+            try:
+                binding_fields = git_connection.resolve_binding_request(workspace, repository_request)
+            except ProviderError as error:
+                return Response(error.as_response_body(), status=error.http_status)
+
+        serializer = ProjectSerializer(data=project_data, context={"workspace_id": workspace.id})
         if serializer.is_valid():
-            serializer.save()
-
-            # Add the user as Administrator to the project
-            _ = ProjectMember.objects.create(
-                project_id=serializer.data["id"],
-                member=request.user,
-                role=ROLE.ADMIN.value,
-            )
-
-            if serializer.data["project_lead"] is not None and str(serializer.data["project_lead"]) != str(
-                request.user.id
-            ):
-                ProjectMember.objects.create(
-                    project_id=serializer.data["id"],
-                    member_id=serializer.data["project_lead"],
-                    role=ROLE.ADMIN.value,
+            # Project, members, states and binding are saved together, so a bind
+            # conflict never leaves a project without the binding it asked for.
+            try:
+                with transaction.atomic():
+                    binding = self._create_project_records(request, serializer, binding_fields)
+            except _RepositoryAlreadyBound:
+                return Response(
+                    {"error": "repository_already_bound", "provider": binding_fields["provider"]},
+                    status=status.HTTP_409_CONFLICT,
                 )
-
-            State.objects.bulk_create(
-                [
-                    State(
-                        name=state["name"],
-                        color=state["color"],
-                        project=serializer.instance,
-                        sequence=state["sequence"],
-                        workspace=serializer.instance.workspace,
-                        group=state["group"],
-                        default=state.get("default", False),
-                        created_by=request.user,
-                    )
-                    for state in DEFAULT_STATES
-                ]
-            )
 
             project = self.get_queryset().filter(pk=serializer.data["id"]).first()
 
@@ -309,8 +305,53 @@ class ProjectViewSet(BaseViewSet):
             )
 
             serializer = ProjectListSerializer(project)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            data = serializer.data
+            if binding is not None:
+                data["repository"] = git_connection.binding_summary(binding)
+            return Response(data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def _create_project_records(self, request, serializer, binding_fields):
+        serializer.save()
+
+        # Add the user as Administrator to the project
+        _ = ProjectMember.objects.create(
+            project_id=serializer.data["id"],
+            member=request.user,
+            role=ROLE.ADMIN.value,
+        )
+
+        if serializer.data["project_lead"] is not None and str(serializer.data["project_lead"]) != str(request.user.id):
+            ProjectMember.objects.create(
+                project_id=serializer.data["id"],
+                member_id=serializer.data["project_lead"],
+                role=ROLE.ADMIN.value,
+            )
+
+        State.objects.bulk_create(
+            [
+                State(
+                    name=state["name"],
+                    color=state["color"],
+                    project=serializer.instance,
+                    sequence=state["sequence"],
+                    workspace=serializer.instance.workspace,
+                    group=state["group"],
+                    default=state.get("default", False),
+                    created_by=request.user,
+                )
+                for state in DEFAULT_STATES
+            ]
+        )
+
+        if binding_fields is None:
+            return None
+        try:
+            with transaction.atomic():
+                return ProjectRepositoryBinding.objects.create(project=serializer.instance, **binding_fields)
+        except IntegrityError:
+            # Another request bound the same repository first; roll back the whole project.
+            raise _RepositoryAlreadyBound()
 
     def partial_update(self, request, slug, pk=None):
         # try:

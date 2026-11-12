@@ -20,8 +20,10 @@ import { getCoverImageType, uploadCoverImage } from "@/helpers/cover-image.helpe
 import { useProject } from "@/hooks/store/use-project";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // plane web types
-import type { TProject } from "@plane/types";
+import type { TAgentGitRepositorySelection, TProject } from "@plane/types";
+import { agentGitErrorMessage } from "@/components/settings/integrations/git/provider-meta";
 import { ProjectAttributes } from "./attributes";
+import { ProjectRepositorySection } from "./repository-section";
 import { getProjectFormValues } from "./utils";
 
 export type TCreateProjectFormProps = {
@@ -41,6 +43,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
   const { addProjectToFavorites, createProject, updateProject } = useProject();
   // states
   const [shouldAutoSyncIdentifier, setShouldAutoSyncIdentifier] = useState(true);
+  const [repository, setRepository] = useState<TAgentGitRepositorySelection | null>(null);
   // form info
   const methods = useForm<TProject>({
     defaultValues: { ...getProjectFormValues(), ...data },
@@ -94,7 +97,8 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
       }
     }
 
-    return createProject(workspaceSlug.toString(), formData)
+    const payload = repository ? { ...formData, repository } : formData;
+    return createProject(workspaceSlug.toString(), payload)
       .then(async (res) => {
         if (uploadedAssetUrl) {
           await updateCoverImageStatus(res.id, uploadedAssetUrl);
@@ -123,7 +127,10 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           const identifierError = errorData?.identifier?.includes("PROJECT_IDENTIFIER_ALREADY_EXIST");
           const nameSpecialCharError = errorData?.name?.includes("PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS");
 
-          if (nameError || identifierError || nameSpecialCharError) {
+          if (typeof errorData.error === "string" && repository) {
+            // Repository binding errors carry a stable reason code; the project was not created.
+            setToast({ type: "error", title: t("toast.error"), message: agentGitErrorMessage(t, errorData) });
+          } else if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
               setToast({
                 type: "error",
@@ -169,6 +176,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
   const handleClose = () => {
     onClose();
     setShouldAutoSyncIdentifier(true);
+    setRepository(null);
     setTimeout(() => {
       reset();
     }, 300);
@@ -189,6 +197,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
                 setShouldAutoSyncIdentifier={setShouldAutoSyncIdentifier}
               />
               <ProjectAttributes isMobile={isMobile} />
+              <ProjectRepositorySection workspaceSlug={workspaceSlug} value={repository} onChange={setRepository} />
             </div>
           </form>
         </div>

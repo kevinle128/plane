@@ -101,4 +101,5 @@ from .agent_git import (
     AgentGithubDeviceAuthorization,
     AgentGithubDeviceAuthorizationKind,
     AgentGithubDeviceAuthorizationStatus,
+    ProjectRepositoryBinding,
 )

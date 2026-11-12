@@ -221,3 +221,46 @@ class AgentGitRepository(BaseModel):
 
     def __str__(self):
         return self.full_name
+
+
+class ProjectRepositoryBinding(BaseModel):
+    """The one repository a project uses for agent work.
+
+    Fields are copied from the catalog row at bind time, so the binding stays
+    readable for audit after the catalog changes. Whether a new Run can use it
+    is derived (see ``binding_availability``), never stored.
+    """
+
+    project = models.OneToOneField("db.Project", on_delete=models.CASCADE, related_name="repository_binding")
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="project_repository_bindings")
+    account = models.ForeignKey(
+        AgentGitAccount,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="project_bindings",
+    )
+    provider = models.CharField(max_length=16, choices=AgentGitProvider.choices)
+    host = models.CharField(max_length=255)
+    external_repository_id = models.CharField(max_length=64)
+    full_name = models.CharField(max_length=512)
+    clone_url = models.CharField(max_length=2048)
+    web_url = models.CharField(max_length=2048, blank=True, default="")
+    default_branch = models.CharField(max_length=255, blank=True, default="")
+    base_ref = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = "Project Repository Binding"
+        verbose_name_plural = "Project Repository Bindings"
+        db_table = "project_repository_bindings"
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "provider", "host", "external_repository_id"],
+                condition=Q(deleted_at__isnull=True),
+                name="project_repository_binding_unique_repository",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} for project {self.project_id}"

@@ -40,6 +40,7 @@ from plane.db.models import (
     AgentGitProvider,
     AgentGitRepository,
     AgentGithubDeviceAuthorizationKind,
+    ProjectRepositoryBinding,
     Workspace,
 )
 
@@ -232,7 +233,17 @@ class AgentGitRepositoriesEndpoint(BaseAPIView):
         )
         next_cursor = str(offset + REPOSITORY_PAGE_SIZE) if len(rows) > REPOSITORY_PAGE_SIZE else None
         rows = rows[:REPOSITORY_PAGE_SIZE]
-        return Response(
-            {"results": AgentGitRepositorySerializer(rows, many=True).data, "next_cursor": next_cursor},
-            status=status.HTTP_200_OK,
-        )
+        results = AgentGitRepositorySerializer(rows, many=True).data
+        bound = {
+            (binding.provider, binding.host, binding.external_repository_id): binding.project
+            for binding in ProjectRepositoryBinding.objects.filter(
+                workspace__slug=slug, external_repository_id__in={row.external_id for row in rows}
+            ).select_related("project")
+        }
+        for row, item in zip(rows, results):
+            project = bound.get((row.provider, row.account.connection.host, row.external_id))
+            item["bound_project"] = (
+                {"id": str(project.id), "name": project.name, "identifier": project.identifier} if project else None
+            )
+            item["available"] = project is None
+        return Response({"results": results, "next_cursor": next_cursor}, status=status.HTTP_200_OK)

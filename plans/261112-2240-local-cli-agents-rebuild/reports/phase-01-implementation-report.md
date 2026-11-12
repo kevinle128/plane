@@ -33,6 +33,14 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Green: disconnect 11 passed; `pytest plane/tests/contract/app -k agent` 67 passed. Web typecheck 10/10, oxlint clean, i18n in sync.
 - AC 2 for new Launches and pending change-request delivery needs Runs; it stays open for Phases 3 and 7 as the plan states. The "bindings kept" check is in the 1.5 binding tests.
 
+### 1.5 Bind one repository while creating a project
+
+- Tests Before 1: a new explicit case `test_create_project_without_repository_keeps_the_response_shape` passed on the unchanged view (`test_project_app.py` 26 passed). Its first version compared against `ProjectListSerializer(project)` and failed because the view adds queryset annotations; the case now pins the serializer's declared field set.
+- Test first: `test_agent_repository_binding.py` -> collection error (`ProjectRepositoryBinding` missing). Blocks `repository-list.test.ts` -> `Cannot find module './repository-list'`.
+- Green: binding 25 passed (including the threaded race `test_concurrent_binds_give_one_201_and_one_409_and_no_orphan_project`, `django_db(transaction=True)`); `pytest plane/tests/contract/app -k 'agent or project_app'` 119 passed; `makemigrations --check` clean (`0128_project_repository_binding`); blocks agent-run 13 passed; web and blocks typecheck 11/11; oxlint/oxfmt clean; i18n in sync.
+- The 1.3 and 1.4 binding checks are in `TestBindingAvailability` (removed installation and disconnect keep the binding with `available=false`).
+- Refactor: `ProjectViewSet.create` now saves project, members, states and binding in one `transaction.atomic` block; a bind `IntegrityError` rolls back the project and returns 409. `model_activity.delay` stays after the block.
+
 ## Deviations from the plan
 
 1. Migrations: the plan names four migrations. The models are split by story: `0126_agent_git_connection` (connection, device authorization) in 1.1; accounts and repositories in 1.2; binding in 1.5; policy in 1.6.
@@ -40,4 +48,5 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 3. The admin GitHub page had a lint warning (`promise/always-return`) that the pre-commit hook rejects for any touched file. It was rewritten as an equivalent `try/catch/finally`.
 4. Locales: the `translate` skill is not installed in this runtime. Every non-English `agent.json` carries the English text for the new keys, so `check:sync` passes; the strings still need translation.
 5. "The Celery task arguments contain no token" check (1.1 list) moves to 1.2, where the catalog task is created (`test_attach_enqueues_catalog_with_ids_only_and_lists_repositories`).
-6. Removed (detached) installations are hidden on the GitHub detail page (1.3 AC "disappears"). The mockup has no control to attach a removed installation again; the API allows it (`POST github/accounts/<id>/attach/`). This is a product gap for the user to decide.
+6. `base_ref` validation lives in `plane/agent/services/branch_name.py` (`is_valid_ref_name`), next to the branch-name helper that 1.8 adds.
+7. Removed (detached) installations are hidden on the GitHub detail page (1.3 AC "disappears"). The mockup has no control to attach a removed installation again; the API allows it (`POST github/accounts/<id>/attach/`). This is a product gap for the user to decide.

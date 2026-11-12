@@ -11,10 +11,13 @@ import type {
   TAgentGitConnection,
   TAgentGitDisconnectResult,
   TAgentGitProvider,
+  TAgentGitRepository,
   TAgentGithubDeviceAuthorization,
   TAgentGithubDeviceAuthorizationKind,
 } from "@plane/types";
 import { AgentGitService } from "@/services/agent/git.service";
+
+const MAX_REPOSITORY_PAGES = 50;
 
 export interface IAgentGitStore {
   /** Connections keyed by workspace slug, then provider. `undefined` until fetched. */
@@ -31,6 +34,9 @@ export interface IAgentGitStore {
     accountId: string
   ) => Promise<TAgentGitAccountRemoval>;
   disconnect: (workspaceSlug: string, provider: TAgentGitProvider) => Promise<TAgentGitDisconnectResult>;
+  /** Every catalog row the caller can bind, keyed by workspace slug. */
+  repositoriesByWorkspace: Record<string, TAgentGitRepository[]>;
+  fetchRepositories: (workspaceSlug: string) => Promise<TAgentGitRepository[]>;
   getConnection: (workspaceSlug: string, provider: TAgentGitProvider) => TAgentGitConnection | undefined;
   isConnected: (workspaceSlug: string, provider: TAgentGitProvider) => boolean;
   fetchConnections: (workspaceSlug: string) => Promise<TAgentGitConnection[]>;
@@ -51,12 +57,15 @@ export interface IAgentGitStore {
 export class AgentGitStore implements IAgentGitStore {
   connectionsByWorkspace: Record<string, Partial<Record<TAgentGitProvider, TAgentGitConnection>>> = {};
   accountsByWorkspace: Record<string, Partial<Record<TAgentGitProvider, TAgentGitAccount[]>>> = {};
+  repositoriesByWorkspace: Record<string, TAgentGitRepository[]> = {};
   service: AgentGitService;
 
   constructor() {
     makeObservable(this, {
       connectionsByWorkspace: observable,
       accountsByWorkspace: observable,
+      repositoriesByWorkspace: observable,
+      fetchRepositories: action,
       fetchConnections: action,
       disconnect: action,
       fetchAccounts: action,
@@ -106,6 +115,23 @@ export class AgentGitStore implements IAgentGitStore {
       };
     });
     return result;
+  };
+
+  fetchRepositories = async (workspaceSlug: string) => {
+    const rows: TAgentGitRepository[] = [];
+    let cursor: string | undefined;
+    // The catalog API pages by 100 rows; read every page so search and owner filters see all rows.
+    for (let page = 0; page < MAX_REPOSITORY_PAGES; page += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- each page needs the cursor of the previous page
+      const result = await this.service.listRepositories(workspaceSlug, cursor ? { cursor } : {});
+      rows.push(...result.results);
+      if (!result.next_cursor) break;
+      cursor = result.next_cursor;
+    }
+    runInAction(() => {
+      this.repositoriesByWorkspace[workspaceSlug] = rows;
+    });
+    return rows;
   };
 
   getAccounts = (workspaceSlug: string, provider: TAgentGitProvider) =>

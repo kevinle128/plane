@@ -61,7 +61,12 @@
       "account_remove_failed": "Plane could not remove the installation. It is still connected. Try again.",
       "github_revoke_failed": "GitHub did not confirm that the token is revoked. GitHub is still connected. Try again.",
       "provider_disconnected": "This provider is not connected in this workspace.",
-      "provider_reconnect_required": "This provider needs to be connected again."
+      "provider_reconnect_required": "This provider needs to be connected again.",
+      "repository_already_bound": "Another project already uses this repository. Choose another one.",
+      "repository_unavailable": "This repository is no longer available. Choose another one.",
+      "repository_not_found": "This repository is no longer in the catalog. Choose another one.",
+      "invalid_base_ref": "The base branch name is not valid.",
+      "invalid_repository": "The repository choice is not valid. Choose it again."
     },
     "accounts": {
       "title": "Connections",
@@ -97,6 +102,30 @@
       "disconnected": "{provider} is disconnected.",
       "github_revoke_in_provider": "Plane did not revoke the old token because it could not use it. Revoke it in GitHub under Settings, Applications, Authorized GitHub Apps.",
       "open_github_authorizations": "Open GitHub settings"
+    },
+    "repository": {
+      "title": "Repository",
+      "description": "Repositories this workspace has been granted access to",
+      "manage_access": "Manage access",
+      "search_label": "Search repositories",
+      "search_placeholder": "Search owner/repository",
+      "owner_label": "Owner",
+      "all_owners": "All owners",
+      "list_label": "Repositories",
+      "none_option": "No repository",
+      "none_warning": "Without a repository, an agent run will ask for one and cannot start its harness until you choose it.",
+      "private": "Private",
+      "public": "Public",
+      "already_used": "Already used by {project}",
+      "empty": "No repository matches.",
+      "loading": "Loading repositories",
+      "load_error": "Repositories could not be loaded. Try again.",
+      "not_connected_title": "No Git provider is connected in this workspace",
+      "not_connected_description": "Connect GitHub to bind a repository to this project. You can also create the project now and choose a repository later.",
+      "open_integrations": "Open Workspace settings → Integrations",
+      "base_ref_label": "Base branch",
+      "base_ref_hint": "Agents start from this branch. Leave empty to use {branch}.",
+      "account_group": "{login} · {type}"
     }
   }
 }

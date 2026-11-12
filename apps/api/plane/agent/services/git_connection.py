@@ -11,10 +11,18 @@ here turn that into an explicit failure, so a connection never becomes
 
 # Python imports
 import logging
+import uuid
 
 # Module imports
 from plane.agent.git_providers.base import ProviderError
-from plane.db.models import AgentGitConnection, AgentGitConnectionStatus
+from plane.agent.services.branch_name import is_valid_ref_name
+from plane.db.models import (
+    AgentGitAccountState,
+    AgentGitConnection,
+    AgentGitConnectionStatus,
+    AgentGitRepository,
+    ProjectRepositoryBinding,
+)
 from plane.license.utils.encryption import decrypt_data, encrypt_data
 
 logger = logging.getLogger("plane.agent.services.git_connection")
@@ -66,3 +74,90 @@ def clear_tokens(connection):
 
 def get_connection(workspace_id, provider):
     return AgentGitConnection.objects.filter(workspace_id=workspace_id, provider=provider).first()
+
+
+# Repository binding
+
+
+def binding_availability(binding):
+    """Whether new agent work may use ``binding``.
+
+    Usable only when its account is attached, its connection is connected,
+    and the binding host equals the connection host. The binding row itself
+    is kept for audit in every other case.
+    """
+    account = binding.account
+    if account is None or account.deleted_at is not None or account.state != AgentGitAccountState.ATTACHED:
+        return {"available": False, "reason": "repository_unavailable"}
+    blocked = status_error(account.connection)
+    if blocked is not None:
+        return {"available": False, "reason": blocked.code}
+    if account.connection.host != binding.host:
+        return {"available": False, "reason": "repository_unavailable"}
+    return {"available": True, "reason": ""}
+
+
+def resolve_binding_request(workspace, repository):
+    """Validate the ``repository`` part of a project create request.
+
+    Only the catalog row ID and an optional ``base_ref`` are read. Provider,
+    host, IDs and URLs always come from this workspace's catalog row, so
+    other client-supplied fields are ignored. Returns the binding field values.
+    """
+    if not isinstance(repository, dict):
+        raise ProviderError("invalid_repository", "", http_status=400)
+    try:
+        repository_id = uuid.UUID(str(repository.get("repository_id")))
+    except ValueError:
+        raise ProviderError("invalid_repository", "", http_status=400)
+
+    row = (
+        AgentGitRepository.objects.select_related("account", "account__connection")
+        .filter(pk=repository_id, workspace=workspace)
+        .first()
+    )
+    if row is None:
+        raise ProviderError("repository_not_found", "", http_status=404)
+    blocked = status_error(row.account.connection)
+    if blocked is not None:
+        blocked.detail = ""
+        raise blocked
+    if row.account.state != AgentGitAccountState.ATTACHED:
+        raise ProviderError("repository_unavailable", row.provider, http_status=409)
+
+    base_ref = repository.get("base_ref") or row.default_branch
+    if not is_valid_ref_name(base_ref):
+        raise ProviderError("invalid_base_ref", row.provider, http_status=400)
+
+    connection = row.account.connection
+    if ProjectRepositoryBinding.objects.filter(
+        workspace=workspace, provider=row.provider, host=connection.host, external_repository_id=row.external_id
+    ).exists():
+        raise ProviderError("repository_already_bound", row.provider, http_status=409)
+    return {
+        "workspace": workspace,
+        "account": row.account,
+        "provider": row.provider,
+        "host": connection.host,
+        "external_repository_id": row.external_id,
+        "full_name": row.full_name,
+        "clone_url": row.clone_url,
+        "web_url": row.web_url,
+        "default_branch": row.default_branch,
+        "base_ref": base_ref,
+    }
+
+
+def binding_summary(binding):
+    """Read-only view of a binding for API responses (no secrets exist on it)."""
+    return {
+        "id": str(binding.id),
+        "provider": binding.provider,
+        "host": binding.host,
+        "external_repository_id": binding.external_repository_id,
+        "full_name": binding.full_name,
+        "web_url": binding.web_url,
+        "default_branch": binding.default_branch,
+        "base_ref": binding.base_ref,
+        **binding_availability(binding),
+    }

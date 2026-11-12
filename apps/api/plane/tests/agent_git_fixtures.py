@@ -197,3 +197,60 @@ def accounts_url(slug, provider="github", account_id=None, action=None):
 
 def repositories_url(slug):
     return f"/api/workspaces/{slug}/agent-git/repositories/"
+
+
+def make_catalog(workspace, connected_by, provider="github", host="github.com", repositories=(), state="attached"):
+    """Create a connected connection, one account and catalog rows directly (no provider calls).
+
+    ``repositories`` is a list of ``(external_id, full_name)`` tuples.
+    """
+    from plane.db.models import AgentGitAccount, AgentGitConnection, AgentGitRepository
+
+    connection = AgentGitConnection.objects.filter(workspace=workspace, provider=provider).first()
+    if connection is None:
+        connection = AgentGitConnection.objects.create(
+            workspace=workspace,
+            provider=provider,
+            base_url=f"https://{host}",
+            host=host,
+            status="connected",
+            connected_by=connected_by,
+            account_login="octo-admin",
+        )
+    owner = repositories[0][1].split("/")[0] if repositories else "plane-mini"
+    account = AgentGitAccount.objects.create(
+        connection=connection,
+        workspace=workspace,
+        provider=provider,
+        external_id=f"{provider}-{owner}",
+        login=owner,
+        account_type="Organization" if provider == "github" else "Group",
+        state=state,
+    )
+    rows = [
+        AgentGitRepository.objects.create(
+            account=account,
+            workspace=workspace,
+            provider=provider,
+            external_id=str(external_id),
+            full_name=full_name,
+            owner_login=full_name.rsplit("/", 1)[0],
+            private=True,
+            default_branch="main",
+            clone_url=f"https://{host}/{full_name}.git",
+            web_url=f"https://{host}/{full_name}",
+        )
+        for external_id, full_name in repositories
+    ]
+    return connection, account, rows
+
+
+def project_payload(name, identifier, repository=None):
+    payload = {"name": name, "identifier": identifier}
+    if repository is not None:
+        payload["repository"] = repository
+    return payload
+
+
+def projects_url(slug):
+    return f"/api/workspaces/{slug}/projects/"
