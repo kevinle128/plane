@@ -519,6 +519,7 @@ class _DrippingServer:
             return
         if self._tls:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
             context.load_cert_chain(*self._tls)
             try:
                 connection = context.wrap_socket(connection, server_side=True)
@@ -562,7 +563,9 @@ class _FullAcceptQueueListener:
         self._fillers = []
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            self._socket.bind(("0.0.0.0", 0))
+            # Bind to all addresses so that connects to 127.0.0.2-4 reach this
+            # test-only listener; it lives only for the duration of one test.
+            self._socket.bind(("0.0.0.0", 0))  # noqa: S104
             self._socket.listen(0)
             self.port = self._socket.getsockname()[1]
             for _ in range(16):
