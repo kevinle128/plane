@@ -96,7 +96,8 @@ def app_credentials():
 
 
 def install_url():
-    slug = app_credentials().slug
+    # Read the slug only: the client secret is not needed to build the install link.
+    slug = _configured_value(GITHUB_APP_SLUG)
     return f"{GITHUB_BASE_URL}/apps/{slug}/installations/new" if slug else ""
 
 
