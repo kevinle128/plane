@@ -43,10 +43,10 @@ Rebuild GitHub connection, four local Harness Agents, durable Q&A Runs and safe 
 | 3 | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md) | 2.7-2.8 (2) | 1, 2 | Pending |
 | 4 | [Run context and conversation](./phase-04-run-context-and-conversation.md) | 2.9-2.13 (5) | 3 | Pending |
 | 5 | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md) | 2.14-2.20 (7) | 4 | Pending |
-| 6 | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md) | 2.21-2.26 (6) | 5, decision Q1 | Pending |
+| 6 | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md) | 2.21-2.26 (6) | 5 | Pending |
 | 7 | [Code jobs and draft PR](./phase-07-code-jobs-and-draft-pr.md) | 3.1-3.9 (9) | 1, 5 | Pending |
 
-Order: 1, 2, 3, 4, 5, then 6 and 7 in either order (7 first if Q1 is still open). They run one after the other, not in parallel: their Worker files are disjoint (`drivers/{codex,grok,omp}.py` vs `code/*`), but both add keys to `packages/i18n/src/locales/*/agent.json`. Each phase branches from `preview` after the previous merge because each PR regenerates `apps/api/migrations_lockfile.txt`.
+Order: 1, 2, 3, 4, 5, then 6 and 7 in either order. They run one after the other, not in parallel: their Worker files are disjoint (`drivers/{codex,grok,omp}.py` vs `code/*`), but both add keys to `packages/i18n/src/locales/*/agent.json`. Each phase branches from `preview` after the previous merge because each PR regenerates `apps/api/migrations_lockfile.txt`.
 
 ## Delivery rules
 
@@ -59,13 +59,15 @@ One PR per phase to `preview`; one commit per story; no plan IDs in code, tests,
 - [ ] API, Worker, web, migration, copyright and i18n checks pass in every phase PR.
 - [ ] Q&A cannot write; Code effects need a matching grant; Docker never exceeds N slots; the Agent cannot push or merge to the default branch.
 
-## Open questions (user decisions)
+## User decisions (2026-11-12)
 
-1. Q1: Accept a per-Run, per-turn disposable runtime directory for Codex, Grok and Omp (exception to AD-7)? Blocks Phase 6.
-2. Q2: Hostname/DNS approval flow for network grants (3.4)? Literal-IP flow ships without it.
-3. Q3: Who registers the GitHub App, and do its client ID, secret and slug come from instance configuration (admin app) or environment?
-4. Q4: Phase 7 split into two PRs if it grows beyond review size?
-5. Q5: Add committed browser e2e tooling (for example Playwright), or keep recorded browser evidence per phase?
-6. Q6: Add a CI job for `apps/agent-worker` (ruff + unit tests)?
-7. Q7: If the hard-link probe fails, adopt Worker-side read/list/search tools (prior repair) instead of native Harness reads?
-8. Q8: Is "repositories available to that member" (1.2) satisfied by workspace grant plus project-create role, with no per-member GitHub identity?
+The user accepted all recommended answers on 2026-11-12.
+
+1. Q1, disposable runtime: accepted. Each Codex, Grok and Omp turn gets a private runtime directory outside the clone. Only that process can write to it, and the Worker deletes it after the turn. The clone, credentials and other Runs stay read-only. This is an accepted exception to AD-7. Phase 6 is unblocked.
+2. Q2, network grants by hostname (3.4): the user approves a hostname. At approval time the Worker resolves the hostname and pins the resolved IP and port set. If the IP changes later, the Worker asks for a new decision.
+3. Q3, GitHub App: the user registers the GitHub App. The client ID, secret and slug come from instance configuration (admin app). When the instance configuration is empty, the values come from environment variables.
+4. Q4, Phase 7 size: Phase 7 can split into two PRs at the 3.5/3.6 boundary.
+5. Q5, browser tests: no Playwright in CI. UI logic is tested with Vitest in `packages/blocks`. Each phase has a manual browser check script and records its evidence in the phase report.
+6. Q6, Worker CI: add a CI job for `apps/agent-worker` that runs ruff and the unit tests.
+7. Q7, hard-link probe: if the probe reads foreign content, the Worker provides the read, list and search tools instead of native Harness reads.
+8. Q8, repository availability (1.2): a repository is available to a member when the workspace grant is active and the member can create projects. Members have no GitHub identity of their own.

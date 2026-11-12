@@ -15,7 +15,7 @@ Codex CLI, Grok CLI and Omp each pass the AD-4 connection probe and run read-onl
 
 ## Blocker
 
-Decision Q1 (AD-7 disposable-runtime exception) must be made before this phase starts. Prior native checks show all three CLIs fail to start under a full read-only boundary ([runtime decision](../2026-09-28-plane-local-cli-agents-implementation/reports/2026-09-28-harness-runtime-decision.md): Codex 0.157.1 `Operation not permitted`, Grok 1.0.41 `FS_PERMISSION_DENIED`, Omp 18.1.21 `SQLITE_READONLY`). Without a decision, each Harness stays Connection failed with the missing action named, which meets the failure ACs but not the success ACs.
+Decision Q1 accepts the AD-7 disposable-runtime exception (see plan.md, User decisions). Prior native checks show all three CLIs fail to start under a full read-only boundary ([runtime decision](../2026-09-28-plane-local-cli-agents-implementation/reports/2026-09-28-harness-runtime-decision.md): Codex 0.157.1 `Operation not permitted`, Grok 1.0.41 `FS_PERMISSION_DENIED`, Omp 18.1.21 `SQLITE_READONLY`). Without a decision, each Harness stays Connection failed with the missing action named, which meets the failure ACs but not the success ACs.
 
 ## Context links
 
@@ -28,12 +28,12 @@ Decision Q1 (AD-7 disposable-runtime exception) must be made before this phase s
 - Codex: app-server JSON-RPC over stdio; models from `model/list`; steering candidate `turn/steer`; approvals mapped to deny in Q&A.
 - Grok: headless streaming JSON turns with session resume; `midturn_input=false`; Plane queue and cancel-then-next-turn; model list from `grok models`. Connected requires a proven permission pause and safe response path (2.23 AC 3); otherwise Connection failed.
 - Omp: stdio RPC (`prompt`, `steer`, `follow_up`, `abort`, UI response, `get_available_models`); questions map to `AgentRunQuestion(kind=harness)` from Phase 4.
-- Runtime state (if Q1 accepts the exception): a per-Run, per-turn private runtime directory under the Run root (or tmpfs), writable only for that process, deleted after the turn; clone, credentials and other Runs stay read-only. The probe asserts writes to clone, Host, credentials and another Run fail.
+- Runtime state (Q1 accepted): a per-Run, per-turn private runtime directory under the Run root (or tmpfs), writable only for that process, deleted after the turn; clone, credentials and other Runs stay read-only. The probe asserts writes to clone, Host, credentials and another Run fail.
 - Plane tools (comments, questions) reach each Harness through MCP when the Harness supports MCP; otherwise the probe fails the matching check and names it. MCP support of Grok and Omp is [UNVERIFIED].
 
 ## File ownership
 
-This phase owns only: `apps/agent-worker/plane_agent_worker/drivers/{codex,grok,omp}.py`, `drivers/__init__.py` (registry entries), `tests/fakes/{fake_codex,fake_grok,fake_omp}.py`, `tests/transcripts/{codex,grok,omp}/`, `tests/test_{codex,grok,omp}_driver.py`, and a runtime-directory helper `plane_agent_worker/runtime_dir.py` if Q1 accepts the exception. It does not touch `plane_agent_worker/code/` (Phase 7). Backend and web need no new files: harness cards, probe API and Run UI already support all four harnesses; add only i18n strings for harness-specific hints.
+This phase owns only: `apps/agent-worker/plane_agent_worker/drivers/{codex,grok,omp}.py`, `drivers/__init__.py` (registry entries), `tests/fakes/{fake_codex,fake_grok,fake_omp}.py`, `tests/transcripts/{codex,grok,omp}/`, `tests/test_{codex,grok,omp}_driver.py`, and a runtime-directory helper `plane_agent_worker/runtime_dir.py`. It does not touch `plane_agent_worker/code/` (Phase 7). Backend and web need no new files: harness cards, probe API and Run UI already support all four harnesses; add only i18n strings for harness-specific hints.
 
 ## Tests Before
 
@@ -76,7 +76,7 @@ Live check on the Mini: Connect each Harness in Integrations, mention it, follow
 
 | Risk | L x I | Mitigation |
 | --- | --- | --- |
-| Q1 not decided | High x High | Phase blocked; Phase 7 can proceed with Claude |
+| Runtime directory leaks writes outside the turn | Medium x High | Probe asserts writes to clone, Host, credentials and another Run fail; directory is deleted after each turn |
 | CLI protocol change between versions | High x Medium | Version recorded in report; driver refuses unknown major versions; transcripts re-recorded |
 | Grok cannot pause for permission | Medium x High | Grok stays Connection failed with "permission pause" named (2.23 AC 3) |
 | Runtime directory leaks state between turns | Medium x High | Directory per Run and turn, deleted after exit; probe checks a second turn cannot read the first turn's runtime files |

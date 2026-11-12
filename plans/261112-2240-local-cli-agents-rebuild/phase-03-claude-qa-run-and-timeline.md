@@ -36,7 +36,7 @@ A member mentions Claude in a work-item comment. Plane commits the comment and a
 - `process_mention` (`plane/bgtasks/email_notification_task.py:130-138`) filters `entity_name="user_mention"` so an agent ID is never looked up as a user.
 - Stale is derived: `status in (in_progress, awaiting, approval)` and `lease_expires_at < now` reads as `stale` with `last_progress_at`. Lease length 5 min, renewed by heartbeat.
 - Run card: one per Run, positioned by `created_at` inside `activity-comment-root.tsx`. Panel: one portal-mounted drawer opened from the full page and from peek. Escape closes the panel first, then peek (prior lesson).
-- Q&A boundary: profile denies writes everywhere except the CLI's own temp dir policy decided for Claude in Phase 2, denies reads of other Runs and of the Worker token. Add a hard-link probe; if it reads foreign content, stop and take decision Q7.
+- Q&A boundary: profile denies writes everywhere except the CLI's own temp dir policy decided for Claude in Phase 2, denies reads of other Runs and of the Worker token. Add a hard-link probe; if it reads foreign content, adopt Worker-side read/list/search tools (decision Q7).
 - Context envelope (FR20-FR23): workspace, project, issue identifier and link, title, description, state, repository, requester, trigger comment, earlier visible comments in order with ID, author and time; member content is fenced as task data below Agent instructions; a byte budget with an exact omission count (retrieval tool arrives in Phase 4).
 - Tool results split into chunks with call ID and part index; the store joins them (prior lesson).
 

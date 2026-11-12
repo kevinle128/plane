@@ -22,7 +22,7 @@ A workspace administrator connects GitHub with the device flow, manages installa
 
 ## Key decisions
 
-- Use a GitHub App with device flow enabled. The user-to-server token lists `/user/installations` and their repositories. "Connect organisation" opens the App install URL, then Plane re-syncs installations through a second device-flow poll or a refresh action. App credentials come from instance configuration (open question Q3).
+- Use a GitHub App with device flow enabled. The user-to-server token lists `/user/installations` and their repositories. "Connect organisation" opens the App install URL, then Plane re-syncs installations through a second device-flow poll or a refresh action. App credentials come from instance configuration (decision Q3: instance configuration, environment variables as fallback).
 - Store tokens and device codes with `encrypt_data` (`plane/license/utils/encryption.py:20`). Serializers never return tokens. Log redaction test covers the device flow.
 - Repository catalog: a Celery task refreshes one GitHub page at a time and swaps the snapshot only after the last page succeeds (prior lesson). Search uses `icontains` on indexed `full_name`; add a trigram index only if a 10k-row probe exceeds 50 ms.
 - Binding availability is derived: a binding is usable only when its installation is active and the connection is connected. Removal and disconnect keep the binding row for audit (1.3, 1.4).
@@ -123,7 +123,7 @@ Opt-in live check (operator credentials): connect a real GitHub App, add one org
 | No GitHub App credentials during development | High x Medium | Client seam mocked in tests; live check is opt-in and blocks only the "done" mark, not the merge of tested code |
 | Device flow for GitHub Apps needs "Enable Device Flow" on the App | Medium x High | Setup doc in README of `plane/agent/github/`; start endpoint returns `device_flow_disabled` error with hint |
 | Catalog refresh interrupted mid-pagination | Medium x Medium | Snapshot swap only after the last page; resume from saved page |
-| "Available to that member" (1.2) has no per-member GitHub identity in the spec | Medium x Medium | V1 rule: a repository is available when the workspace grant is active and the caller is a workspace Admin or Member who can create projects. Guests get 403. Confirm with the user (open question Q8) |
+| "Available to that member" (1.2) has no per-member GitHub identity in the spec | Medium x Medium | V1 rule: a repository is available when the workspace grant is active and the caller is a workspace Admin or Member who can create projects. Guests get 403. Confirmed by the user (decision Q8) |
 
 ## Rollback
 
