@@ -5,11 +5,15 @@
 """Self-hosted GitLab client for the provider-neutral interface."""
 
 # Python imports
+import logging
 import re
+from urllib.parse import urlsplit
 
 # Module imports
 from plane.agent.git_providers import http
 from plane.agent.git_providers.base import ProviderError, RepositoryInfo, RepositoryPage
+
+logger = logging.getLogger("plane.agent.git_providers.gitlab")
 
 PROVIDER = "gitlab"
 PAGE_SIZE = 100
@@ -62,8 +66,15 @@ class GitlabClient:
             },
         )
         raise_for_status(response)
+        expected = urlsplit(self.connection.base_url)
         repositories = []
         for item in response.json() or []:
+            clone = urlsplit(str(item.get("http_url_to_repo") or ""))
+            # A project whose clone URL points at another host or scheme is skipped,
+            # so the Worker is never sent to a third host through an API response.
+            if clone.scheme != expected.scheme or clone.hostname != expected.hostname or clone.port != expected.port:
+                logger.warning("gitlab project %s skipped: clone URL is not on the connection host", item.get("id"))
+                continue
             path = str(item["path_with_namespace"])
             repositories.append(
                 RepositoryInfo(
@@ -76,4 +87,6 @@ class GitlabClient:
                     web_url=str(item.get("web_url") or ""),
                 )
             )
-        return RepositoryPage(repositories=repositories, next_cursor=None)
+        # GitLab sends an empty X-Next-Page on the last page.
+        next_page = (response.header("X-Next-Page") or "").strip()
+        return RepositoryPage(repositories=repositories, next_cursor=next_page or None)

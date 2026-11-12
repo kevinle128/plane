@@ -65,6 +65,11 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Live smoke check: NOT RUN. The personal GitLab token is in a file that the privacy hook blocks; the task says not to work around it. Without a token the module skips (exit 0); with `PLANE_TEST_GITLAB_REQUIRED=1` it fails at collection, as designed.
 - Refactor: `url_security.pinned_fetch`, `_fetch_validated_hop` and `_request_to_ip` take `verify` (default `True`); `settings/common.py` has one parse helper pair used by the webhook and the new `AGENT_GIT_ALLOWED_*` settings. Only the changed lines were formatted, because both files are not ruff-formatted on `preview`.
 
+### G2 List the group's projects as repositories
+
+- Test first: 5 new GitLab catalog cases failed (no GitLab branch in `client_for`, no enqueue on connect, no `X-Next-Page` paging, no host filter).
+- Green: catalog plus provider contract 26 passed; with the expired-token case, `pytest plane/tests/contract/app -k agent plane/tests/unit/test_agent_git_provider_contract.py` 180 passed; `ruff check plane` clean.
+
 ## Deviations from the plan
 
 1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.

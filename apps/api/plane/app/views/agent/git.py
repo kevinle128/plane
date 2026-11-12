@@ -141,6 +141,7 @@ class AgentGitConnectionEndpoint(BaseAPIView):
             )
         except ProviderError as error:
             return provider_error_response(error)
+        enqueue_catalog_refresh(connection.id)
         return Response(AgentGitConnectionSerializer(connection).data, status=status.HTTP_201_CREATED)
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")

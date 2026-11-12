@@ -275,3 +275,25 @@ def _attach_single_group(connection, group, user):
     AgentGitAccount.objects.filter(connection=connection).exclude(pk=account.pk).exclude(
         state=AgentGitAccountState.DETACHED
     ).update(state=AgentGitAccountState.DETACHED, removed_at=now)
+
+
+def usable_token(connection_id):
+    """Return the stored GitLab token, or raise when the connection cannot be used.
+
+    An expired token or a stored value that cannot be decrypted sets
+    ``reconnect_required`` before any provider call.
+    """
+    error = None
+    with transaction.atomic():
+        connection = AgentGitConnection.objects.select_for_update().get(pk=connection_id)
+        blocked = git_connection.status_error(connection)
+        if blocked:
+            raise blocked
+        token = git_connection.decrypt_secret(connection.access_token)
+        if not token:
+            error = git_connection.mark_reconnect_required(connection, "token_decrypt_failed")
+        elif connection.token_expires_at and connection.token_expires_at <= timezone.now():
+            error = git_connection.mark_reconnect_required(connection, "gitlab_token_invalid")
+    if error:
+        raise error
+    return token

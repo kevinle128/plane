@@ -16,4 +16,9 @@ def client_for(connection):
         from plane.agent.services import github_connection
 
         return GithubClient(connection, github_connection.usable_token(connection.id))
+    if connection.provider == "gitlab":
+        from plane.agent.git_providers.gitlab import GitlabClient
+        from plane.agent.services import gitlab_connection
+
+        return GitlabClient(connection, gitlab_connection.usable_token(connection.id))
     raise ValueError(f"Unsupported Git provider: {connection.provider}")
