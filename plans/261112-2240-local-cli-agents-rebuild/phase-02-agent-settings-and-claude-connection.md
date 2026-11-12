@@ -86,7 +86,8 @@ Note: 2.4 AC 2-3, 2.5 AC 2-3 and 2.2/2.3 AC 3 need a Run. Phase 2 commits the se
 
 ```bash
 docker compose -f docker-compose-test.yml run --rm --build api-tests pytest plane/tests/contract/app/test_agent_settings.py plane/tests/contract/app/test_agent_harness_probe.py plane/tests/contract/app/test_agent_worker_auth.py plane/tests/contract/app/test_api_token.py
-cd apps/api && uv run python manage.py makemigrations --check --dry-run && uv run ruff check .
+docker compose -f docker-compose-test.yml run --rm api-tests python manage.py makemigrations --check --dry-run
+cd apps/api && uv run ruff check .
 cd apps/agent-worker && uv sync && uv run pytest -m "not native and not docker" && uv run ruff check . && uv run ruff format --check .
 cd apps/agent-worker && uv run pytest -m native tests/test_claude_probe.py   # Mini only
 pnpm --filter=@plane/blocks test && pnpm turbo run check:types --filter=web --filter=@plane/blocks

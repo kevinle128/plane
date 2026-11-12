@@ -37,7 +37,7 @@ Every `file:line` below was read in this worktree on 2026-11-12.
 | Instance config | Not analysed | `get_configuration_value` (`plane/license/utils/instance_value.py:17-39`); GitHub login keys at `plane/utils/instance_config_variables/core.py:73` | Add GitHub App keys beside them (decision Q3) |
 | Safe HTTP | Not analysed | `pinned_fetch` (`plane/utils/url_security.py`, used at `bgtasks/webhook_task.py:55,317`) | GitHub host is fixed; the GitHub client uses `requests` with timeouts. No new HTTP library |
 | Celery | Beat scan for stale | `beat_schedule` in `plane/celery.py:46-101` with `DatabaseScheduler` (`:124`) | Derive Stale at read time from lease expiry. Use Celery only for catalog refresh and PR comment mirroring |
-| Test markers | Not analysed | `apps/api/pytest.ini` uses `--strict-markers --reuse-db --nomigrations` | Register any new marker. Use `--create-db` after a model change in a reused local database |
+| Test markers | Not analysed | `apps/api/pytest.ini` uses `--strict-markers --reuse-db --nomigrations` | Register any new marker. Use `--create-db` after a model change in a reused local database Concurrency tests (row locks, `IntegrityError` races) use `@pytest.mark.django_db(transaction=True)` and real threads; inside the default per-test transaction they prove nothing <!-- red-team 2026-11-12 --> |
 
 ## 3. Data model (Plane API, PostgreSQL)
 
@@ -124,14 +124,14 @@ New `.py` files need the `COPYRIGHT.txt` header (the CI check runs on all tracke
 Worker markers `native` and `docker` go in `apps/agent-worker/pytest.ini` with `--strict-markers`.
 API contract tests follow `apps/api/plane/tests/TESTING_GUIDE.md` and live in `apps/api/plane/tests/contract/app/test_agent_*.py`.
 
-Standard verification commands (each phase lists its own subset):
+Standard verification commands (each phase lists its own subset): Run each line from the repository root. <!-- red-team 2026-11-12 -->
 
 ```bash
 # API
 docker compose -f docker-compose-test.yml run --rm --build api-tests pytest plane/tests/contract/app -k agent
 docker compose -f docker-compose-test.yml run --rm api-tests pytest plane/tests/unit -k agent
+docker compose -f docker-compose-test.yml run --rm api-tests python manage.py makemigrations --check --dry-run   # local manage.py defaults to production settings and does not load apps/api/.env
 cd apps/api && uv run ruff check . && uv run ruff format --check .
-cd apps/api && uv run python manage.py makemigrations --check --dry-run
 # Worker
 cd apps/agent-worker && uv run pytest -m "not native and not docker" && uv run ruff check .
 # Web

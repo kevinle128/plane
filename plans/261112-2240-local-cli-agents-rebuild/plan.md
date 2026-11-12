@@ -71,3 +71,35 @@ The user accepted all recommended answers on 2026-11-12.
 6. Q6, Worker CI: add a CI job for `apps/agent-worker` that runs ruff and the unit tests.
 7. Q7, hard-link probe: if the probe reads foreign content, the Worker provides the read, list and search tools instead of native Harness reads.
 8. Q8, repository availability (1.2): a repository is available to a member when the workspace grant is active and the member can create projects. Members have no GitHub identity of their own.
+
+## Red Team Review
+
+### Session — 2026-11-12
+**Findings:** 15 (13 accepted and applied, 2 surface-to-user; 0 rejected). Report: [reports/red-team-261112-local-cli-agents-rebuild.md](./reports/red-team-261112-local-cli-agents-rebuild.md)
+**Severity breakdown:** 0 Critical, 4 High, 11 Medium
+**Method note:** one reviewer applied all four lenses (no subagent tool in this run). The lead's brief authorised direct edits for findings that do not touch user decisions. No user decision Q1-Q8 was changed.
+
+| # | Finding | Severity | Disposition | Applied To |
+|---|---------|----------|-------------|------------|
+| F1 | Project create plus binding not atomic; bind race gives 500 and an orphan project | High | Accept | Phase 1 Refactor, 1.5 |
+| F2 | Binding trusts client repository fields; `base_ref` reaches git unvalidated | High | Accept | Phase 1 Key decisions, 1.5 |
+| F3 | Single-use GitHub refresh tokens; concurrent refresh breaks connection | High | Accept | Phase 1 Key decisions, 1.1; Phase 7 Key decisions |
+| F4 | Grant revoke disconnects other workspaces; expired token must not block revoke | Medium | Accept | Phase 1 Key decisions, 1.4 |
+| F5 | `encrypt_data`/`decrypt_data` return `""` on error | Medium | Accept | Phase 1 Key decisions, 1.1 |
+| F6 | Q3 env fallback differs from `get_configuration_value` semantics | Medium | Accept (implements Q3) | Phase 1 Key decisions, Files, 1.1 |
+| F7 | Files list misses settings union, icon map, i18n namespace, constants export, admin form | Medium | Accept | Phase 1 Files |
+| F8 | Uninstall needs App JWT; detach must survive the next sync | Medium | Accept | Phase 1 Key decisions, 1.3 |
+| F9 | Device-flow poll has no concurrency guard | Medium | Accept | Phase 1 Key decisions, 1.1 |
+| F10 | Phase 3 pytest command with two `-k` skips agent contract tests | Medium | Accept | Phase 3 Verification |
+| F11 | 1.4 AC 2 and 1.8 AC 4 have no test in any phase | Medium | Accept | Phase 3 2.7, Phase 7 3.1, story-coverage, Phase 1 Success criteria |
+| F12 | Local `makemigrations --check` needs CI env; run in test container | Medium | Accept | Phases 1-5, 7 Verification; architecture-contracts §7 |
+| F13 | Installation scoping: connecting admin's token decides what all members can bind | High | Surface to user | Phase 1 Risks (open) |
+| F14 | Connection outlives the admin who connected it | Medium | Surface to user | Phase 1 Risks (open) |
+| F15 | Tests Before 3 is not a regression test; log assertion scope | Medium | Accept | Phase 1 Tests Before, 1.1 |
+
+### Whole-Plan Consistency Sweep
+- Files reread: plan.md, phase-01 to phase-07, architecture-contracts.md, story-coverage.md
+- Decision deltas checked: 11 (sync keeps detach, concurrency test DB mode, installation removal semantics, revoke endpoint, refresh locking, binding input source, `base_ref` rule, Q3 accessor, makemigrations command location, pytest `-k` split, deferred 1.4/1.8 ACs)
+- Reconciled stale references: 8 (Phase 1 1.3 and 1.4 rows, Tests Before 1-3 reference, two `app/(all)` paths without the `apps/web/` prefix, makemigrations lines in Phases 2, 3, 4, 5, 7 and architecture-contracts §7, Phase 7 PR token source)
+- Unresolved contradictions: 0. Open product questions: 2 (F13, F14). They do not block Phase 1 tests or files, but the F13 answer decides the installation sync behavior of 1.1/1.2, so answer it before story 1.2 is implemented.
+- Scope change not reconciled: `gitlab-scope-decisions.md` (GitLab in Phase 1, provider-neutral model) appeared during this review and is not yet reflected in the phase files. Rerun this gate on Phase 1 after the phase files include it.

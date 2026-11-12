@@ -74,7 +74,8 @@ Protected by Tests Before 1-2: `run_creation.py` gains the awaiting-repository b
 
 ```bash
 docker compose -f docker-compose-test.yml run --rm --build api-tests pytest plane/tests/contract/app -k "agent_run or agent_older_comments"
-cd apps/api && uv run python manage.py makemigrations --check --dry-run && uv run ruff check .
+docker compose -f docker-compose-test.yml run --rm api-tests python manage.py makemigrations --check --dry-run
+cd apps/api && uv run ruff check .
 cd apps/agent-worker && uv run pytest -m "not native and not docker"
 pnpm --filter=@plane/blocks test && pnpm turbo run check:types --filter=web --filter=@plane/blocks
 pnpm check:lint && pnpm --filter=@plane/i18n check:sync

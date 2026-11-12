@@ -70,3 +70,5 @@ Phase totals: 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 9 (sum 43).
 | 12 | New project | 1 |
 
 Row I070 shows clone progress at project creation. UX-DR16 (epics.md:309) forbids a shared Mirror clone state, so Phase 1 implements the selection part of I070 and omits clone progress.
+
+<!-- red-team 2026-11-12 --> Two Epic 1 criteria need a Run and close in later phases: 1.4 AC 2 (epics.md:472) in Phase 3 (new launches) and Phase 7 (pending PR delivery); 1.8 AC 4 (epics.md:588) in Phase 7 (3.1). Stories 1.4 and 1.8 are "done" only after those tests pass.
