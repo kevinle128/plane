@@ -11,7 +11,7 @@ import useSWR from "swr";
 import { Avatar } from "@makeplane/propel/components/avatar";
 import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
-import { getTokenExpiryState } from "@plane/blocks/agent-run";
+import { getTokenExpiryWarning } from "@plane/blocks/agent-run";
 import { useTranslation } from "@plane/i18n";
 import type { TAgentGitConnection, TAgentGitDisconnectResult, TAgentGitProvider } from "@plane/types";
 import { getFileURL, renderFormattedDate } from "@plane/utils";
@@ -22,7 +22,7 @@ import { GitChangeRequestPolicy } from "./change-request-policy";
 import { GitDisconnectAction } from "./disconnect-action";
 import { GithubSetupCard } from "./github/setup-card";
 import { GitlabSetupCard } from "./gitlab/setup-card";
-import { agentGitProviderLabel } from "./provider-meta";
+import { AgentGitConnectionsError, agentGitConnectionsKey, agentGitProviderLabel } from "./provider-meta";
 
 type Props = {
   workspaceSlug: string;
@@ -139,16 +139,18 @@ function ConnectionMetaStrip({ connection, action }: { connection: TAgentGitConn
 
 function ConnectionWarnings({ connection }: { connection: TAgentGitConnection }) {
   const { t } = useTranslation();
-  const expiry = getTokenExpiryState(connection.token_expires_at);
+  const expiryWarning = getTokenExpiryWarning(connection.provider, connection.token_expires_at);
   const warnings: string[] = [];
   if (connection.warnings.includes("gitlab_token_not_bot")) warnings.push(t("agent_git.gitlab.warnings.not_bot"));
-  if (expiry.expiresSoon && connection.token_expires_at)
+  if (expiryWarning && connection.token_expires_at)
     warnings.push(
-      t("agent_git.gitlab.warnings.expires_soon", { date: renderFormattedDate(connection.token_expires_at) ?? "" })
+      t(`agent_git.gitlab.warnings.${expiryWarning}`, {
+        date: renderFormattedDate(connection.token_expires_at) ?? "",
+      })
     );
   if (connection.worker_last_error)
     warnings.push(
-      t("agent_git.gitlab.warnings.worker_error", { host: connection.host, reason: connection.worker_last_error })
+      t("agent_git.connection.worker_error", { host: connection.host, reason: connection.worker_last_error })
     );
   if (warnings.length === 0) return null;
   return (
@@ -172,7 +174,11 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
   const { t } = useTranslation();
   const { fetchConnections, getConnection } = useAgentGit();
   const [disconnectResult, setDisconnectResult] = useState<TAgentGitDisconnectResult | null>(null);
-  const { isLoading } = useSWR(`AGENT_GIT_CONNECTIONS_${workspaceSlug}`, () => fetchConnections(workspaceSlug));
+  const { data, isLoading, error, mutate } = useSWR(agentGitConnectionsKey(workspaceSlug), () =>
+    fetchConnections(workspaceSlug)
+  );
+  // Without loaded connections the page cannot tell connected from not connected, so it shows only the error.
+  const isReady = !isLoading && data !== undefined;
   const connection = getConnection(workspaceSlug, provider);
   const isConnected = connection?.status === "connected";
   const needsReconnect = connection?.status === "reconnect_required";
@@ -210,7 +216,8 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
           {canEdit && disconnectAction}
         </div>
       )}
-      {!isLoading && isConnected && connection && (
+      {!!error && !isLoading && <AgentGitConnectionsError onRetry={() => void mutate()} />}
+      {isReady && isConnected && connection && (
         <>
           <ConnectionMetaStrip connection={connection} action={canEdit ? disconnectAction : undefined} />
           <ConnectionWarnings connection={connection} />
@@ -218,10 +225,10 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
           <GitChangeRequestPolicy workspaceSlug={workspaceSlug} provider={provider} canEdit={canEdit} />
         </>
       )}
-      {!isLoading && !isConnected && provider === "github" && (
+      {isReady && !isConnected && provider === "github" && (
         <GithubSetupCard workspaceSlug={workspaceSlug} canEdit={canEdit} />
       )}
-      {!isLoading && !isConnected && provider === "gitlab" && (
+      {isReady && !isConnected && provider === "gitlab" && (
         <GitlabSetupCard workspaceSlug={workspaceSlug} canEdit={canEdit} />
       )}
     </div>

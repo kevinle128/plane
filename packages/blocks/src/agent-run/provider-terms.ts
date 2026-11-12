@@ -34,3 +34,13 @@ export function getChangeRequestTerm(provider: TAgentGitProvider): TChangeReques
 export function getPolicyLabelKey(field: TPolicyLabelField, provider: TAgentGitProvider): string {
   return `agent_git.policy.${field}.${getChangeRequestTerm(provider)}`;
 }
+
+const ACCOUNT_TYPE_LABEL_KEYS: Record<string, string> = {
+  Organization: "agent_git.accounts.organization",
+  Group: "agent_git.accounts.group",
+};
+
+/** i18n key of a provider account type (GitHub `Organization`/`User`, GitLab `Group`). Other types read as an account. */
+export function getAccountTypeLabelKey(accountType: string): string {
+  return ACCOUNT_TYPE_LABEL_KEYS[accountType] ?? "agent_git.accounts.user";
+}

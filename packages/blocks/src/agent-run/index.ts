@@ -5,6 +5,7 @@
  */
 
 export * from "./device-flow";
+export * from "./git-errors";
 export * from "./repository-list";
 export * from "./token-expiry";
 export * from "./provider-terms";

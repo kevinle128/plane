@@ -5,9 +5,11 @@
  */
 
 import type { SVGProps } from "react";
+import { Button } from "@makeplane/propel/components/button";
 import { Github, Gitlab } from "@makeplane/propel/icons";
 import { AGENT_GIT_CONNECTION_STATUS_I18N, AGENT_GIT_PROVIDER_LABELS } from "@plane/constants";
 import type { TAgentGitConnection, TAgentGitError, TAgentGitProvider } from "@plane/types";
+import { useTranslation } from "@plane/i18n";
 import { cn } from "@plane/utils";
 
 const PROVIDER_ICONS: Record<TAgentGitProvider, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
@@ -21,6 +23,26 @@ export function AgentGitProviderIcon({ provider, className }: { provider: TAgent
 }
 
 export const agentGitProviderLabel = (provider: TAgentGitProvider) => AGENT_GIT_PROVIDER_LABELS[provider];
+
+/** SWR key of the Git connections of a workspace. */
+export const agentGitConnectionsKey = (workspaceSlug: string) => `AGENT_GIT_CONNECTIONS_${workspaceSlug}`;
+
+/** SWR key of the repository catalog of a workspace. */
+export const agentGitRepositoriesKey = (workspaceSlug: string) => `AGENT_GIT_REPOSITORIES_${workspaceSlug}`;
+
+/** Shown when the connections cannot load, so a failed request does not look like "not connected". */
+export function AgentGitConnectionsError({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-2 rounded-md bg-danger-subtle px-3 py-2 text-body-sm-regular text-danger-primary"
+    >
+      <span className="flex-1">{t("agent_git.connection.load_error")}</span>
+      <Button variant="secondary" size="sm" stretch="auto" label={t("common.retry")} onClick={onRetry} />
+    </div>
+  );
+}
 
 type TTranslate = (key: string, params?: Record<string, unknown>) => string;
 

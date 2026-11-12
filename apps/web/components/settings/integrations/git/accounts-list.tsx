@@ -6,15 +6,16 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { Button } from "@makeplane/propel/components/button";
+import { getAccountTypeLabelKey, isReconnectErrorCode } from "@plane/blocks/agent-run";
 import { ConfirmDialog } from "@plane/blocks/dialog";
 import { setToast } from "@plane/blocks/toast";
 import { useTranslation } from "@plane/i18n";
-import type { TAgentGitAccount, TAgentGitAccountRemoval, TAgentGitConnection } from "@plane/types";
+import type { TAgentGitAccount, TAgentGitAccountRemoval, TAgentGitConnection, TAgentGitError } from "@plane/types";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
-import { agentGitErrorMessage } from "./provider-meta";
+import { agentGitConnectionsKey, agentGitErrorMessage } from "./provider-meta";
 
 type Props = {
   workspaceSlug: string;
@@ -36,11 +37,7 @@ function AccountRow(props: {
   const { account, canEdit, isBusy, onAttach, onRemove } = props;
   const { t } = useTranslation();
   const isAttached = account.state === "attached";
-  const typeLabels: Record<string, string> = {
-    Organization: t("agent_git.accounts.organization"),
-    Group: t("agent_git.accounts.group"),
-  };
-  const typeLabel = typeLabels[account.account_type] ?? t("agent_git.accounts.user");
+  const typeLabel = t(getAccountTypeLabelKey(account.account_type));
   const selectionLabel =
     account.repository_selection === "selected"
       ? t("agent_git.accounts.selected_repositories")
@@ -110,13 +107,20 @@ export const GitAccountsList = observer(function GitAccountsList({ workspaceSlug
     (account) => account.state !== "detached"
   );
 
+  const showError = (error: unknown) => {
+    setToast({ type: "error", title: agentGitErrorMessage(t, error) });
+    // The provider no longer accepts the token: reload the connection so the page shows the reconnect state.
+    if (isReconnectErrorCode((error as TAgentGitError | undefined)?.error))
+      void mutate(agentGitConnectionsKey(workspaceSlug));
+  };
+
   const run = async (action: () => Promise<unknown>, successMessage: string) => {
     setIsBusy(true);
     try {
       await action();
       setToast({ type: "success", title: successMessage });
     } catch (error) {
-      setToast({ type: "error", title: agentGitErrorMessage(t, error) });
+      showError(error);
     } finally {
       setIsBusy(false);
     }
@@ -138,7 +142,7 @@ export const GitAccountsList = observer(function GitAccountsList({ workspaceSlug
       setRemoveTarget(null);
     } catch (error) {
       // The installation stays visible: the store changes only after a successful response.
-      setToast({ type: "error", title: agentGitErrorMessage(t, error) });
+      showError(error);
     } finally {
       setIsRemoving(false);
     }

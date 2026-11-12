@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { getTokenExpiryState } from "./token-expiry";
+import { getTokenExpiryState, getTokenExpiryWarning } from "./token-expiry";
 
 const NOW = Date.parse("2026-11-12T10:00:00Z");
 
@@ -28,5 +28,25 @@ describe("getTokenExpiryState", () => {
 
   it("ignores an unreadable date", () => {
     expect(getTokenExpiryState("soon", NOW)).toEqual({ expired: false, expiresSoon: false });
+  });
+});
+
+describe("getTokenExpiryWarning", () => {
+  it("never warns for GitHub, because Plane refreshes its short-lived token", () => {
+    expect(getTokenExpiryWarning("github", "2026-11-12T18:00:00Z", NOW)).toBeNull();
+    expect(getTokenExpiryWarning("github", "2026-11-12T09:00:00Z", NOW)).toBeNull();
+  });
+
+  it("warns for a GitLab token that expires within 14 days", () => {
+    expect(getTokenExpiryWarning("gitlab", "2026-11-26T00:00:00Z", NOW)).toBe("expires_soon");
+  });
+
+  it("warns for a GitLab token that is already expired", () => {
+    expect(getTokenExpiryWarning("gitlab", "2026-11-12T00:00:00Z", NOW)).toBe("expired");
+  });
+
+  it("does not warn for a GitLab token without expiry or with a far expiry", () => {
+    expect(getTokenExpiryWarning("gitlab", null, NOW)).toBeNull();
+    expect(getTokenExpiryWarning("gitlab", "2027-01-01T00:00:00Z", NOW)).toBeNull();
   });
 });

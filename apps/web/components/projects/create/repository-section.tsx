@@ -9,10 +9,12 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Input } from "@makeplane/propel/components/input";
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
 import { UnlinkOutline } from "@makeplane/propel/icons";
 import {
   describeRepositoryRow,
   filterRepositories,
+  getAccountTypeLabelKey,
   getRepositoryGroupLabel,
   getRepositoryOwners,
   groupRepositories,
@@ -21,10 +23,17 @@ import { AGENT_GIT_PROVIDERS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TAgentGitRepository, TAgentGitRepositorySelection } from "@plane/types";
 import { cn } from "@plane/utils";
-import { AgentGitProviderIcon, agentGitProviderLabel } from "@/components/settings/integrations/git/provider-meta";
+import {
+  AgentGitProviderIcon,
+  agentGitConnectionsKey,
+  agentGitProviderLabel,
+  agentGitRepositoriesKey,
+} from "@/components/settings/integrations/git/provider-meta";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
 
 const NO_REPOSITORIES: TAgentGitRepository[] = [];
+/** Owner filter value that shows the repositories of every owner. */
+const ALL_OWNERS = "";
 
 type Props = {
   workspaceSlug: string;
@@ -78,22 +87,31 @@ export const ProjectRepositorySection = observer(function ProjectRepositorySecti
   const { t } = useTranslation();
   const { fetchConnections, isConnected, fetchRepositories, repositoriesByWorkspace } = useAgentGit();
   const [search, setSearch] = useState("");
-  const [owner, setOwner] = useState("");
+  const [owner, setOwner] = useState(ALL_OWNERS);
   const radioName = useId();
   const headingId = useId();
 
-  const { isLoading: isLoadingConnections } = useSWR(`AGENT_GIT_CONNECTIONS_${workspaceSlug}`, () =>
+  const { isLoading: isLoadingConnections } = useSWR(agentGitConnectionsKey(workspaceSlug), () =>
     fetchConnections(workspaceSlug)
   );
   const connectedProviders = AGENT_GIT_PROVIDERS.filter((provider) => isConnected(workspaceSlug, provider));
   const hasConnection = connectedProviders.length > 0;
+  // The catalog reads every page; do not read it again each time the window gets focus.
   const { isLoading: isLoadingRepositories, error } = useSWR(
-    hasConnection ? `AGENT_GIT_REPOSITORIES_${workspaceSlug}` : null,
-    () => fetchRepositories(workspaceSlug)
+    hasConnection ? agentGitRepositoriesKey(workspaceSlug) : null,
+    () => fetchRepositories(workspaceSlug),
+    { revalidateOnFocus: false }
   );
 
   const rows = repositoriesByWorkspace[workspaceSlug] ?? NO_REPOSITORIES;
   const owners = useMemo(() => getRepositoryOwners(rows), [rows]);
+  const ownerOptions = useMemo(
+    () => [
+      { value: ALL_OWNERS, label: t("agent_git.repository.all_owners") },
+      ...owners.map((item) => ({ value: item, label: item })),
+    ],
+    [owners, t]
+  );
   const groups = useMemo(() => groupRepositories(filterRepositories(rows, { search, owner })), [rows, search, owner]);
   const selectedRow = rows.find((row) => row.id === value?.repository_id) ?? null;
 
@@ -149,23 +167,30 @@ export const ProjectRepositorySection = observer(function ProjectRepositorySecti
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            // Enter filters the list; it must not submit the create-project form.
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.preventDefault();
+            }}
             placeholder={t("agent_git.repository.search_placeholder")}
             aria-label={t("agent_git.repository.search_label")}
           />
         </div>
-        <select
-          value={owner}
-          onChange={(event) => setOwner(event.target.value)}
-          aria-label={t("agent_git.repository.owner_label")}
-          className="rounded-md border border-subtle bg-surface-1 px-2 text-body-sm-regular text-primary"
-        >
-          <option value="">{t("agent_git.repository.all_owners")}</option>
-          {owners.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+        <Select<string> items={ownerOptions} value={owner} onValueChange={(next) => setOwner(next ?? ALL_OWNERS)}>
+          <SelectTrigger
+            size="md"
+            width="fit"
+            aria-label={t("agent_git.repository.owner_label")}
+            // An empty value counts as no selection, so the placeholder names the "all owners" choice.
+            placeholder={t("agent_git.repository.all_owners")}
+          />
+          <SelectContent side="bottom" align="end">
+            <SelectList>
+              {ownerOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value} label={option.label} />
+              ))}
+            </SelectList>
+          </SelectContent>
+        </Select>
       </div>
       <div
         role="radiogroup"
@@ -207,7 +232,7 @@ export const ProjectRepositorySection = observer(function ProjectRepositorySecti
                 <AgentGitProviderIcon provider={group.provider} className="size-3" />
                 {t("agent_git.repository.account_group", {
                   login: getRepositoryGroupLabel(group.provider, account),
-                  type: account.type,
+                  type: t(getAccountTypeLabelKey(account.type)),
                 })}
               </div>
               {account.rows.map((row) => (

@@ -7,6 +7,7 @@
 import { useId, useState } from "react";
 import { observer } from "mobx-react";
 import { FormProvider, useForm } from "react-hook-form";
+import { mutate } from "swr";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { setToast } from "@plane/blocks/toast";
@@ -21,7 +22,7 @@ import { useProject } from "@/hooks/store/use-project";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // plane web types
 import type { TAgentGitRepositorySelection, TProject } from "@plane/types";
-import { agentGitErrorMessage } from "@/components/settings/integrations/git/provider-meta";
+import { agentGitErrorMessage, agentGitRepositoriesKey } from "@/components/settings/integrations/git/provider-meta";
 import { ProjectAttributes } from "./attributes";
 import { ProjectRepositorySection } from "./repository-section";
 import { getProjectFormValues } from "./utils";
@@ -100,6 +101,8 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
     const payload = repository ? { ...formData, repository } : formData;
     return createProject(workspaceSlug.toString(), payload)
       .then(async (res) => {
+        // The new project now uses its repository; other forms must see it as used.
+        if (repository) void mutate(agentGitRepositoriesKey(workspaceSlug.toString()));
         if (uploadedAssetUrl) {
           await updateCoverImageStatus(res.id, uploadedAssetUrl);
           await updateProject(workspaceSlug.toString(), res.id, { cover_image_url: uploadedAssetUrl });
@@ -130,6 +133,8 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           if (typeof errorData.error === "string" && repository) {
             // Repository binding errors carry a stable reason code; the project was not created.
             setToast({ type: "error", title: t("toast.error"), message: agentGitErrorMessage(t, errorData) });
+            // The catalog is out of date (for example another project took the repository): load it again.
+            void mutate(agentGitRepositoriesKey(workspaceSlug.toString()));
           } else if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
               setToast({

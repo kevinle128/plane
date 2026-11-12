@@ -7,6 +7,7 @@
 import { useId, useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
+import { Select, SelectContent, SelectItem, SelectList, SelectTrigger } from "@makeplane/propel/components/select";
 import { Switch } from "@makeplane/propel/components/switch";
 import { getPolicyLabelKey } from "@plane/blocks/agent-run";
 import { setToast } from "@plane/blocks/toast";
@@ -22,6 +23,8 @@ type Props = {
 };
 
 type TPolicyChange = Partial<Omit<TAgentGitPolicy, "provider">>;
+
+const BRANCH_FORMAT_OPTIONS = AGENT_GIT_BRANCH_FORMATS.map((format) => ({ value: format.key, label: format.label }));
 
 function SwitchRow(props: {
   label: string;
@@ -63,32 +66,35 @@ function BranchFormatRow(props: {
   onChange: (value: TAgentGitPolicy["branch_format"]) => void;
 }) {
   const { label, hint, value, disabled, onChange } = props;
-  const selectId = useId();
+  const labelId = useId();
   const hintId = useId();
   return (
     <li className="flex flex-wrap items-center gap-3 border-b border-subtle px-4 py-3 last:border-b-0">
       <span className="flex min-w-45 flex-1 flex-col">
-        <label htmlFor={selectId} className="text-body-sm-medium text-primary">
+        <span id={labelId} className="text-body-sm-medium text-primary">
           {label}
-        </label>
+        </span>
         <span id={hintId} className="text-caption-sm-regular text-tertiary">
           {hint}
         </span>
       </span>
-      <select
-        id={selectId}
+      <Select<TAgentGitPolicy["branch_format"]>
+        items={BRANCH_FORMAT_OPTIONS}
         value={value}
         disabled={disabled}
-        aria-describedby={hintId}
-        onChange={(event) => onChange(event.target.value as TAgentGitPolicy["branch_format"])}
-        className="max-w-full min-w-50 rounded-md border border-subtle bg-surface-1 px-2 py-1 font-code text-caption-sm-regular text-primary disabled:cursor-not-allowed disabled:text-tertiary"
+        onValueChange={(next) => {
+          if (next) onChange(next);
+        }}
       >
-        {AGENT_GIT_BRANCH_FORMATS.map((format) => (
-          <option key={format.key} value={format.key}>
-            {format.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger size="md" width="fit" aria-labelledby={labelId} aria-describedby={hintId} />
+        <SelectContent side="bottom" align="end">
+          <SelectList>
+            {BRANCH_FORMAT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value} label={option.label} />
+            ))}
+          </SelectList>
+        </SelectContent>
+      </Select>
     </li>
   );
 }

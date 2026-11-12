@@ -11,7 +11,13 @@ import { useTranslation } from "@plane/i18n";
 import type { TAgentGitProvider } from "@plane/types";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
-import { AgentGitProviderIcon, AgentGitStatusTag, agentGitProviderLabel } from "./git/provider-meta";
+import {
+  AgentGitConnectionsError,
+  AgentGitProviderIcon,
+  AgentGitStatusTag,
+  agentGitConnectionsKey,
+  agentGitProviderLabel,
+} from "./git/provider-meta";
 
 type Props = { workspaceSlug: string };
 
@@ -23,7 +29,12 @@ const ESSENTIAL_PROVIDERS: { provider: TAgentGitProvider; blurbKey: string }[] =
 export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ workspaceSlug }: Props) {
   const { t } = useTranslation();
   const { fetchConnections, getConnection } = useAgentGit();
-  useSWR(`AGENT_GIT_CONNECTIONS_${workspaceSlug}`, () => fetchConnections(workspaceSlug));
+  const { data, error, isLoading, mutate } = useSWR(agentGitConnectionsKey(workspaceSlug), () =>
+    fetchConnections(workspaceSlug)
+  );
+  const hasLoadError = !!error && !isLoading;
+  // Without loaded connections the status is unknown, so the cards show no status or "Connect" label.
+  const isStatusKnown = data !== undefined;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -35,6 +46,7 @@ export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ w
         <h4 id="agent-git-essentials" className="tracking-wider text-11 font-semibold text-tertiary uppercase">
           {t("agent_git.integrations.essentials")}
         </h4>
+        {hasLoadError && <AgentGitConnectionsError onRetry={() => void mutate()} />}
         <div className="flex flex-wrap gap-3">
           {ESSENTIAL_PROVIDERS.map(({ provider, blurbKey }) => {
             const connection = getConnection(workspaceSlug, provider);
@@ -49,9 +61,8 @@ export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ w
                     <AgentGitProviderIcon provider={provider} />
                   </span>
                   <span className="flex-1 text-body-sm-semibold text-primary">{agentGitProviderLabel(provider)}</span>
-                  {connection ? (
-                    <AgentGitStatusTag connection={connection} t={t} />
-                  ) : (
+                  {isStatusKnown && connection && <AgentGitStatusTag connection={connection} t={t} />}
+                  {isStatusKnown && !connection && (
                     <span className="text-caption-sm-medium text-accent-primary">
                       {t("agent_git.integrations.connect")}
                     </span>
