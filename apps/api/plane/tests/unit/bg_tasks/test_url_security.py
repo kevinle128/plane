@@ -763,10 +763,11 @@ class TestAgentGitHttpSeam:
 
         settings.AGENT_GIT_ALLOWED_HOSTS = ["git.example.com"]
         settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
-        budget = 1.5
+        budget = 2.5
         monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
-        # Without a limit across addresses, 4 addresses would take 4 x 1.0 s.
-        monkeypatch.setattr(http, "CONNECT_TIMEOUT_SECONDS", 1.0)
+        # The second address starts at 2.0 s. If its connect wait is not cut to the
+        # time that remains, it ends at about 4.0 s, past the asserted limit.
+        monkeypatch.setattr(http, "CONNECT_TIMEOUT_SECONDS", 2.0)
         # Patch the resolver above the socket module: urllib3 still resolves each IP literal itself.
         mock_resolve.return_value = [f"127.0.0.{last}" for last in range(1, 5)]
         with _FullAcceptQueueListener() as listener:
