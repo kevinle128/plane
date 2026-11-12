@@ -144,3 +144,11 @@ export type TAgentGitError = {
   provider?: TAgentGitProvider | "";
   detail?: string;
 };
+
+/** Change-request policy of one provider in a workspace. */
+export type TAgentGitPolicy = {
+  provider: TAgentGitProvider;
+  open_as_draft: boolean;
+  mirror_conclusions: boolean;
+  branch_format: "issue" | "project_issue";
+};

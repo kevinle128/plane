@@ -27,6 +27,7 @@ from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers.agent_git import (
     AgentGitAccountSerializer,
     AgentGitConnectionSerializer,
+    AgentGitPolicySerializer,
     AgentGitRepositorySerializer,
     AgentGithubDeviceAuthorizationSerializer,
 )
@@ -37,6 +38,7 @@ from plane.db.models import (
     AgentGitAccountState,
     AgentGitConnection,
     AgentGitConnectionStatus,
+    AgentGitPolicy,
     AgentGitProvider,
     AgentGitRepository,
     AgentGithubDeviceAuthorizationKind,
@@ -247,3 +249,27 @@ class AgentGitRepositoriesEndpoint(BaseAPIView):
             )
             item["available"] = project is None
         return Response({"results": results, "next_cursor": next_cursor}, status=status.HTTP_200_OK)
+
+
+class AgentGitPolicyEndpoint(BaseAPIView):
+    """Change-request policy per provider: members read, admins change."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug, provider):
+        require_provider(provider)
+        workspace = Workspace.objects.get(slug=slug)
+        return Response(git_connection.change_request_policy(workspace.id, provider), status=status.HTTP_200_OK)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def patch(self, request, slug, provider):
+        require_provider(provider)
+        workspace = Workspace.objects.get(slug=slug)
+        serializer = AgentGitPolicySerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            policy, _ = AgentGitPolicy.objects.select_for_update().get_or_create(workspace=workspace, provider=provider)
+            for name, value in serializer.validated_data.items():
+                setattr(policy, name, value)
+            policy.save()
+        return Response(git_connection.change_request_policy(workspace.id, provider), status=status.HTTP_200_OK)

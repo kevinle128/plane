@@ -10,6 +10,7 @@ import type {
   TAgentGitAccountRemoval,
   TAgentGitConnection,
   TAgentGitDisconnectResult,
+  TAgentGitPolicy,
   TAgentGitProvider,
   TAgentGitRepositoryPage,
   TAgentGitRepositoryQuery,
@@ -122,6 +123,26 @@ export class AgentGitService extends APIService {
     query: TAgentGitRepositoryQuery = {}
   ): Promise<TAgentGitRepositoryPage> {
     return this.get(`${this.base(workspaceSlug)}/repositories/`, { params: query })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async getPolicy(workspaceSlug: string, provider: TAgentGitProvider): Promise<TAgentGitPolicy> {
+    return this.get(`${this.base(workspaceSlug)}/${provider}/policy/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updatePolicy(
+    workspaceSlug: string,
+    provider: TAgentGitProvider,
+    data: Partial<Omit<TAgentGitPolicy, "provider">>
+  ): Promise<TAgentGitPolicy> {
+    return this.patch(`${this.base(workspaceSlug)}/${provider}/policy/`, data)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

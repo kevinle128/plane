@@ -126,6 +126,22 @@
       "base_ref_label": "Base branch",
       "base_ref_hint": "Agents start from this branch. Leave empty to use {branch}.",
       "account_group": "{login} · {type}"
+    },
+    "policy": {
+      "title": {
+        "pull_request": "Pull requests from agents"
+      },
+      "description": {
+        "pull_request": "Defaults for the pull requests that agents open from code jobs."
+      },
+      "open_as_draft": {
+        "pull_request": "Open pull requests as drafts"
+      },
+      "open_as_draft_hint": {
+        "pull_request": "Reviewers see the change as a draft until a person marks it ready."
+      },
+      "saved": "Setting saved.",
+      "save_failed": "The setting was not saved. Try again."
     }
   }
 }

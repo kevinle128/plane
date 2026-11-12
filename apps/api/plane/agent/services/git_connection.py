@@ -20,6 +20,7 @@ from plane.db.models import (
     AgentGitAccountState,
     AgentGitConnection,
     AgentGitConnectionStatus,
+    AgentGitPolicy,
     AgentGitRepository,
     ProjectRepositoryBinding,
 )
@@ -161,3 +162,16 @@ def binding_summary(binding):
         "base_ref": binding.base_ref,
         **binding_availability(binding),
     }
+
+
+# Change-request policy
+
+POLICY_FIELDS = ("open_as_draft", "mirror_conclusions", "branch_format")
+
+
+def change_request_policy(workspace_id, provider):
+    """The policy values that agent delivery reads; defaults when the workspace saved none."""
+    policy = AgentGitPolicy.objects.filter(workspace_id=workspace_id, provider=provider).first()
+    if policy is None:
+        policy = AgentGitPolicy(workspace_id=workspace_id, provider=provider)
+    return {"provider": provider, **{name: getattr(policy, name) for name in POLICY_FIELDS}}

@@ -41,9 +41,14 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - The 1.3 and 1.4 binding checks are in `TestBindingAvailability` (removed installation and disconnect keep the binding with `available=false`).
 - Refactor: `ProjectViewSet.create` now saves project, members, states and binding in one `transaction.atomic` block; a bind `IntegrityError` rolls back the project and returns 409. `model_activity.delay` stays after the block.
 
+### 1.6 Set the draft pull-request default
+
+- Test first: `test_agent_git_policy.py` -> collection error (`change_request_policy` missing).
+- Green: policy 6 passed; `pytest plane/tests/contract/app -k agent` 99 passed; `makemigrations --check` clean (`0129_agent_git_policy`); web typecheck 10/10; i18n in sync.
+
 ## Deviations from the plan
 
-1. Migrations: the plan names four migrations. The models are split by story: `0126_agent_git_connection` (connection, device authorization) in 1.1; accounts and repositories in 1.2; binding in 1.5; policy in 1.6.
+1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.
 2. Test fixtures are registered through `plane/tests/conftest.py` (same pattern as `conftest_external`), because importing pytest fixtures into each test module triggers ruff F811.
 3. The admin GitHub page had a lint warning (`promise/always-return`) that the pre-commit hook rejects for any touched file. It was rewritten as an equivalent `try/catch/finally`.
 4. Locales: the `translate` skill is not installed in this runtime. Every non-English `agent.json` carries the English text for the new keys, so `check:sync` passes; the strings still need translation.

@@ -264,3 +264,42 @@ class ProjectRepositoryBinding(BaseModel):
 
     def __str__(self):
         return f"{self.full_name} for project {self.project_id}"
+
+
+class AgentGitBranchFormat(models.TextChoices):
+    ISSUE = "issue", "agent/<issue-identifier>-<run-short-id>"
+    PROJECT_ISSUE = "project_issue", "agent/<project-identifier>/<issue-identifier>-<run-short-id>"
+
+
+class AgentGitPolicy(BaseModel):
+    """Change-request policy of one provider in one workspace.
+
+    A missing row means the defaults: draft change requests on, conclusion
+    mirroring off, branch format ``issue``.
+    """
+
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="agent_git_policies")
+    provider = models.CharField(max_length=16, choices=AgentGitProvider.choices)
+    open_as_draft = models.BooleanField(default=True)
+    mirror_conclusions = models.BooleanField(default=False)
+    branch_format = models.CharField(
+        max_length=32,
+        choices=AgentGitBranchFormat.choices,
+        default=AgentGitBranchFormat.ISSUE,
+    )
+
+    class Meta:
+        verbose_name = "Agent Git Policy"
+        verbose_name_plural = "Agent Git Policies"
+        db_table = "agent_git_policies"
+        ordering = ("provider",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "provider"],
+                condition=Q(deleted_at__isnull=True),
+                name="agent_git_policy_unique_workspace_provider",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.provider} policy of {self.workspace_id}"

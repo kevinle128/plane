@@ -18,6 +18,7 @@ from plane.app.serializers.user import UserLiteSerializer
 from plane.db.models import (
     AgentGitAccount,
     AgentGitConnection,
+    AgentGitPolicy,
     AgentGitProvider,
     AgentGitRepository,
     AgentGithubDeviceAuthorization,
@@ -139,3 +140,11 @@ class AgentGitRepositorySerializer(BaseSerializer):
             "web_url",
         ]
         read_only_fields = fields
+
+
+class AgentGitPolicySerializer(serializers.ModelSerializer):
+    """Writable policy fields; ``provider`` comes from the URL."""
+
+    class Meta:
+        model = AgentGitPolicy
+        fields = ["open_as_draft"]

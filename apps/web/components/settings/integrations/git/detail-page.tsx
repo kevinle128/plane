@@ -17,6 +17,7 @@ import { getFileURL, renderFormattedDate } from "@plane/utils";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
 import { GitAccountsList } from "./accounts-list";
+import { GitChangeRequestPolicy } from "./change-request-policy";
 import { GitDisconnectAction } from "./disconnect-action";
 import { GithubSetupCard } from "./github/setup-card";
 import { agentGitProviderLabel } from "./provider-meta";
@@ -163,6 +164,7 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
         <>
           <ConnectionMetaStrip connection={connection} action={canEdit ? disconnectAction : undefined} />
           <GitAccountsList workspaceSlug={workspaceSlug} connection={connection} canEdit={canEdit} />
+          <GitChangeRequestPolicy workspaceSlug={workspaceSlug} provider={provider} canEdit={canEdit} />
         </>
       )}
       {!isLoading && !isConnected && provider === "github" && (

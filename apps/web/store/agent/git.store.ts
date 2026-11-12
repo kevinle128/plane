@@ -10,6 +10,7 @@ import type {
   TAgentGitAccountRemoval,
   TAgentGitConnection,
   TAgentGitDisconnectResult,
+  TAgentGitPolicy,
   TAgentGitProvider,
   TAgentGitRepository,
   TAgentGithubDeviceAuthorization,
@@ -37,6 +38,15 @@ export interface IAgentGitStore {
   /** Every catalog row the caller can bind, keyed by workspace slug. */
   repositoriesByWorkspace: Record<string, TAgentGitRepository[]>;
   fetchRepositories: (workspaceSlug: string) => Promise<TAgentGitRepository[]>;
+  /** Change-request policy keyed by workspace slug, then provider. */
+  policiesByWorkspace: Record<string, Partial<Record<TAgentGitProvider, TAgentGitPolicy>>>;
+  getPolicy: (workspaceSlug: string, provider: TAgentGitProvider) => TAgentGitPolicy | undefined;
+  fetchPolicy: (workspaceSlug: string, provider: TAgentGitProvider) => Promise<TAgentGitPolicy>;
+  updatePolicy: (
+    workspaceSlug: string,
+    provider: TAgentGitProvider,
+    data: Partial<Omit<TAgentGitPolicy, "provider">>
+  ) => Promise<TAgentGitPolicy>;
   getConnection: (workspaceSlug: string, provider: TAgentGitProvider) => TAgentGitConnection | undefined;
   isConnected: (workspaceSlug: string, provider: TAgentGitProvider) => boolean;
   fetchConnections: (workspaceSlug: string) => Promise<TAgentGitConnection[]>;
@@ -58,6 +68,7 @@ export class AgentGitStore implements IAgentGitStore {
   connectionsByWorkspace: Record<string, Partial<Record<TAgentGitProvider, TAgentGitConnection>>> = {};
   accountsByWorkspace: Record<string, Partial<Record<TAgentGitProvider, TAgentGitAccount[]>>> = {};
   repositoriesByWorkspace: Record<string, TAgentGitRepository[]> = {};
+  policiesByWorkspace: Record<string, Partial<Record<TAgentGitProvider, TAgentGitPolicy>>> = {};
   service: AgentGitService;
 
   constructor() {
@@ -65,6 +76,9 @@ export class AgentGitStore implements IAgentGitStore {
       connectionsByWorkspace: observable,
       accountsByWorkspace: observable,
       repositoriesByWorkspace: observable,
+      policiesByWorkspace: observable,
+      fetchPolicy: action,
+      updatePolicy: action,
       fetchRepositories: action,
       fetchConnections: action,
       disconnect: action,
@@ -132,6 +146,34 @@ export class AgentGitStore implements IAgentGitStore {
       this.repositoriesByWorkspace[workspaceSlug] = rows;
     });
     return rows;
+  };
+
+  getPolicy = (workspaceSlug: string, provider: TAgentGitProvider) =>
+    this.policiesByWorkspace[workspaceSlug]?.[provider];
+
+  private setPolicy(workspaceSlug: string, policy: TAgentGitPolicy) {
+    runInAction(() => {
+      this.policiesByWorkspace[workspaceSlug] = {
+        ...this.policiesByWorkspace[workspaceSlug],
+        [policy.provider]: policy,
+      };
+    });
+  }
+
+  fetchPolicy = async (workspaceSlug: string, provider: TAgentGitProvider) => {
+    const policy = await this.service.getPolicy(workspaceSlug, provider);
+    this.setPolicy(workspaceSlug, policy);
+    return policy;
+  };
+
+  updatePolicy = async (
+    workspaceSlug: string,
+    provider: TAgentGitProvider,
+    data: Partial<Omit<TAgentGitPolicy, "provider">>
+  ) => {
+    const policy = await this.service.updatePolicy(workspaceSlug, provider, data);
+    this.setPolicy(workspaceSlug, policy);
+    return policy;
   };
 
   getAccounts = (workspaceSlug: string, provider: TAgentGitProvider) =>

@@ -10,6 +10,7 @@ from plane.app.views.agent.git import (
     AgentGitAccountsEndpoint,
     AgentGitConnectionEndpoint,
     AgentGitConnectionsEndpoint,
+    AgentGitPolicyEndpoint,
     AgentGitRepositoriesEndpoint,
     AgentGithubAccountsSyncEndpoint,
     AgentGithubDeviceAuthorizationCancelEndpoint,
@@ -53,5 +54,6 @@ urlpatterns = [
         AgentGitAccountAttachEndpoint.as_view(),
         name="agent-git-account-attach",
     ),
+    path(f"{AGENT_GIT}/<str:provider>/policy/", AgentGitPolicyEndpoint.as_view(), name="agent-git-policy"),
     path(f"{AGENT_GIT}/repositories/", AgentGitRepositoriesEndpoint.as_view(), name="agent-git-repositories"),
 ]
