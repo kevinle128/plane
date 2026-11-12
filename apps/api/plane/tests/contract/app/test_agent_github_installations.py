@@ -7,6 +7,7 @@ from rest_framework import status
 
 from plane.bgtasks.agent_git_catalog_task import refresh_catalog
 from plane.db.models import AgentGitAccount, AgentGitConnection
+from plane.tests.agent_git_fakes import json_response
 from plane.tests.agent_git_fixtures import (
     GITHUB_ACCESS_TOKEN,
     GITHUB_REFRESH_TOKEN,
@@ -107,6 +108,26 @@ class TestInstallationSync:
 
         after = list(AgentGitAccount.objects.filter(workspace=workspace).values_list("external_id", "login", "state"))
         assert after == before
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "body",
+        [["not an object"], {"installations": "not a list"}, {"installations": [{"account": {"login": "no-id"}}]}],
+        ids=["list-body", "string-installations", "missing-id"],
+    )
+    def test_malformed_installations_answer_returns_unexpected_response(
+        self, body, session_client, workspace, fake_http, github_app_env
+    ):
+        connection = connected_with(session_client, workspace, fake_http, github_installation(111, "plane-mini"))
+        fake_http.add("GET", "api.github.com/user/installations", json_response(200, body))
+
+        response = session_client.post(accounts_url(workspace.slug, action="sync"), {}, format="json")
+
+        assert response.status_code == status.HTTP_502_BAD_GATEWAY, response.data
+        assert response.data["error"] == "github_unexpected_response"
+        assert list(AgentGitAccount.objects.filter(connection=connection).values_list("external_id", flat=True)) == [
+            "111"
+        ]
 
     @pytest.mark.django_db
     def test_sync_without_connection_returns_provider_disconnected(self, session_client, workspace, fake_http):

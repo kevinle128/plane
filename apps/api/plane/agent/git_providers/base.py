@@ -41,6 +41,23 @@ class RepositoryInfo:
     web_url: str
 
 
+# Column sizes of the repository catalog. A provider value that is longer
+# cannot be stored, so the client skips that repository.
+CATALOG_FIELD_LIMITS = {
+    "external_id": 64,
+    "full_name": 512,
+    "owner_login": 255,
+    "default_branch": 255,
+    "clone_url": 2048,
+    "web_url": 2048,
+}
+
+
+def fits_catalog(info):
+    """Whether every field of ``info`` fits its catalog column."""
+    return all(len(getattr(info, name)) <= limit for name, limit in CATALOG_FIELD_LIMITS.items())
+
+
 @dataclass(frozen=True)
 class RepositoryPage:
     repositories: list = field(default_factory=list)

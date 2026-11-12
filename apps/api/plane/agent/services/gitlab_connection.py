@@ -162,6 +162,8 @@ def _check_token(client, deadline):
     if not token.get("active") or token.get("revoked") or (expires_at and expires_at <= timezone.now()):
         raise _error("gitlab_token_invalid")
     scopes = token.get("scopes") or []
+    if not isinstance(scopes, list):
+        raise _error("gitlab_unexpected_response", "scopes", http_status=502)
     missing = [scope for scope in REQUIRED_SCOPES if scope not in scopes]
     if missing:
         raise _error("gitlab_scope_missing", ", ".join(missing))
@@ -203,7 +205,10 @@ def _check_member(client, group_id, user_id, deadline):
     if response.status_code == 404:
         raise _error("gitlab_role_too_low", "none")
     member = _check_json(response)
-    level = int(member.get("access_level") or 0)
+    try:
+        level = int(member.get("access_level") or 0)
+    except (TypeError, ValueError):
+        raise _error("gitlab_unexpected_response", "access_level", http_status=502)
     if level < DEVELOPER_ACCESS_LEVEL:
         raise _error("gitlab_role_too_low", ACCESS_LEVEL_NAMES.get(level, str(level)))
 

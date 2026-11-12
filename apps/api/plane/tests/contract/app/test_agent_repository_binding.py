@@ -289,6 +289,88 @@ class TestBindingAvailability:
 
 
 @pytest.mark.contract
+class TestConnectingAdminRuleOnBind:
+    @pytest.mark.django_db
+    def test_bind_after_the_connecting_admin_left_returns_reconnect_required(
+        self, workspace, create_user, fake_http, mock_celery
+    ):
+        connection, _, rows = catalog(workspace, create_user)
+        WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=15)
+        member = client_for_user(create_user)
+
+        response = member.post(
+            projects_url(workspace.slug),
+            project_payload("Late", "LATE", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT, response.data
+        assert response.data["error"] == "provider_reconnect_required"
+        assert not Project.objects.filter(workspace=workspace, name="Late").exists()
+        connection.refresh_from_db()
+        assert (connection.status, connection.last_error) == ("reconnect_required", "connected_admin_lost")
+        assert fake_http.calls == []
+
+    @pytest.mark.django_db
+    def test_availability_after_the_connecting_admin_left_is_false(
+        self, session_client, workspace, create_user, fake_http, mock_celery
+    ):
+        _, _, rows = catalog(workspace, create_user)
+        created = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("One", "ONE", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+        binding = ProjectRepositoryBinding.objects.get(project_id=created.data["id"])
+        WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(is_active=False)
+
+        assert binding_availability(binding) == {"available": False, "reason": "provider_reconnect_required"}
+
+    @pytest.mark.django_db
+    def test_gitlab_bind_does_not_depend_on_the_connecting_member(self, workspace, create_user, fake_http, mock_celery):
+        _, _, rows = gitlab_catalog(workspace, create_user)
+        WorkspaceMember.objects.filter(workspace=workspace, member=create_user).update(role=15)
+
+        response = client_for_user(create_user).post(
+            projects_url(workspace.slug),
+            project_payload("Lab", "LAB", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+
+
+@pytest.mark.contract
+class TestBindConstraintRace:
+    @pytest.mark.django_db
+    def test_unique_constraint_conflict_returns_409_and_rolls_back_the_project(
+        self, session_client, workspace, create_user, fake_http, mock_celery, mocker
+    ):
+        """The pre-check misses a binding committed by another request, so the database constraint decides."""
+        from plane.agent.services import git_connection
+        from plane.db.models import ProjectMember, State
+
+        _, _, rows = catalog(workspace, create_user)
+        fields = git_connection.resolve_binding_request(workspace, {"repository_id": str(rows[0].id)})
+        other = session_client.post(projects_url(workspace.slug), project_payload("Other", "OTH"), format="json")
+        assert other.status_code == status.HTTP_201_CREATED, other.data
+        ProjectRepositoryBinding.objects.create(project_id=other.data["id"], **fields)
+        mocker.patch("plane.app.views.project.base.git_connection.resolve_binding_request", return_value=dict(fields))
+        counts = (Project.objects.count(), ProjectMember.objects.count(), State.objects.count())
+
+        response = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("Race", "RACE", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT, response.data
+        assert response.data == {"error": "repository_already_bound", "provider": "github"}
+        assert (Project.objects.count(), ProjectMember.objects.count(), State.objects.count()) == counts
+        assert ProjectRepositoryBinding.objects.filter(workspace=workspace).count() == 1
+
+
+@pytest.mark.contract
 class TestConcurrentBind:
     @pytest.mark.django_db(transaction=True)
     def test_concurrent_binds_give_one_201_and_one_409_and_no_orphan_project(

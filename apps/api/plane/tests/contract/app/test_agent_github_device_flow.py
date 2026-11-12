@@ -36,6 +36,7 @@ from plane.tests.agent_git_fixtures import (
     github_user_response,
     make_workspace_user,
 )
+from plane.tests.agent_git_fakes import json_response
 
 CONNECTIONS_URL = "/api/workspaces/{slug}/agent-git/connections/"
 
@@ -261,6 +262,70 @@ class TestDeviceFlowPoll:
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.data["error"] == "token_encryption_failed"
         assert not AgentGitConnection.objects.filter(workspace=workspace, status="connected").exists()
+
+
+@pytest.mark.contract
+class TestDeviceFlowIdentityFailure:
+    REVOKE_PATH = "api.github.com/applications/Iv1.testclientid/token"
+
+    def _poll_with_identity(self, client, slug, fake, identity_response, revoke_response=None):
+        add_github_connect_routes(fake)
+        fake.add("POST", "github.com/login/device/code", github_device_code_response(interval=0))
+        fake.add("GET", "api.github.com/user", identity_response)
+        fake.add("DELETE", self.REVOKE_PATH, revoke_response or json_response(204))
+        auth_id = start(client, slug).data["id"]
+        return auth_id, poll(client, slug, auth_id)
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "identity_response",
+        [
+            json_response(500, {"message": "Server Error"}),
+            ProviderError("github_url_unreachable", "github", "timeout", http_status=502),
+            json_response(200, ["not an object"]),
+        ],
+        ids=["server-error", "timeout", "list-body"],
+    )
+    def test_identity_failure_ends_the_flow_and_revokes_the_new_token(
+        self, identity_response, session_client, workspace, fake_http, github_app_env
+    ):
+        auth_id, response = self._poll_with_identity(session_client, workspace.slug, fake_http, identity_response)
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        assert (response.data["status"], response.data["last_error"]) == ("denied", "github_identity_failed")
+        assert not AgentGitConnection.objects.filter(workspace=workspace).exists()
+        revoke = next(call for call in fake_http.calls if call["method"] == "DELETE")
+        assert revoke["json_body"] == {"access_token": GITHUB_ACCESS_TOKEN}
+        token_calls = fake_http.count("POST", "github.com/login/oauth/access_token")
+        again = poll(session_client, workspace.slug, auth_id)
+        assert again.data["status"] == "denied"
+        assert fake_http.count("POST", "github.com/login/oauth/access_token") == token_calls
+
+    @pytest.mark.django_db
+    def test_failed_revoke_still_ends_the_flow(self, session_client, workspace, fake_http, github_app_env):
+        _, response = self._poll_with_identity(
+            session_client,
+            workspace.slug,
+            fake_http,
+            json_response(503, {}),
+            revoke_response=json_response(500, {}),
+        )
+
+        assert (response.data["status"], response.data["last_error"]) == ("denied", "github_identity_failed")
+        assert not AgentGitConnection.objects.filter(workspace=workspace).exists()
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("route", ["github.com/login/device/code", "github.com/login/oauth/access_token"])
+    def test_json_array_from_github_returns_unexpected_response(
+        self, route, session_client, workspace, fake_http, github_app_env
+    ):
+        fake_http.add("POST", "github.com/login/device/code", github_device_code_response(interval=0))
+        fake_http.add("POST", route, json_response(200, ["not an object"]))
+        started = start(session_client, workspace.slug)
+        response = started if started.status_code != 201 else poll(session_client, workspace.slug, started.data["id"])
+
+        assert response.status_code == status.HTTP_502_BAD_GATEWAY, response.data
+        assert response.data["error"] == "github_unexpected_response"
 
 
 @pytest.mark.contract

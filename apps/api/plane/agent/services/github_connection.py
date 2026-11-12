@@ -23,7 +23,7 @@ from django.utils import timezone
 # Module imports
 from plane.agent.git_providers import http
 from plane.agent.git_providers.base import ProviderError
-from plane.agent.git_providers.github import api_headers, has_next_page, raise_for_status
+from plane.agent.git_providers.github import api_headers, has_next_page, raise_for_status, unexpected_body
 from plane.agent.services import git_connection
 from plane.db.models import (
     AgentGitAccount,
@@ -51,6 +51,8 @@ DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code"
 # caller does not expire during its request.
 REFRESH_MARGIN = timedelta(minutes=5)
 ADMIN_ROLE = 20
+# Device flow outcome when GitHub gave a token but Plane could not read the GitHub user.
+IDENTITY_FAILED = "github_identity_failed"
 
 GITHUB_APP_CLIENT_ID = "GITHUB_APP_CLIENT_ID"
 GITHUB_APP_CLIENT_SECRET = "GITHUB_APP_CLIENT_SECRET"
@@ -128,7 +130,7 @@ def start_device_authorization(workspace, user, kind):
         headers=_OAUTH_HEADERS,
         data={"client_id": credentials.client_id},
     )
-    body = response.json() or {}
+    body = response.json_object()
     if body.get("error") == "device_flow_disabled":
         raise ProviderError(
             "device_flow_disabled",
@@ -197,7 +199,7 @@ def poll_device_authorization(workspace, authorization_id, user):
                 "grant_type": DEVICE_GRANT_TYPE,
             },
         )
-        body = response.json() or {}
+        body = response.json_object()
         error = body.get("error")
         if error == "authorization_pending":
             pass
@@ -211,9 +213,15 @@ def poll_device_authorization(workspace, authorization_id, user):
         elif response.status_code != 200 or not body.get("access_token"):
             raise _unexpected(response)
         else:
-            connection = _store_connection(workspace, user, body)
-            _sync_after_connect(connection, body["access_token"])
-            authorization.status = AgentGithubDeviceAuthorizationStatus.COMPLETED
+            identity = _identity_or_revoke(body["access_token"])
+            if identity is None:
+                # GitHub consumed the device code, so a later poll cannot succeed.
+                authorization.status = AgentGithubDeviceAuthorizationStatus.DENIED
+                authorization.last_error = IDENTITY_FAILED
+            else:
+                connection = _store_connection(workspace, user, body, identity)
+                _sync_after_connect(connection, body["access_token"])
+                authorization.status = AgentGithubDeviceAuthorizationStatus.COMPLETED
         authorization.save()
 
     logger.info("github device authorization %s is %s", authorization.id, authorization.status)
@@ -238,13 +246,28 @@ def _apply_token_body(connection, body):
     connection.token_expires_at = timezone.now() + timedelta(seconds=int(expires_in)) if expires_in else None
 
 
-def _store_connection(workspace, user, token_body):
-    access_token = token_body["access_token"]
-    response = http.request("GET", f"{GITHUB_API_URL}/user", provider=PROVIDER, headers=api_headers(access_token))
-    identity = response.json() or {}
-    if response.status_code != 200 or not identity.get("login"):
-        raise _unexpected(response)
+def _identity_or_revoke(access_token):
+    """Return the GitHub user of a new token, or revoke the token and return ``None``.
 
+    The device code is already used when this runs, so a failure here ends
+    the flow. The new token is revoked so that no unused grant stays at GitHub.
+    """
+    try:
+        response = http.request("GET", f"{GITHUB_API_URL}/user", provider=PROVIDER, headers=api_headers(access_token))
+        identity = response.json_object()
+        if response.status_code != 200 or not identity.get("login") or identity.get("id") is None:
+            raise _unexpected(response)
+        return identity
+    except ProviderError as error:
+        logger.warning("github identity check after the token exchange failed: %s", error.code)
+    try:
+        _revoke_token(access_token)
+    except ProviderError as error:
+        logger.warning("revoking the unused github token failed: %s", error.code)
+    return None
+
+
+def _store_connection(workspace, user, token_body, identity):
     connection = AgentGitConnection.objects.select_for_update().filter(
         workspace=workspace, provider=PROVIDER
     ).first() or AgentGitConnection(workspace=workspace, provider=PROVIDER)
@@ -297,7 +320,10 @@ def _list_installations(token):
             params={"per_page": 100, "page": page},
         )
         raise_for_status(response)
-        installations.extend((response.json() or {}).get("installations") or [])
+        page_items = response.json_object().get("installations")
+        if not isinstance(page_items, list):
+            raise unexpected_body("installations")
+        installations.extend(page_items)
         if not has_next_page(response):
             break
     return installations
@@ -310,8 +336,11 @@ def sync_installations(connection, token):
     sync never attaches an installation and never clears ``detached``.
     """
     installations = _list_installations(token)
+    if any(not isinstance(item, dict) or item.get("id") is None for item in installations):
+        raise unexpected_body("installation")
     for installation in installations:
-        account_info = installation.get("account") or {}
+        account_info = installation.get("account")
+        account_info = account_info if isinstance(account_info, dict) else {}
         fields = {
             "login": str(account_info.get("login") or installation["id"])[:255],
             "account_type": str(account_info.get("type") or installation.get("target_type") or "")[:32],
@@ -403,7 +432,7 @@ def _refresh_locked(connection):
     )
     if response.status_code >= 500:
         raise _unexpected(response)
-    body = response.json() or {}
+    body = response.json_object()
     if body.get("error") or not body.get("access_token"):
         return None, git_connection.mark_reconnect_required(connection, "github_refresh_failed")
     _apply_token_body(connection, body)

@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 
 # Module imports
 from plane.agent.git_providers import http
-from plane.agent.git_providers.base import ProviderError, RepositoryInfo, RepositoryPage
+from plane.agent.git_providers.base import ProviderError, RepositoryInfo, RepositoryPage, fits_catalog
 
 logger = logging.getLogger("plane.agent.git_providers.gitlab")
 
@@ -36,6 +36,11 @@ def raise_for_status(response):
         raise ProviderError("gitlab_token_invalid", PROVIDER, http_status=409)
     if response.status_code != 200:
         raise ProviderError("gitlab_unexpected_response", PROVIDER, f"HTTP {response.status_code}", http_status=502)
+
+
+def unexpected_body(detail):
+    """A GitLab answer whose JSON does not have the documented shape."""
+    return ProviderError("gitlab_unexpected_response", PROVIDER, detail, http_status=502)
 
 
 class GitlabClient:
@@ -66,27 +71,47 @@ class GitlabClient:
             },
         )
         raise_for_status(response)
+        items = response.json()
+        if not isinstance(items, list):
+            raise unexpected_body("projects")
         expected = urlsplit(self.connection.base_url)
         repositories = []
-        for item in response.json() or []:
-            clone = urlsplit(str(item.get("http_url_to_repo") or ""))
+        for item in items:
+            if not isinstance(item, dict) or item.get("id") is None or not item.get("path_with_namespace"):
+                raise unexpected_body("project")
+            external_id = str(item["id"])[:64]
+            try:
+                clone = urlsplit(str(item.get("http_url_to_repo") or ""))
+                clone_port = clone.port
+            except ValueError:
+                clone, clone_port = None, None
             # A project whose clone URL points at another host or scheme is skipped,
             # so the Worker is never sent to a third host through an API response.
-            if clone.scheme != expected.scheme or clone.hostname != expected.hostname or clone.port != expected.port:
-                logger.warning("gitlab project %s skipped: clone URL is not on the connection host", item.get("id"))
+            if (
+                clone is None
+                or clone.scheme != expected.scheme
+                or clone.hostname != expected.hostname
+                or clone_port != expected.port
+            ):
+                logger.warning("gitlab project %s skipped: clone URL is not on the connection host", external_id)
                 continue
             path = str(item["path_with_namespace"])
-            repositories.append(
-                RepositoryInfo(
-                    external_id=str(item["id"]),
-                    full_name=path,
-                    owner_login=str((item.get("namespace") or {}).get("full_path") or path.rsplit("/", 1)[0]),
-                    private=item.get("visibility") != "public",
-                    default_branch=str(item.get("default_branch") or ""),
-                    clone_url=str(item["http_url_to_repo"]),
-                    web_url=str(item.get("web_url") or ""),
-                )
+            namespace = item.get("namespace")
+            info = RepositoryInfo(
+                external_id=str(item["id"]),
+                full_name=path,
+                owner_login=str(
+                    (namespace.get("full_path") if isinstance(namespace, dict) else None) or path.rsplit("/", 1)[0]
+                ),
+                private=item.get("visibility") != "public",
+                default_branch=str(item.get("default_branch") or ""),
+                clone_url=str(item["http_url_to_repo"]),
+                web_url=str(item.get("web_url") or ""),
             )
+            if fits_catalog(info):
+                repositories.append(info)
+            else:
+                logger.warning("gitlab project %s skipped: a value is too long for the catalog", external_id)
         # GitLab sends an empty X-Next-Page on the last page.
         next_page = (response.header("X-Next-Page") or "").strip()
         return RepositoryPage(repositories=repositories, next_cursor=next_page or None)

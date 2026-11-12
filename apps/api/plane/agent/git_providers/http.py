@@ -70,6 +70,11 @@ class HttpResponse:
             # A deeply nested body from a hostile server raises RecursionError.
             return None
 
+    def json_object(self):
+        """Return the decoded body when it is a JSON object, else an empty dict."""
+        body = self.json()
+        return body if isinstance(body, dict) else {}
+
 
 def new_deadline(seconds):
     """Return a deadline for a sequence of calls that share one time budget."""

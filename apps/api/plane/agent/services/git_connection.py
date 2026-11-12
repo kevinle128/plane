@@ -21,6 +21,7 @@ from plane.db.models import (
     AgentGitConnection,
     AgentGitConnectionStatus,
     AgentGitPolicy,
+    AgentGitProvider,
     AgentGitRepository,
     ProjectRepositoryBinding,
 )
@@ -80,6 +81,20 @@ def get_connection(workspace_id, provider):
 # Repository binding
 
 
+def _ensure_connected_admin(connection):
+    """GitHub only: set ``reconnect_required`` when the connecting admin is no longer an active Admin.
+
+    A GitLab Group Access Token belongs to a group bot user, not to a
+    workspace member, so the rule does not apply to GitLab.
+    """
+    if connection.provider != AgentGitProvider.GITHUB:
+        return
+    # github_connection imports this module, so import it here.
+    from plane.agent.services import github_connection
+
+    github_connection.ensure_connected_admin(connection)
+
+
 def binding_availability(binding):
     """Whether new agent work may use ``binding``.
 
@@ -90,6 +105,7 @@ def binding_availability(binding):
     account = binding.account
     if account is None or account.deleted_at is not None or account.state != AgentGitAccountState.ATTACHED:
         return {"available": False, "reason": "repository_unavailable"}
+    _ensure_connected_admin(account.connection)
     blocked = status_error(account.connection)
     if blocked is not None:
         return {"available": False, "reason": blocked.code}
@@ -119,6 +135,7 @@ def resolve_binding_request(workspace, repository):
     )
     if row is None:
         raise ProviderError("repository_not_found", "", http_status=404)
+    _ensure_connected_admin(row.account.connection)
     blocked = status_error(row.account.connection)
     if blocked is not None:
         blocked.detail = ""

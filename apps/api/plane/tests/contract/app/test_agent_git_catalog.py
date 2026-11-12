@@ -279,3 +279,127 @@ class TestGitlabCatalogRefresh:
         connection.refresh_from_db()
         assert (connection.status, connection.last_error) == ("reconnect_required", "gitlab_token_invalid")
         assert len(fake_http.calls) == calls_before
+
+
+def gitlab_project(project_id, path, **overrides):
+    project = {
+        "id": project_id,
+        "path_with_namespace": path,
+        "namespace": {"full_path": path.rsplit("/", 1)[0]},
+        "visibility": "private",
+        "default_branch": "main",
+        "http_url_to_repo": f"https://git.example.com/{path}.git",
+        "web_url": f"https://git.example.com/{path}",
+    }
+    project.update(overrides)
+    return project
+
+
+@pytest.mark.contract
+class TestCatalogUntrustedShapes:
+    def _refreshed_once(self, session_client, workspace, fake_http):
+        connection = connected_gitlab(session_client, workspace, fake_http)
+        fake_http.add("GET", GITLAB_PROJECTS, gitlab_page("group_projects_page1.json"))
+        refresh_catalog(connection.id)
+        return connection
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"message": "not a list"},
+            ["not an object"],
+            [{"id": 105, "http_url_to_repo": "https://git.example.com/platform/x.git"}],
+            [gitlab_project(None, "platform/no-id")],
+        ],
+        ids=["object-body", "string-item", "missing-path", "missing-id"],
+    )
+    def test_malformed_gitlab_page_records_the_error_and_keeps_the_snapshot(
+        self, body, session_client, workspace, fake_http, mock_celery
+    ):
+        connection = self._refreshed_once(session_client, workspace, fake_http)
+        fake_http.add("GET", GITLAB_PROJECTS, json_response(200, body, headers={"X-Next-Page": ""}))
+
+        refresh_catalog(connection.id)
+
+        account = AgentGitAccount.objects.get(connection=connection, state="attached")
+        assert account.catalog_error == "gitlab_unexpected_response"
+        assert names(workspace) == ["platform/api", "platform/tools/cli"]
+
+    @pytest.mark.django_db
+    def test_value_longer_than_the_catalog_field_skips_only_that_project(
+        self, session_client, workspace, fake_http, mock_celery
+    ):
+        connection = connected_gitlab(session_client, workspace, fake_http)
+        long_path = "platform/" + "x" * 600
+        fake_http.add(
+            "GET",
+            GITLAB_PROJECTS,
+            json_response(
+                200,
+                [gitlab_project(201, "platform/ok"), gitlab_project(202, long_path)],
+                headers={"X-Next-Page": ""},
+            ),
+        )
+
+        refresh_catalog(connection.id)
+
+        assert names(workspace) == ["platform/ok"]
+        assert AgentGitAccount.objects.get(connection=connection, state="attached").catalog_error == ""
+
+    @pytest.mark.django_db
+    def test_any_failure_of_one_account_is_recorded_and_the_next_account_is_read(
+        self, session_client, workspace, fake_http, github_app_env, mocker
+    ):
+        connection = attached_github(session_client, workspace, fake_http)
+        second = AgentGitAccount.objects.create(
+            connection=connection,
+            workspace=workspace,
+            provider="github",
+            external_id="222",
+            login="beta",
+            account_type="Organization",
+            state="attached",
+        )
+        first = AgentGitAccount.objects.get(connection=connection, external_id="111")
+        fake_http.add(
+            "GET",
+            github_installation_repositories_path(222),
+            github_repositories_page(github_repository(601, "beta/api")),
+        )
+        from plane.agent.git_providers.github import GithubClient
+
+        real = GithubClient.list_repositories
+
+        def broken_for_first(client, account, cursor=None):
+            if account.pk == first.pk:
+                raise RuntimeError("unexpected failure")
+            return real(client, account, cursor)
+
+        mocker.patch.object(GithubClient, "list_repositories", broken_for_first)
+
+        refresh_catalog(connection.id)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.catalog_error == "github_unexpected_response"
+        assert second.catalog_error == ""
+        assert names(workspace) == ["beta/api"]
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "body",
+        [
+            ["not an object"],
+            {"repositories": "not a list"},
+            {"repositories": [{"clone_url": "https://github.com/a/b.git"}]},
+        ],
+        ids=["list-body", "string-repositories", "missing-id"],
+    )
+    def test_malformed_github_page_records_the_error(self, body, session_client, workspace, fake_http, github_app_env):
+        connection = attached_github(session_client, workspace, fake_http)
+        fake_http.add("GET", REPOS_PATH, json_response(200, body))
+
+        refresh_catalog(connection.id)
+
+        assert AgentGitAccount.objects.get(connection=connection).catalog_error == "github_unexpected_response"

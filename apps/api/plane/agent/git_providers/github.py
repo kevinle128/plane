@@ -5,11 +5,14 @@
 """GitHub client for the provider-neutral interface."""
 
 # Python imports
+import logging
 from urllib.parse import urlsplit
 
 # Module imports
 from plane.agent.git_providers import http
-from plane.agent.git_providers.base import ProviderError, RepositoryInfo, RepositoryPage
+from plane.agent.git_providers.base import ProviderError, RepositoryInfo, RepositoryPage, fits_catalog
+
+logger = logging.getLogger("plane.agent.git_providers.github")
 
 PROVIDER = "github"
 GITHUB_HOST = "github.com"
@@ -37,6 +40,11 @@ def raise_for_status(response):
         raise ProviderError("github_unexpected_response", PROVIDER, f"HTTP {response.status_code}", http_status=502)
 
 
+def unexpected_body(detail):
+    """A GitHub answer whose JSON does not have the documented shape."""
+    return ProviderError("github_unexpected_response", PROVIDER, detail, http_status=502)
+
+
 def _on_github(url):
     parts = urlsplit(url or "")
     return parts.scheme == "https" and parts.hostname == GITHUB_HOST
@@ -57,22 +65,32 @@ class GithubClient:
             params={"per_page": PAGE_SIZE, "page": page},
         )
         raise_for_status(response)
-        body = response.json() or {}
+        items = response.json_object().get("repositories")
+        if not isinstance(items, list):
+            raise unexpected_body("repositories")
         repositories = []
-        for item in body.get("repositories") or []:
+        for item in items:
+            if not isinstance(item, dict) or item.get("id") is None or not item.get("full_name"):
+                raise unexpected_body("repository")
             # Only GitHub-hosted clone URLs reach the catalog, so the Worker is
             # never pointed at another host through an API response.
             if not _on_github(item.get("clone_url")):
                 continue
-            repositories.append(
-                RepositoryInfo(
-                    external_id=str(item["id"]),
-                    full_name=str(item["full_name"]),
-                    owner_login=str((item.get("owner") or {}).get("login") or item["full_name"].split("/")[0]),
-                    private=bool(item.get("private", True)),
-                    default_branch=str(item.get("default_branch") or ""),
-                    clone_url=str(item["clone_url"]),
-                    web_url=str(item.get("html_url") or ""),
-                )
+            full_name = str(item["full_name"])
+            owner = item.get("owner")
+            info = RepositoryInfo(
+                external_id=str(item["id"]),
+                full_name=full_name,
+                owner_login=str((owner.get("login") if isinstance(owner, dict) else None) or full_name.split("/")[0]),
+                private=bool(item.get("private", True)),
+                default_branch=str(item.get("default_branch") or ""),
+                clone_url=str(item["clone_url"]),
+                web_url=str(item.get("html_url") or ""),
             )
+            if fits_catalog(info):
+                repositories.append(info)
+            else:
+                logger.warning(
+                    "github repository %s skipped: a value is too long for the catalog", info.external_id[:64]
+                )
         return RepositoryPage(repositories=repositories, next_cursor=str(page + 1) if has_next_page(response) else None)

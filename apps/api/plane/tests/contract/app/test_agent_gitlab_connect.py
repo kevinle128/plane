@@ -363,6 +363,32 @@ class TestGitlabConnectFailures:
 
     @pytest.mark.django_db
     @pytest.mark.parametrize(
+        "routes",
+        [
+            {"member": json_response(200, {"id": 77, "access_level": "maintainer"})},
+            {"member": json_response(200, {"id": 77, "access_level": [30]})},
+            {
+                "token": json_response(
+                    200, {**gitlab_fixture("token_self_active.json"), "scopes": "api write_repository"}
+                )
+            },
+            {"user": json_response(200, {"username": "no-id"})},
+        ],
+        ids=["text-access-level", "list-access-level", "text-scopes", "user-without-id"],
+    )
+    def test_malformed_answer_returns_unexpected_response_and_stores_nothing(
+        self, routes, session_client, workspace, fake_http, mock_celery
+    ):
+        add_gitlab_connect_routes(fake_http, **routes)
+
+        response = connect(session_client, workspace.slug)
+
+        assert response.status_code == status.HTTP_502_BAD_GATEWAY, response.data
+        assert response.data["error"] == "gitlab_unexpected_response"
+        assert_nothing_stored(workspace)
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
         "base_url",
         [
             "http://git.example.com",

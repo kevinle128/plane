@@ -32,6 +32,10 @@ MAX_PAGES = 200
 TOKEN_INVALID_CODES = {"github_token_invalid", "gitlab_token_invalid"}
 
 
+def _unexpected(account, detail=""):
+    return ProviderError(f"{account.provider}_unexpected_response", account.provider, detail, http_status=502)
+
+
 def _fetch_all(client, account):
     repositories = []
     cursor = None
@@ -41,7 +45,7 @@ def _fetch_all(client, account):
         if not page.next_cursor:
             return repositories
         cursor = page.next_cursor
-    raise ProviderError(f"{account.provider}_unexpected_response", account.provider, "too_many_pages", http_status=502)
+    raise _unexpected(account, "too_many_pages")
 
 
 @transaction.atomic
@@ -101,12 +105,18 @@ def refresh_catalog(connection_id):
     for account in accounts:
         try:
             repositories = _fetch_all(client, account)
+            _swap_snapshot(account.id, repositories)
         except ProviderError as error:
             logger.warning("catalog refresh for account %s failed: %s", account.id, error.code)
             if not _record_failure(connection, account, error):
                 return
             continue
-        _swap_snapshot(account.id, repositories)
+        except Exception:
+            # Provider answers are untrusted: any other failure is recorded on the
+            # account, so the admin sees a reason, and the next account is read.
+            logger.exception("catalog refresh for account %s failed unexpectedly", account.id)
+            _record_failure(connection, account, _unexpected(account))
+            continue
         logger.info("catalog of account %s refreshed with %s repositories", account.id, len(repositories))
 
 
