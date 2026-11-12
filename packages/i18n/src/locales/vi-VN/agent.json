@@ -150,22 +150,28 @@
     },
     "policy": {
       "title": {
-        "pull_request": "Pull requests from agents"
+        "pull_request": "Pull requests from agents",
+        "merge_request": "Merge requests from agents"
       },
       "description": {
-        "pull_request": "Defaults for the pull requests that agents open from code jobs."
+        "pull_request": "Defaults for the pull requests that agents open from code jobs.",
+        "merge_request": "Defaults for the merge requests that agents open from code jobs."
       },
       "open_as_draft": {
-        "pull_request": "Open pull requests as drafts"
+        "pull_request": "Open pull requests as drafts",
+        "merge_request": "Open merge requests as drafts"
       },
       "open_as_draft_hint": {
-        "pull_request": "Reviewers see the change as a draft until a person marks it ready."
+        "pull_request": "Reviewers see the change as a draft until a person marks it ready.",
+        "merge_request": "Reviewers see the change as a draft until a person marks it ready."
       },
       "mirror_conclusions": {
-        "pull_request": "Post run conclusions as PR comments"
+        "pull_request": "Post run conclusions as PR comments",
+        "merge_request": "Post run conclusions as merge request comments"
       },
       "mirror_conclusions_hint": {
-        "pull_request": "The conclusion of each run is also posted as a comment on the agent's pull request."
+        "pull_request": "The conclusion of each run is also posted as a comment on the agent's pull request.",
+        "merge_request": "The conclusion of each run is also posted as a comment on the agent's merge request."
       },
       "branch_format": "Branch format",
       "branch_format_hint": "Each run gets its own branch. The run ID at the end keeps names unique, and a run keeps its branch when this format changes.",

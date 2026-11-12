@@ -111,3 +111,51 @@ class TestBranchFormat:
         response = member_client.patch(policy_url(workspace.slug), {"branch_format": "project_issue"}, format="json")
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.contract
+class TestGitlabMergeRequestPolicy:
+    @pytest.mark.django_db
+    def test_gitlab_policy_has_the_same_defaults(self, session_client, workspace):
+        response = session_client.get(policy_url(workspace.slug, provider="gitlab"))
+
+        assert response.data == {
+            "provider": "gitlab",
+            "open_as_draft": True,
+            "mirror_conclusions": False,
+            "branch_format": "issue",
+        }
+
+    @pytest.mark.django_db
+    def test_changing_gitlab_leaves_github_unchanged_and_the_reverse(self, session_client, workspace):
+        session_client.patch(
+            policy_url(workspace.slug, provider="gitlab"),
+            {"open_as_draft": False, "mirror_conclusions": True, "branch_format": "project_issue"},
+            format="json",
+        )
+        session_client.patch(
+            policy_url(workspace.slug, provider="github"), {"mirror_conclusions": False}, format="json"
+        )
+
+        assert change_request_policy(workspace.id, "github") == {
+            "provider": "github",
+            "open_as_draft": True,
+            "mirror_conclusions": False,
+            "branch_format": "issue",
+        }
+        assert change_request_policy(workspace.id, "gitlab") == {
+            "provider": "gitlab",
+            "open_as_draft": False,
+            "mirror_conclusions": True,
+            "branch_format": "project_issue",
+        }
+
+    @pytest.mark.django_db
+    def test_member_reads_gitlab_policy_but_cannot_change_it(self, member_client, workspace):
+        assert member_client.get(policy_url(workspace.slug, provider="gitlab")).status_code == status.HTTP_200_OK
+
+        response = member_client.patch(
+            policy_url(workspace.slug, provider="gitlab"), {"open_as_draft": False}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN

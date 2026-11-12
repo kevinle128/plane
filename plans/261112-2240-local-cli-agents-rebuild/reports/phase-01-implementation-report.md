@@ -81,6 +81,44 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Test first: 3 of 6 cases failed (`DELETE gitlab/connection/` was a 404). The 403/401 catalog case, the member 403 and the "group cannot be removed alone" (400) cases already held from G2 and 1.3.
 - Green: GitLab disconnect 6 passed; `pytest plane/tests/contract/app -k agent` 182 passed; `ruff check plane` clean; web typecheck 10/10; i18n in sync. The test asserts that the HTTP seam receives no call during disconnect.
 
+### G5 Set GitLab merge-request policy
+
+- Test first: blocks `provider-terms.test.ts` -> `Cannot find module './provider-terms'`. The 3 API cases (GitLab defaults, independence of the two providers, member 403) passed on their first run, because the policy has been keyed by (workspace, provider) since 1.6.
+- Green: blocks agent-run 27 passed; web and blocks typecheck 11/11; i18n in sync. The detail page reads every policy label through `getPolicyLabelKey`, so GitLab shows "merge request" terms.
+- AC4 (Runs read the GitLab policy) closes in Phase 3 (snapshot) and Phase 7 (G6), as the plan states.
+
+## Phase verification (run before the G5 commit, on the G5 tree)
+
+| Command                                                                                                                               | Result                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `docker compose -f docker-compose-test.yml run --rm --build api-tests pytest <the 11 files of the phase list> --create-db`            | 268 passed                                                                                                                           |
+| `... pytest test_url_security.py test_ssrf_advisories.py test_work_item_link_task.py test_outbound_allowlists.py`                     | 118 passed                                                                                                                           |
+| `... python manage.py makemigrations --check --dry-run`                                                                               | No changes detected                                                                                                                  |
+| `... ruff check .` (ruff 0.9.7 from the locked test image; host uv is 0.10.9, not the required 0.12.21, so ruff ran in the container) | clean                                                                                                                                |
+| `... ruff format --check .`                                                                                                           | 53 files would be reformatted, the same count as on `preview`; none is a file of this phase (migrations are excluded by `ruff.toml`) |
+| `... pytest` (full API suite)                                                                                                         | 1840 passed, 4 skipped (the GitLab smoke module without a token)                                                                     |
+| `pnpm --filter=@plane/blocks test`                                                                                                    | 40 files, 415 passed                                                                                                                 |
+| `pnpm turbo run check:types --filter=web --filter=admin --filter=@plane/blocks --filter=@plane/types --filter=@plane/constants`       | 14/14 tasks successful                                                                                                               |
+| `pnpm check:lint`                                                                                                                     | exit 0, 15/15 tasks; the remaining warnings are in files this phase did not touch                                                    |
+| `pnpm check:format`                                                                                                                   | 15/15 tasks successful                                                                                                               |
+| `pnpm --filter=@plane/i18n check:sync`                                                                                                | all locales in sync                                                                                                                  |
+| Copyright header on every new `.py/.ts/.tsx` (manual check; `addlicense` is not installed)                                            | present                                                                                                                              |
+| GitLab live read-only smoke (`PLANE_TEST_GITLAB_REQUIRED=1`)                                                                          | NOT RUN: no readable token (privacy hook)                                                                                            |
+
+## Manual browser check (scenes 11 and 12) — NOT RUN
+
+No browser automation is available in this session, and the check needs the local stack (`docker compose -f docker-compose-local.yml up -d`, `pnpm dev`) plus a person or a browser driver. Script to run, in Light and Dark at 375, 768 and 1280 px, keyboard only:
+
+1. As an admin, open Workspace settings → Integrations. Expect the Integrations tab under Features, an "Essentials" group with GitHub and GitLab cards, and a status tag in text (Connect / Connected / Reconnect required). (I046)
+2. As a member, open the same page and the GitHub page. Expect read access, disabled policy switches and the read-only note; no Authenticate, Attach, Remove or Disconnect action. As a guest, expect no Integrations tab.
+3. GitHub not connected: the setup card with the 3-row checklist, "Authenticate with GitHub", and "I'll do this later". Start the flow: the device card shows "Waiting for GitHub", the code in a mono box with a label, "Expires in m:ss" counting down, "Open GitHub", "I entered the code", "Cancel". Tab order: Open GitHub → I entered the code → Cancel. Cancel shows "Authorization cancelled. Nothing was connected." (I054-I057)
+4. GitHub connected (needs App credentials): meta strip (Enabled by, Account, Scopes, Disconnect), Connections list with candidates (Attach) and attached installations (Remove), "Connect organisation" opens the install page in a new tab, "Refresh installations". Remove shows the confirm dialog, then the notice with "Open GitHub settings". (I047-I050)
+5. Pull-request policy rows: "Open pull requests as drafts" on, "Post run conclusions as PR comments" off, Branch format select with both Run-unique patterns. Change each, reload, values stay. (I051-I053)
+6. Disconnect GitHub: confirm dialog text, then the page returns to the setup card. (I048)
+7. GitLab: the token form (GitLab URL, Group path, Group Access Token as a password field, optional CA bundle) with labels and hints; a wrong value shows the reason in a `role="alert"` text. After connect: meta strip (GitLab URL, Version, Token, Token user, Expires), the group row, the human-token warning when the token is not a bot, "Merge requests from agents" policy rows. Disconnect shows the revoke-in-GitLab text and the "Open GitLab access tokens" link.
+8. New project modal (scene 12): with no provider connected, the dashed card with "Open Workspace settings → Integrations". With a provider connected: Repository heading with provider names, search, owner select, "No repository" option with its warning, groups headed "GitHub · <owner> · <type>", rows with Private/Public pills, "Already used by <project>" rows disabled, arrow keys move the radio selection, the Base branch field with the default branch as placeholder. I070 shows no clone progress. (I068-I071, I076, I077)
+9. Check that no nested interactive element exists (axe or keyboard) in the cards, rows and dialogs.
+
 ## Deviations from the plan
 
 1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.

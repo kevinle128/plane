@@ -8,6 +8,7 @@ import { useId, useState } from "react";
 import { observer } from "mobx-react";
 import useSWR from "swr";
 import { Switch } from "@makeplane/propel/components/switch";
+import { getPolicyLabelKey } from "@plane/blocks/agent-run";
 import { setToast } from "@plane/blocks/toast";
 import { AGENT_GIT_BRANCH_FORMATS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
@@ -100,7 +101,6 @@ export const GitChangeRequestPolicy = observer(function GitChangeRequestPolicy(p
   const [isSaving, setIsSaving] = useState(false);
   useSWR(`AGENT_GIT_POLICY_${workspaceSlug}_${provider}`, () => fetchPolicy(workspaceSlug, provider));
   const policy = getPolicy(workspaceSlug, provider);
-  const term = "pull_request";
 
   const save = async (change: TPolicyChange) => {
     setIsSaving(true);
@@ -121,22 +121,22 @@ export const GitChangeRequestPolicy = observer(function GitChangeRequestPolicy(p
     <section className="flex flex-col gap-3" aria-labelledby="agent-git-policy-title">
       <div className="flex flex-col gap-1">
         <h4 id="agent-git-policy-title" className="text-body-sm-semibold text-primary">
-          {t(`agent_git.policy.title.${term}`)}
+          {t(getPolicyLabelKey("title", provider))}
         </h4>
-        <p className="text-caption-sm-regular text-tertiary">{t(`agent_git.policy.description.${term}`)}</p>
+        <p className="text-caption-sm-regular text-tertiary">{t(getPolicyLabelKey("description", provider))}</p>
         {!canEdit && <p className="text-caption-sm-regular text-tertiary">{t("agent_git.integrations.read_only")}</p>}
       </div>
       <ul className="rounded-lg border border-subtle bg-surface-1">
         <SwitchRow
-          label={t(`agent_git.policy.open_as_draft.${term}`)}
-          hint={t(`agent_git.policy.open_as_draft_hint.${term}`)}
+          label={t(getPolicyLabelKey("open_as_draft", provider))}
+          hint={t(getPolicyLabelKey("open_as_draft_hint", provider))}
           checked={policy.open_as_draft}
           disabled={disabled}
           onChange={(checked) => void save({ open_as_draft: checked })}
         />
         <SwitchRow
-          label={t(`agent_git.policy.mirror_conclusions.${term}`)}
-          hint={t(`agent_git.policy.mirror_conclusions_hint.${term}`)}
+          label={t(getPolicyLabelKey("mirror_conclusions", provider))}
+          hint={t(getPolicyLabelKey("mirror_conclusions_hint", provider))}
           checked={policy.mirror_conclusions}
           disabled={disabled}
           onChange={(checked) => void save({ mirror_conclusions: checked })}
