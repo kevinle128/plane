@@ -1,0 +1,1843 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="_ds/plane-propel-85052822-e844-4817-9eef-981c38dc9eae/fonts/fonts.css">
+<link rel="stylesheet" href="_ds/plane-propel-85052822-e844-4817-9eef-981c38dc9eae/_ds_bundle.css">
+<link rel="stylesheet" href="_ds/plane-propel-85052822-e844-4817-9eef-981c38dc9eae/styles.css">
+<script src="_ds/plane-propel-85052822-e844-4817-9eef-981c38dc9eae/_ds_bundle.js"></script>
+<style>body{margin:0}*{scrollbar-width:thin}
+@keyframes om-sweep{0%{transform:translateX(-70%)}100%{transform:translateX(250%)}}
+@keyframes om-breathe{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}</style>
+</helmet>
+<div ref="{{ rootRef }}" class="bg-canvas text-primary font-body flex flex-col" style="height:100vh;min-height:720px;overflow:hidden">
+
+  <div class="flex items-center gap-2 px-4 border-b border-subtle bg-surface-2 shrink-0" style="height:40px;overflow-x:auto">
+    <span class="text-caption-sm-regular text-tertiary shrink-0" style="letter-spacing:.04em">MOCKUP</span>
+    <sc-for list="{{ scenes }}" as="s" hint-placeholder-count="6">
+      <button type="button" onClick="{{ s.go }}" class="shrink-0 rounded-sm px-2 py-1 text-caption-sm-regular" style-hover="background:var(--bg-layer-1-hover)" style="{{ s.btnStyle }}">{{ s.label }}</button>
+    </sc-for>
+    <div class="ml-auto shrink-0 flex items-center gap-2">
+      <button type="button" onClick="{{ toggleTheme }}" class="rounded-sm border border-subtle px-2 py-1 text-caption-sm-regular text-secondary" style-hover="background:var(--bg-layer-1-hover)">{{ themeLabel }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+  <div class="flex flex-col flex-1" style="min-height:0">
+    <div class="flex items-center gap-2 border-b border-subtle bg-canvas px-3 shrink-0" style="height:44px">
+      <button type="button" class="flex shrink-0 items-center gap-1.5 rounded-md px-1 py-1" style-hover="background:var(--bg-layer-1-hover)">
+        <span class="grid size-5 place-items-center rounded-sm bg-accent-primary text-on-color" style="font-size:10px;font-weight:700">M</span>
+        <span class="text-13 font-medium">mini</span>
+        {{ icoChevronDown }}
+      </button>
+      <div class="flex flex-1 items-center justify-center">
+        <div class="flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-2.5" style="width:360px;height:28px">
+          {{ icoSearchSm }}
+          <span class="text-13 text-placeholder">Search commands…</span>
+        </div>
+      </div>
+      <div class="flex shrink-0 items-center gap-2 text-icon-tertiary">
+        {{ icoInbox }}
+        {{ icoHelp }}
+        <span class="grid size-6 place-items-center rounded-full bg-accent-subtle text-accent-primary" style="font-size:9px;font-weight:600">KL</span>
+      </div>
+    </div>
+
+    <div class="flex flex-1" style="min-height:0">
+      <div class="h-full shrink-0 overflow-y-auto border-r border-subtle bg-surface-1" style="width:250px">
+        <div class="shrink-0">
+          <div class="flex items-center gap-1 py-3 pr-5 pl-4 text-body-md-medium">
+            <button type="button" class="grid size-6 place-items-center rounded-md text-icon-secondary" style-hover="background:var(--bg-layer-1-hover)">{{ icoBack }}</button>
+            <p style="margin:0">Workspace settings</p>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between gap-2 px-5 py-0.5">
+            <div class="flex items-center gap-2 truncate">
+              <span class="grid size-8 shrink-0 place-items-center rounded-md border border-subtle bg-accent-primary text-on-color" style="font-size:13px;font-weight:700">M</span>
+              <div class="truncate">
+                <p class="truncate text-body-sm-medium" style="margin:0">mini</p>
+                <p class="truncate text-caption-md-regular text-tertiary" style="margin:0">Admin</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-col px-3">
+          <div class="shrink-0 py-3" style="padding-top:0">
+            <div class="p-2 text-caption-md-medium text-tertiary">Administration</div>
+            <div class="flex flex-col">
+            <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body-sm-medium text-secondary"><span class="grid size-4 shrink-0 place-items-center">{{ icoBuilding }}</span><span class="truncate">General</span></div>
+            <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body-sm-medium text-secondary"><span class="grid size-4 shrink-0 place-items-center">{{ icoMembers }}</span><span class="truncate">Members</span></div>
+            <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body-sm-medium text-secondary"><span class="grid size-4 shrink-0 place-items-center">{{ icoBillings }}</span><span class="truncate">Billing and plans</span></div>
+            <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body-sm-medium text-secondary"><span class="grid size-4 shrink-0 place-items-center">{{ icoExport }}</span><span class="truncate">Exports</span></div>
+            </div>
+          </div>
+          <div class="shrink-0 py-3" style="border-top:1px solid var(--border-color-subtle)">
+            <div class="p-2 text-caption-md-medium text-tertiary">Developer</div>
+            <div class="flex flex-col">
+            <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body-sm-medium text-secondary"><span class="grid size-4 shrink-0 place-items-center">{{ icoWebhooks }}</span><span class="truncate">Webhooks</span></div>
+              <button type="button" onClick="{{ goConnectors }}" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body-sm-medium text-primary" style="background:var(--bg-layer-transparent-selected)"><span class="grid size-4 shrink-0 place-items-center">{{ icoIntegrations }}</span><span class="truncate">Integrations</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="relative flex flex-1 flex-col" style="min-width:0">
+        <div class="flex items-center gap-2 border-b border-subtle bg-surface-1 px-4 shrink-0" style="height:44px">
+          <span class="grid size-4 place-items-center">{{ icoIntegrations }}</span>
+          <span class="text-13 text-primary">{{ pageTitle }}</span>
+        </div>
+          <div class="flex-1 overflow-y-auto">
+            <div class="flex flex-col gap-6" style="max-width:56.25rem;margin:0 auto;padding:36px 1.35rem">
+              <div class="flex items-start gap-4">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-h3-medium text-primary" style="margin:0">{{ pageTitle }}</h3>
+                  <p class="text-body-xs-regular text-tertiary" style="margin:0;max-width:620px">{{ pageBlurb }}</p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-6 items-start">
+                <div class="flex flex-wrap gap-6 items-start w-full">
+                <sc-if value="{{ isListView }}" hint-placeholder-val="{{ true }}">
+                  <div class="flex flex-col gap-6 w-full">
+                    <sc-for list="{{ integrationGroups }}" as="grp" hint-placeholder-count="2">
+                      <div class="flex flex-col gap-2">
+                        <div class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">{{ grp.title }}</div>
+                        <div class="flex flex-wrap gap-3">
+                          <sc-for list="{{ grp.items }}" as="c" hint-placeholder-count="6">
+                            <button type="button" onClick="{{ c.open }}" class="rounded-lg border border-subtle bg-surface-1 flex flex-col gap-2 p-3 text-left" style="flex:1 1 210px;min-width:190px;max-width:260px" style-hover="border-color:var(--border-color-strong)">
+                              <span class="flex w-full items-center gap-2">
+                                <span class="grid size-7 shrink-0 place-items-center rounded-md border border-subtle bg-layer-2 text-secondary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">{{ c.icon }}</span>
+                                <span class="text-body-sm-semibold truncate">{{ c.name }}</span>
+                                <span class="ml-auto shrink-0 text-caption-sm-regular" style="{{ c.tagStyle }}">{{ c.tag }}</span>
+                              </span>
+                              <span class="text-caption-sm-regular text-secondary" style="text-wrap:pretty">{{ c.blurb }}</span>
+                              <sc-if value="{{ c.meta }}" hint-placeholder-val="{{ false }}">
+                                <span class="flex w-full items-center gap-2">
+                                  <span class="text-caption-sm-regular font-code text-tertiary truncate">{{ c.meta }}</span>
+                                  <sc-if value="{{ c.isAgent }}" hint-placeholder-val="{{ false }}">
+                                    <span class="ml-auto shrink-0 text-caption-sm-regular text-link-primary">Configure</span>
+                                  </sc-if>
+                                </span>
+                              </sc-if>
+                            </button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-for>
+
+                    <sc-if value="{{ ghNotConnected }}" hint-placeholder-val="{{ false }}">
+                    <div class="flex flex-col gap-2">
+                      <div class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">GITHUB</div>
+                      <sc-if value="{{ ghIdle }}" hint-placeholder-val="{{ false }}">
+                        <div class="flex flex-col items-center gap-3 rounded-lg border border-subtle bg-surface-1 px-6 py-8">
+                          <span class="grid size-8 place-items-center rounded-full bg-layer-1">{{ icoGithub }}</span>
+                          <div class="flex flex-col items-center gap-1">
+                            <span class="text-body-md-semibold">Install the GitHub integration</span>
+                            <span class="text-caption-sm-regular text-tertiary">Bind projects to repositories and let agents open draft pull requests.</span>
+                          </div>
+                          <div class="rounded-lg border border-subtle bg-surface-2 flex flex-col" style="width:100%;max-width:480px">
+                          <div class="flex items-start gap-2.5 border-b border-subtle px-4 py-3">
+                            {{ icoTick }}
+                            <span class="text-caption-sm-regular text-secondary" style="text-wrap:pretty">Each project points at one repository from any account or organisation you install on.</span>
+                          </div>
+                          <div class="flex items-start gap-2.5 border-b border-subtle px-4 py-3">
+                            {{ icoTick }}
+                            <span class="text-caption-sm-regular text-secondary" style="text-wrap:pretty">Agents read that repository&rsquo;s clone on the Mini and open draft pull requests for a human to merge.</span>
+                          </div>
+                          <div class="flex items-start gap-2.5 border-b border-subtle px-4 py-3">
+                            {{ icoTick }}
+                            <span class="text-caption-sm-regular text-secondary" style="text-wrap:pretty">The token is never used for git — clones and pushes use the SSH key already on the Mini.</span>
+                          </div>
+                        </div>
+                          <span><x-import component-from-global-scope="PlanePropel.Button" variant="primary" size="lg" on-click="{{ ghConnect }}" hint-size="210px,36px">Authenticate with GitHub</x-import></span>
+                          <button type="button" class="text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-secondary)">I&rsquo;ll do this later</button>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ ghPairing }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg border border-subtle bg-surface-1 flex flex-col gap-2 px-4 py-3">
+                          <div class="flex items-center gap-2">
+                            <x-import component-from-global-scope="PlanePropel.Spinner" height="14px" width="14px" class-name="text-icon-tertiary" hint-size="14px,14px"></x-import>
+                            <span class="text-caption-sm-medium">Waiting for GitHub</span>
+                            <span class="ml-auto text-caption-sm-regular text-tertiary">expires in 14:22</span>
+                          </div>
+                          <p class="text-caption-sm-regular text-secondary" style="margin:0">Open <span class="font-code">github.com/login/device</span> on any machine, enter this code, then choose the account or organisation to install on and whether it gets all repositories or a selected few. The Mini only makes outbound calls, so no public hostname is needed.</p>
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-h5-medium font-code" style="letter-spacing:.18em">JQXK-7D24</span>
+                            <button type="button" onClick="{{ ghDone }}" class="text-caption-sm-regular text-link-primary">I entered the code</button>
+                            <button type="button" onClick="{{ ghReset }}" class="ml-auto text-caption-sm-regular text-tertiary">Cancel</button>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                  <sc-if value="{{ isGithubDetail }}" hint-placeholder-val="{{ false }}">
+                    <div class="flex flex-col gap-6 w-full">
+                      <button type="button" onClick="{{ backToList }}" class="flex w-fit items-center gap-1.5 text-left text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-secondary)">
+                        {{ icoBack }}Integrations
+                      </button>
+
+                      <div class="flex flex-wrap items-center gap-6 rounded-lg border border-subtle bg-surface-1 px-4 py-3">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">ENABLED BY</span>
+                          <span class="flex items-center gap-1.5 text-caption-sm-regular"><x-import component-from-global-scope="PlanePropel.Avatar" name="Kevin Le" fallback-text="KL" size="sm" hint-size="20px,20px"></x-import>Kevin Le <span class="text-tertiary">Sep 6</span></span>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">SCOPES</span>
+                          <span class="text-caption-sm-regular font-code text-secondary">contents:read · pull_requests:write</span>
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">DOCS</span>
+                          <span class="text-caption-sm-regular text-link-primary">GitHub integration</span>
+                        </div>
+                        <button type="button" onClick="{{ ghReset }}" class="ml-auto text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-danger-primary)">Disconnect</button>
+                      </div>
+
+                      <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                          <span class="text-body-sm-semibold">Connections</span>
+                          <span class="ml-auto"><x-import component-from-global-scope="PlanePropel.Button" variant="secondary" size="sm" on-click="{{ ghConnect }}" hint-size="160px,28px">Connect organisation</x-import></span>
+                        </div>
+                        <div class="rounded-lg border border-subtle bg-surface-1 flex flex-col">
+                          <sc-for list="{{ installations }}" as="i" hint-placeholder-count="3">
+                            <div class="flex flex-wrap items-center gap-3 border-b border-subtle px-4 py-3">
+                              <span class="grid size-8 shrink-0 place-items-center rounded-md bg-layer-1 text-caption-sm-medium text-secondary">{{ i.initials }}</span>
+                              <div class="flex flex-col gap-0.5" style="flex:1 1 200px;min-width:0">
+                                <span class="text-body-sm-medium font-code truncate">{{ i.login }}</span>
+                                <span class="text-caption-sm-regular text-tertiary truncate">{{ i.kind }} · {{ i.access }}</span>
+                              </div>
+                              <span class="flex items-center gap-1.5 shrink-0" style="margin-left:auto">
+                                <span class="block rounded-full" style="width:6px;height:6px;background:var(--bg-success-primary)"></span>
+                                <span class="text-caption-sm-regular text-secondary">Connected</span>
+                              </span>
+                              <button type="button" onClick="{{ i.remove }}" class="shrink-0 text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-danger-primary)">Remove</button>
+                            </div>
+                          </sc-for>
+                          <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                            <div class="flex flex-col gap-0.5" style="flex:1 1 200px;min-width:0">
+                              <span class="text-body-sm-medium">Your personal GitHub account</span>
+                              <span class="text-caption-sm-regular text-tertiary">Connected · used to attribute pull requests you approve</span>
+                            </div>
+                            <span class="ml-auto shrink-0 text-caption-sm-regular text-link-primary">Manage</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="flex flex-col gap-2">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-body-sm-semibold">Pull requests from agents</span>
+                          <span class="text-caption-sm-regular text-secondary">Workspace-wide defaults for what an agent is allowed to do on GitHub.</span>
+                        </div>
+                        <div class="rounded-lg border border-subtle bg-surface-1 flex flex-col">
+                          <div class="flex flex-wrap items-center gap-3 border-b border-subtle px-4 py-3">
+                            <div class="flex flex-col gap-0.5" style="flex:1 1 240px;min-width:0">
+                              <span class="text-body-sm-medium">Open pull requests as drafts</span>
+                              <span class="text-caption-sm-regular text-tertiary">Agents never mark a PR ready for review; a person does.</span>
+                            </div>
+                            <span class="ml-auto shrink-0"><x-import component-from-global-scope="PlanePropel.Switch" value="{{ true }}" size="sm" hint-size="32px,18px"></x-import></span>
+                          </div>
+                          <div class="flex flex-wrap items-center gap-3 border-b border-subtle px-4 py-3">
+                            <div class="flex flex-col gap-0.5" style="flex:1 1 240px;min-width:0">
+                              <span class="text-body-sm-medium">Post run conclusions as PR comments</span>
+                              <span class="text-caption-sm-regular text-tertiary">The final summary from the run card is mirrored onto the pull request.</span>
+                            </div>
+                            <span class="ml-auto shrink-0"><x-import component-from-global-scope="PlanePropel.Switch" value="{{ false }}" size="sm" hint-size="32px,18px"></x-import></span>
+                          </div>
+                          <div class="flex flex-wrap items-center gap-3 px-4 py-3">
+                            <div class="flex flex-col gap-0.5" style="flex:1 1 240px;min-width:0">
+                              <span class="text-body-sm-medium">Branch format</span>
+                              <span class="text-caption-sm-regular text-tertiary">Example: <span class="font-code">agent/PLAN-214</span></span>
+                            </div>
+                            <button type="button" class="flex items-center gap-2 rounded-md border border-subtle bg-surface-2 px-2.5 py-1.5" style="margin-left:auto" style-hover="border-color:var(--border-color-strong)">
+                              <span class="text-body-sm-regular font-code">agent/identifier</span>
+                              <span class="shrink-0 text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">unfold_more</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ isAgentDetail }}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{ backToList }}" class="flex w-full items-center gap-1.5 text-left text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-secondary)">
+                      {{ icoBack }}Integrations
+                    </button>
+                  <div class="flex flex-col gap-1.5" style="flex:1 1 220px;min-width:0">
+                    <sc-for list="{{ agents }}" as="g" hint-placeholder-count="2">
+                      <button type="button" onClick="{{ g.select }}" class="flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left" style="{{ g.cardStyle }}">
+                        <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">{{ icoAgentOutline_size4 }}</span>
+                        <span class="flex flex-col" style="min-width:0">
+                          <span class="text-body-sm-semibold truncate">{{ g.name }}</span>
+                          <span class="text-caption-sm-regular font-code text-tertiary truncate">{{ g.handle }}</span>
+                        </span>
+                        <span class="ml-auto shrink-0"><x-import component-from-global-scope="PlanePropel.Badge" variant="{{ g.badge }}" size="sm" hint-size="70px,20px">{{ g.status }}</x-import></span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <div class="rounded-lg border border-subtle bg-surface-1 shadow-raised-100" style="flex:999 1 340px;min-width:0">
+                    <div class="flex items-center gap-3 border-b border-subtle px-4 py-3">
+                      <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">{{ icoAgentOutline_size4 }}</span>
+                      <div class="flex flex-col" style="min-width:0">
+                        <span class="text-body-md-semibold truncate">{{ agent.name }}</span>
+                        <span class="text-caption-sm-regular text-tertiary truncate">{{ agent.subtitle }}</span>
+                      </div>
+                      <span class="ml-auto shrink-0 flex items-center gap-2">
+                        <span class="text-caption-sm-regular text-secondary">Mentionable</span>
+                        <x-import component-from-global-scope="PlanePropel.Switch" value="{{ agent.enabled }}" on-change="{{ toggleAgent }}" size="sm" hint-size="32px,18px"></x-import>
+                      </span>
+                    </div>
+
+                    <div class="flex flex-col">
+                      <div class="flex flex-wrap items-start gap-2 border-b border-subtle px-4 py-3" style="{{ agent.rowStyle }}">
+                        <div class="flex flex-col gap-1" style="flex:1 1 220px;min-width:0">
+                          <span class="flex items-center gap-2">
+                            <span class="text-body-sm-medium">Connection</span>
+                            <span class="text-caption-sm-regular" style="{{ agent.tagStyle }}">{{ agent.status }}</span>
+                          </span>
+                          <span class="text-caption-sm-regular text-tertiary" style="text-wrap:pretty">{{ agent.connHint }}</span>
+                          <sc-if value="{{ agent.isError }}" hint-placeholder-val="{{ false }}">
+                            <span class="w-fit rounded-md border border-subtle bg-surface-2 px-2 py-1 text-caption-sm-regular font-code" style="color:var(--txt-danger-primary)">{{ agent.errDetail }}</span>
+                          </sc-if>
+                        </div>
+                        <span class="shrink-0 flex items-center gap-2" style="margin-left:auto">
+                          <sc-if value="{{ agent.isConnecting }}" hint-placeholder-val="{{ false }}">
+                            <x-import component-from-global-scope="PlanePropel.Spinner" height="14px" width="14px" class-name="text-icon-tertiary" hint-size="14px,14px"></x-import>
+                          </sc-if>
+                          <sc-if value="{{ agent.hasAlt }}" hint-placeholder-val="{{ false }}">
+                            <button type="button" onClick="{{ agent.doAlt }}" class="text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-danger-primary)">{{ agent.alt }}</button>
+                          </sc-if>
+                          <sc-if value="{{ agent.hasAct }}" hint-placeholder-val="{{ true }}">
+                            <x-import component-from-global-scope="PlanePropel.Button" variant="{{ agent.actVariant }}" size="sm" on-click="{{ agent.doAct }}" hint-size="100px,28px">{{ agent.act }}</x-import>
+                          </sc-if>
+                        </span>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-3">
+                        <div class="flex flex-col gap-0.5" style="flex:1 1 180px;min-width:0">
+                          <span class="text-body-sm-medium">Name</span>
+                          <span class="text-caption-sm-regular text-tertiary">Shown on the run card; the handle follows it.</span>
+                        </div>
+                        <span style="flex:0 1 240px;min-width:0;margin-left:auto"><x-import component-from-global-scope="PlanePropel.Input" input-size="sm" value="{{ agent.name }}" class-name="w-full" hint-size="100%,32px"></x-import></span>
+                      </div>
+
+                      <div class="flex flex-col gap-2 border-b border-subtle px-4 py-3">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-body-sm-medium">Instructions</span>
+                          <span class="text-caption-sm-regular text-tertiary">Prepended to every run this agent starts, on top of the work item and the repo it is given.</span>
+                        </div>
+                        <textarea rows="5" class="w-full rounded-md border border-subtle px-2.5 py-2 text-body-sm-regular" style="background:var(--bg-surface-2);color:var(--txt-primary);outline:none;resize:vertical;font-family:var(--font-body)" key="{{ agent.name }}" defaultValue="{{ agent.instructions }}"></textarea>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+                        <div class="flex flex-col gap-0.5" style="flex:1 1 180px;min-width:0">
+                          <span class="text-body-sm-medium">Model</span>
+                          <span class="text-caption-sm-regular text-tertiary">Reported by the agent when it connects; picked per agent.</span>
+                        </div>
+                        <sc-if value="{{ agent.modelKnown }}" hint-placeholder-val="{{ true }}">
+                          <span class="relative shrink-0" style="margin-left:auto">
+                            <button type="button" onClick="{{ toggleModelMenu }}" class="flex items-center gap-2 rounded-md border border-subtle bg-surface-2 px-2.5 py-1.5" style="min-width:200px" style-hover="border-color:var(--border-color-strong)">
+                              <span class="truncate text-body-sm-regular font-code">{{ agent.model }}</span>
+                              <span class="ml-auto shrink-0 text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">unfold_more</span>
+                            </button>
+                            <sc-if value="{{ modelMenuOpen }}" hint-placeholder-val="{{ false }}">
+                              <span class="absolute flex flex-col gap-0.5 rounded-md border border-subtle bg-surface-1 p-1 shadow-overlay-200" style="top:calc(100% + 4px);right:0;min-width:260px;z-index:30">
+                                <sc-for list="{{ agent.models }}" as="m" hint-placeholder-count="3">
+                                  <button type="button" onClick="{{ m.pick }}" class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-left" style="{{ m.style }}" style-hover="background:var(--bg-layer-1-hover)">
+                                    <span class="text-caption-sm-regular font-code text-primary">{{ m.name }}</span>
+                                    <span class="ml-auto text-caption-sm-regular text-tertiary">{{ m.note }}</span>
+                                    <sc-if value="{{ m.isSel }}" hint-placeholder-val="{{ false }}">
+                                      {{ icoTickSm }}
+                                    </sc-if>
+                                  </button>
+                                </sc-for>
+                              </span>
+                            </sc-if>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ agent.modelUnknown }}" hint-placeholder-val="{{ false }}">
+                          <span class="text-caption-sm-regular text-tertiary" style="margin-left:auto">Available after connecting</span>
+                        </sc-if>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+      
+        <sc-if value="{{ addOpen }}" hint-placeholder-val="{{ false }}">
+          <div class="absolute flex items-center justify-center" style="inset:0;background:var(--bg-backdrop);z-index:40">
+            <div class="rounded-lg border border-subtle bg-surface-1 shadow-overlay-200 flex flex-col" style="width:520px;max-width:100%">
+              <div class="flex flex-col gap-1 border-b border-subtle px-5 py-4">
+                <span class="text-body-md-semibold">Add agent</span>
+                <span class="text-caption-sm-regular text-secondary">The worker reports which CLIs are installed on the Mini. An agent can only be added once per workspace.</span>
+              </div>
+              <div class="flex flex-col gap-1.5 px-5 py-4">
+                <sc-for list="{{ detected }}" as="d" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ d.pick }}" class="flex items-center gap-3 rounded-md border px-3 py-2.5 text-left" style="{{ d.style }}">
+                    <span class="grid size-7 shrink-0 place-items-center rounded-full bg-layer-1 text-secondary" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">{{ d.icon }}</span>
+                    <span class="flex flex-col" style="min-width:0">
+                      <span class="text-body-sm-medium truncate">{{ d.name }}</span>
+                      <span class="text-caption-sm-regular font-code text-tertiary truncate">{{ d.path }}</span>
+                    </span>
+                    <span class="ml-auto shrink-0 text-caption-sm-regular" style="{{ d.tagStyle }}">{{ d.tag }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div class="flex flex-col gap-1.5 border-t border-subtle px-5 py-4">
+                <span class="text-caption-sm-medium">Mention handle</span>
+                <input ref="{{ handleRef }}" onKeyUp="{{ onHandleChange }}" defaultValue="@Aider" class="rounded-md px-2.5 py-1.5 text-body-sm-regular font-code" style="{{ handleFieldStyle }}" />
+                <span class="text-caption-sm-regular" style="{{ handleHintStyle }}">{{ handleHint }}</span>
+              </div>
+              <div class="flex items-center justify-end gap-2 border-t border-subtle px-5 py-3">
+                <x-import component-from-global-scope="PlanePropel.Button" variant="secondary" size="base" on-click="{{ closeAdd }}" hint-size="86px,32px">Cancel</x-import>
+                <x-import component-from-global-scope="PlanePropel.Button" variant="primary" size="base" disabled="{{ addDisabled }}" on-click="{{ closeAdd }}" hint-size="110px,32px">Add agent</x-import>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isIssue }}" hint-placeholder-val="{{ true }}">
+  <div class="flex flex-1" style="min-height:0">
+
+    <aside class="shrink-0 flex flex-col gap-2 border-r border-subtle bg-surface-2 px-3 py-3" style="width:244px">
+      <div class="flex items-center gap-2 px-1 py-1">
+        <div class="grid size-6 place-items-center rounded-md bg-inverse text-inverse shrink-0" style="font-size:11px;font-weight:700">M</div>
+        <span class="text-13 font-medium truncate">Mini Workspace</span>
+        <span class="ml-auto flex items-center gap-0.5 text-placeholder">{{ icoMoreHorizontalOutline_size4shrink0 }}{{ icoChevronRightOutline_size4shrink0 }}</span>
+      </div>
+      <button type="button" class="flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2 py-1.5 text-secondary shadow-raised-100" style-hover="background:var(--bg-layer-1-hover)">
+        {{ icoAddWorkItemOutline_size4shrink0 }}
+        <span class="text-13 font-medium">New work item</span>
+      </button>
+      <div class="flex flex-col gap-0.5 mt-2">
+        <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-secondary">{{ icoHomeOutline_size4shrink0 }}<span class="text-13 font-medium">Home</span></div>
+        <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-secondary">{{ icoYourWorkOutline_size4shrink0 }}<span class="text-13 font-medium">Your work</span></div>
+        <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-secondary">{{ icoInboxNav }}<span class="text-13 font-medium">Inbox</span></div>
+        <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-secondary">{{ icoProjectsOutline_size4shrink0 }}<span class="text-13 font-medium">Projects</span></div>
+        <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-secondary">{{ icoDraftsOutline_size4shrink0 }}<span class="text-13 font-medium">Drafts</span></div>
+      </div>
+      <div class="mt-4 px-2 text-11 font-semibold text-tertiary">Your projects</div>
+      <div class="flex flex-col gap-0.5">
+        <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5" style="background:var(--bg-layer-1-active)">
+          <span class="grid size-4 place-items-center shrink-0">🛩️</span>
+          <span class="text-13 font-medium text-secondary truncate">Plane CE</span>
+        </div>
+        <div class="flex flex-col gap-0.5 pl-6">
+          <div class="flex items-center gap-1.5 rounded-md px-2 py-1 text-13 text-secondary" style="background:var(--bg-layer-1-selected)">Work items</div>
+          <div class="flex items-center gap-1.5 rounded-md px-2 py-1 text-13 text-secondary">Cycles</div>
+          <div class="flex items-center gap-1.5 rounded-md px-2 py-1 text-13 text-secondary">Modules</div>
+          <div class="flex items-center gap-1.5 rounded-md px-2 py-1 text-13 text-secondary">Views</div>
+          <div class="flex items-center gap-1.5 rounded-md px-2 py-1 text-13 text-secondary">Pages</div>
+          <div class="flex items-center gap-1.5 rounded-md px-2 py-1 text-13 text-secondary">Intake</div>
+        </div>
+      </div>
+      <div class="mt-auto flex items-center gap-1 px-1">
+        <button type="button" class="grid size-7 place-items-center rounded-md text-icon-tertiary" style-hover="background:var(--bg-layer-1-hover)">{{ icoHelpNav }}</button>
+        <button type="button" class="ml-auto grid size-7 place-items-center rounded-md text-icon-tertiary" style-hover="background:var(--bg-layer-1-hover)">{{ icoSidePanel }}</button>
+      </div>
+    </aside>
+
+    <div class="flex flex-1 flex-col" style="min-width:0">
+      <div class="flex items-center gap-2 border-b border-subtle bg-surface-1 px-4 shrink-0" style="height:44px">
+        <span class="text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">menu_open</span>
+        <div class="flex items-center gap-1.5 text-13">
+          <span class="text-secondary">{{ crumb1 }}</span>
+          {{ icoChevronRightOutline_size35texticonplaceholdershrink0 }}
+          <span class="text-secondary">{{ crumb2 }}</span>
+          {{ icoChevronRightOutline_size35texticonplaceholdershrink0 }}
+          <span class="text-primary font-medium">{{ crumb3 }}</span>
+        </div>
+        <sc-if value="{{ isIssue }}" hint-placeholder-val="{{ true }}">
+        <div class="ml-auto flex items-center gap-2 text-icon-tertiary">
+          <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-subtle px-2 py-1 text-body-xs-medium text-secondary" style-hover="background:var(--bg-accent-subtle)">{{ icoSubscribeOutline_h3w3shrink0 }}Subscribe</button>
+          {{ icoLinkOutline_size4shrink0 }}
+          {{ icoMoreHorizontalOutline_size4shrink0 }}
+        </div>
+        </sc-if>
+      </div>
+
+      <div class="relative flex flex-1" style="min-height:0">
+
+
+
+        <sc-if value="{{ isIssue }}" hint-placeholder-val="{{ true }}">
+          <div class="flex-1 overflow-y-auto px-8 py-5">
+            <div class="flex flex-col gap-4" style="max-width:780px">
+              <div class="flex items-center gap-2">
+                <span class="text-caption-sm-medium text-tertiary">{{ issueKey }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-layer-1 px-2 py-0.5 text-caption-sm-regular text-secondary">In progress</span>
+              </div>
+              <h1 class="text-h3-regular" style="margin:0">Attachments over 10 MB vanish from intake without an error</h1>
+              <div class="flex flex-col gap-2 text-body-sm-regular text-secondary">
+                <p style="margin:0">Uploading a 12 MB PDF through the intake form returns a success toast, but the work item is created with no attachment and nothing lands in storage. Smaller files are fine.</p>
+                <p style="margin:0">Reported twice this week by the support rotation. We need to know where the limit is enforced before we change it.</p>
+              </div>
+
+              <div class="flex items-center gap-2 mt-2">
+                <span class="inline-flex items-center gap-1 rounded-full border border-subtle px-2 py-0.5 text-caption-sm-regular text-secondary">👀 2</span>
+                <span class="inline-flex items-center gap-1 rounded-full border border-subtle px-2 py-0.5 text-caption-sm-regular text-secondary">🐛 1</span>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2 mt-2">
+                <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-xs-medium text-secondary" style-hover="background:var(--bg-layer-1-hover)">{{ icoViewsOutline_h35w35shrink0 }}Add sub-work item</button>
+                <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-xs-medium text-secondary" style-hover="background:var(--bg-layer-1-hover)">{{ icoRelationsOutline_h35w35shrink0 }}Add relation</button>
+                <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-xs-medium text-secondary" style-hover="background:var(--bg-layer-1-hover)">{{ icoLinkOutline_h35w35shrink0 }}Add link</button>
+                <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-xs-medium text-secondary" style-hover="background:var(--bg-layer-1-hover)">{{ icoAttachOutline_h35w35shrink0 }}Attach</button>
+              </div>
+
+              <div class="flex items-center justify-between mt-2">
+                <span class="text-h5-medium">Activity</span>
+                <div class="flex items-center gap-2 text-icon-tertiary">
+                  {{ icoSortAscendingOutline_size4shrink0 }}
+                  {{ icoFilterOutline_size4shrink0 }}
+                </div>
+              </div>
+
+              <div class="flex flex-col">
+                <div class="relative flex items-center gap-3 py-2 text-caption-sm-regular">
+                  <div class="absolute top-0 bottom-0 w-px bg-layer-3" style="left:13px"></div>
+                  <div class="relative flex size-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-layer-2 text-secondary shadow-raised-100" style="z-index:3">{{ icoHierarchyOutline_h35w35 }}</div>
+                  <div class="w-full truncate text-secondary"><span class="font-medium text-primary">Kevin</span> created the work item <span class="text-tertiary">2 days ago</span></div>
+                </div>
+                <div class="relative flex items-center gap-3 py-2 text-caption-sm-regular">
+                  <div class="absolute top-0 bottom-0 w-px bg-layer-3" style="left:13px"></div>
+                  <div class="relative flex size-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-layer-2 text-secondary shadow-raised-100" style="z-index:3">{{ icoLabelsOutline_h35w35 }}</div>
+                  <div class="w-full truncate text-secondary"><span class="font-medium text-primary">Mai</span> added the label <span class="rounded-sm bg-label-crimson-bg px-1 py-0.5 text-label-crimson-text">bug</span> <span class="text-tertiary">yesterday</span></div>
+                </div>
+
+                <div class="relative flex gap-3 py-2">
+                  <div class="absolute top-0 bottom-0 w-px bg-layer-3" style="left:13px"></div>
+                  <div class="relative flex size-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-layer-2 shadow-raised-100" style="z-index:3">{{ icoReplyOutline_h35w35textsecondary }}</div>
+                  <div class="flex flex-1 flex-col truncate">
+                    <div class="mb-2 rounded-lg border border-subtle bg-surface-1 shadow-raised-100">
+                      <div class="p-3">
+                        <div class="mb-3 flex w-full items-center gap-2">
+                          <span class="shrink-0"><x-import component-from-global-scope="PlanePropel.Avatar" name="Kevin Le" fallback-text="KL" size="sm" hint-size="20px,20px"></x-import></span>
+                          <div class="text-caption-sm-medium">Kevin</div>
+                          <div class="text-caption-sm-regular text-tertiary">commented 14 minutes ago</div>
+                        </div>
+                        <div class="text-body-sm-regular text-secondary">
+                          <span class="rounded-sm bg-accent-subtle px-1 py-0.5 text-accent-primary">@Claude</span>
+                          why do attachments over 10 MB disappear silently? Point me at where the limit is enforced.
+                        </div>
+                      </div>
+                      <sc-if value="{{ showRunCard }}" hint-placeholder-val="{{ true }}">
+                        <div class="flex flex-col gap-1.5 border-t border-subtle p-1.5">
+                          <div class="flex items-center gap-2 px-2 py-1">
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">{{ icoAgentOutline_size35 }}</span>
+                            <span class="text-body-sm-medium">{{ run.bot }}</span>
+                            <span class="text-body-sm-regular text-tertiary">started by</span>
+                            <span class="text-body-sm-medium">Kevin</span>
+                            <span class="text-caption-sm-regular text-tertiary">{{ run.ago }}</span>
+                            <span class="ml-auto text-caption-sm-regular font-code text-tertiary">{{ run.kindLabel }}</span>
+                          </div>
+                          <button type="button" onClick="{{ openPanel }}" class="flex w-full items-center gap-2.5 rounded-md border border-subtle bg-surface-2 px-2.5 py-2 text-left" style-hover="background:var(--bg-layer-1-hover)">
+                            <span class="shrink-0" style="{{ run.rowIconStyle }}">{{ run.rowIcon }}</span>
+                            <span class="shrink-0 text-body-sm-medium" style="{{ run.rowLabelStyle }}">{{ run.rowLabel }}</span>
+                            <span class="truncate text-body-sm-regular text-secondary">{{ run.lastLine }}</span>
+                            <span class="ml-auto shrink-0 text-caption-sm-regular font-code text-tertiary">{{ run.elapsed }}</span>
+                            {{ icoChevronRightOutline_size4shrink0texticontertiary }}
+                          </button>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </div>
+
+                <sc-for list="{{ feedComments }}" as="c" hint-placeholder-count="1">
+                  <div class="relative flex gap-3 py-2">
+                    <div class="absolute top-0 bottom-0 w-px bg-layer-3" style="left:13px"></div>
+                    <div class="relative flex size-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-layer-2 shadow-raised-100" style="z-index:3">{{ icoReplyOutline_h35w35textsecondary }}</div>
+                    <div class="flex flex-1 flex-col truncate">
+                      <div class="mb-2 rounded-lg border border-subtle bg-layer-2 p-3 shadow-raised-100">
+                        <div class="mb-3 flex w-full items-center gap-2">
+                          <div class="grid size-5 place-items-center rounded-full bg-accent-subtle text-accent-primary shrink-0">{{ icoAgentOutline_size3 }}</div>
+                          <div class="text-caption-sm-medium">{{ c.author }}</div>
+                          <div class="text-caption-sm-regular text-tertiary">{{ c.meta }}</div>
+                          <span class="ml-auto rounded-sm px-1.5 py-0.5 text-caption-sm-regular" style="{{ c.tagStyle }}">{{ c.tag }}</span>
+                        </div>
+                        <div class="text-body-sm-regular text-secondary" style="white-space:pre-line">{{ c.body }}</div>
+                        <sc-if value="{{ c.hasLink }}" hint-placeholder-val="{{ false }}">
+                          <div class="mt-3 inline-flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5">
+                            <span class="text-icon-secondary" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">merge</span>
+                            <span class="text-caption-sm-regular font-code text-link-primary">{{ c.link }}</span>
+                            <span class="rounded-full bg-layer-1 px-1.5 py-0.5 text-caption-sm-regular text-secondary">Draft</span>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+
+                <div class="relative flex gap-3 py-2">
+                  <div class="relative flex size-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-layer-2 shadow-raised-100" style="z-index:3">
+                    <div class="grid size-5 place-items-center rounded-full bg-accent-subtle text-accent-primary" style="font-size:9px;font-weight:600">KL</div>
+                  </div>
+                  <div class="relative flex flex-1 flex-col" style="min-width:0">
+                    <div class="rounded-lg border border-subtle bg-surface-1 shadow-raised-100">
+                      <div class="px-3 py-2.5 text-body-sm-regular">
+                        <sc-if value="{{ isMentionScene }}" hint-placeholder-val="{{ false }}">
+                          <span class="text-primary">@Cl</span><span class="text-placeholder">|</span>
+                        </sc-if>
+                        <sc-if value="{{ notMentionScene }}" hint-placeholder-val="{{ true }}">
+                          <span class="text-placeholder">Add comment… type @ to mention a teammate or an agent</span>
+                        </sc-if>
+                      </div>
+                      <div class="flex h-9 w-full items-stretch gap-1.5 border-t border-subtle bg-surface-2 px-1.5 py-1" style="overflow-x:auto">
+                        <div class="flex shrink-0 items-stretch gap-0.5 rounded-sm p-1" style="border:0.5px solid var(--border-color-subtle)">
+                          <button type="button" class="grid aspect-square place-items-center rounded-xs p-1" style="background:var(--bg-layer-1)">{{ icoLock }}</button>
+                          <button type="button" class="grid aspect-square place-items-center rounded-xs p-1" style-hover="background:var(--bg-layer-1)">{{ icoGlobe }}</button>
+                        </div>
+                        <div class="flex w-full items-stretch justify-between gap-2 rounded-sm p-1" style="border:0.5px solid var(--border-color-subtle)">
+                          <div class="flex items-stretch">
+                            <div class="flex items-stretch gap-0.5 border-r border-subtle px-2.5" style="padding-left:0">
+                              <button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoBold }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoItalic }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoUnderline }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoStrike }}</button>
+                            </div>
+                            <div class="flex items-stretch gap-0.5 border-r border-subtle px-2.5">
+                              <button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoAlignLeft }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoAlignCenter }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoAlignRight }}</button>
+                            </div>
+                            <div class="flex items-stretch gap-0.5 border-r border-subtle px-2.5">
+                              <button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoList }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoNumberedList }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoToDo }}</button>
+                            </div>
+                            <div class="flex items-stretch gap-0.5 border-r border-subtle px-2.5">
+                              <button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoQuote }}</button><button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoCode }}</button>
+                            </div>
+                            <div class="flex items-stretch gap-0.5 px-2.5">
+                              <button type="button" class="grid aspect-square place-items-center rounded-xs p-0.5 text-placeholder" style-hover="background:var(--bg-layer-1)">{{ icoImage }}</button>
+                            </div>
+                          </div>
+                          <div class="shrink-0">
+                            <x-import component-from-global-scope="PlanePropel.Button" variant="primary" size="sm" hint-size="78px,26px">Comment</x-import>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <sc-if value="{{ isMentionScene }}" hint-placeholder-val="{{ false }}">
+                      <div class="absolute rounded-md bg-surface-1 px-2 py-2.5 shadow-raised-200 flex flex-col gap-2" style="top:44px;left:12px;width:14rem;border:0.5px solid var(--border-color-strong);z-index:30">
+                        <div class="flex flex-col gap-2">
+                          <h6 class="text-11 font-semibold text-tertiary" style="margin:0">Agents</h6>
+                          <button type="button" onClick="{{ pickClaude }}" class="flex w-full items-center gap-2 truncate rounded-sm px-1 py-1.5 text-left text-11 text-secondary" style="background:var(--bg-layer-1-hover)">
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary" style="font-family:'Material Symbols Rounded';font-size:12px;line-height:1">smart_toy</span>
+                            <h5 class="shrink-0 text-11 text-tertiary" style="white-space:nowrap;margin:0">Bot</h5>
+                            <p class="grow truncate" style="margin:0">Claude</p>
+                          </button>
+                          <button type="button" onClick="{{ pickCodex }}" class="flex w-full items-center gap-2 truncate rounded-sm px-1 py-1.5 text-left text-11 text-secondary" style-hover="background:var(--bg-layer-1-hover)">
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full bg-layer-1 text-secondary" style="font-family:'Material Symbols Rounded';font-size:12px;line-height:1">terminal</span>
+                            <h5 class="shrink-0 text-11 text-tertiary" style="white-space:nowrap;margin:0">Bot</h5>
+                            <p class="grow truncate" style="margin:0">Codex</p>
+                          </button>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                          <h6 class="text-11 font-semibold text-tertiary" style="margin:0">Users</h6>
+                          <button type="button" class="flex w-full items-center gap-2 truncate rounded-sm px-1 py-1.5 text-left text-11 text-secondary" style-hover="background:var(--bg-layer-1-hover)">
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full bg-label-emerald-bg text-label-emerald-text" style="font-size:9px;font-weight:600">CL</span>
+                            <p class="grow truncate" style="margin:0">clara</p>
+                          </button>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="shrink-0 border-l border-subtle bg-surface-1 overflow-y-auto px-6" style="width:320px">
+            <h5 class="mt-5 text-body-xs-medium">Properties</h5>
+            <div class="mt-4 mb-2 flex flex-col gap-2.5">
+              <sc-for list="{{ properties }}" as="p" hint-placeholder-count="6">
+                <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1.5 text-icon-tertiary shrink-0" style="width:110px">
+                    {{ p.iconEl }}
+                    <span class="text-body-xs-regular text-secondary">{{ p.label }}</span>
+                  </div>
+                  <div class="flex-1 truncate rounded-sm px-2 py-1 text-body-xs-regular text-primary" style-hover="background:var(--bg-layer-1-hover)">{{ p.value }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </aside>
+        </sc-if>
+
+        <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ false }}">
+          <div class="absolute flex flex-col border-l border-subtle bg-surface-1 shadow-overlay-200" style="top:0;right:0;bottom:0;z-index:20;width:{{ panelW }}px">
+            <div onMouseDown="{{ startResize }}" title="Drag to resize" class="absolute" style="top:0;bottom:0;left:-3px;width:7px;cursor:col-resize;z-index:25"></div>
+
+            <div class="flex items-center gap-2 border-b border-subtle px-4 shrink-0" style="height:52px">
+              <span class="grid size-6 place-items-center rounded-full bg-accent-subtle text-accent-primary shrink-0">{{ icoAgentOutline_size4 }}</span>
+              <div class="flex flex-col" style="min-width:0">
+                <span class="text-body-sm-semibold truncate">{{ run.bot }} · {{ issueKey }}</span>
+                <span class="text-caption-sm-regular text-tertiary truncate">{{ run.kindLabel }} · started {{ run.started }}</span>
+              </div>
+              <div class="ml-auto flex items-center gap-2 shrink-0">
+                <x-import component-from-global-scope="PlanePropel.Badge" variant="{{ run.badgeVariant }}" size="sm" hint-size="90px,20px">{{ run.statusLabel }}</x-import>
+                <span class="text-caption-sm-regular font-code text-tertiary">{{ run.elapsed }}</span>
+                <button type="button" onClick="{{ closePanel }}" class="grid size-6 place-items-center rounded-md text-icon-tertiary" style-hover="background:var(--bg-layer-1-hover)">
+                  {{ icoCloseOutline_size4shrink0 }}
+                </button>
+              </div>
+            </div>
+
+            <sc-if value="{{ run.banner }}" hint-placeholder-val="{{ false }}">
+              <div class="flex items-start gap-2 border-b border-subtle px-4 py-2.5 shrink-0" style="{{ run.bannerStyle }}">
+                <span class="shrink-0" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1.2">{{ run.bannerIcon }}</span>
+                <span class="text-caption-sm-regular">{{ run.banner }}</span>
+              </div>
+            </sc-if>
+
+            <div class="flex-1 overflow-y-auto px-4 py-3" style="min-height:0">
+              <div class="flex flex-col">
+                <sc-for list="{{ timeline }}" as="a" hint-placeholder-count="6">
+                  <div class="flex gap-3 py-1">
+                    <div class="flex flex-1 flex-col gap-1.5" style="min-width:0">
+
+                      <sc-if value="{{ a.isPrompt }}" hint-placeholder-val="{{ false }}">
+                        <div class="flex gap-2.5 py-1">
+                          <span class="shrink-0"><x-import component-from-global-scope="PlanePropel.Avatar" name="Kevin Le" fallback-text="KL" size="sm" hint-size="20px,20px"></x-import></span>
+                          <div class="flex flex-col gap-0.5" style="min-width:0">
+                            <div class="flex items-baseline gap-2">
+                              <span class="text-caption-sm-medium">{{ a.who }}</span>
+                              <span class="text-caption-sm-regular text-tertiary">{{ a.ts }}</span>
+                            </div>
+                            <div class="text-body-sm-regular text-primary">{{ a.text }}</div>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isBatch }}" hint-placeholder-val="{{ true }}">
+                        <div class="flex flex-col gap-1.5">
+                          <button type="button" onClick="{{ a.toggle }}" class="flex items-center gap-2 py-1 text-left" style-hover="color:var(--txt-primary)">
+                            {{ a.chevronEl }}
+                            <span class="text-caption-sm-medium text-secondary">{{ a.title }}</span>
+                            <span class="text-caption-sm-regular text-tertiary">{{ a.meta }}</span>
+                            <sc-if value="{{ a.diff }}" hint-placeholder-val="{{ false }}">
+                              <span class="text-caption-sm-regular font-code text-success-primary">{{ a.diff }}</span>
+                            </sc-if>
+                          </button>
+                          <sc-if value="{{ a.open }}" hint-placeholder-val="{{ false }}">
+                            <div class="flex flex-col gap-1.5" style="padding-left:12px;margin-left:6px;border-left:1px solid var(--bg-layer-3)">
+                              <sc-for list="{{ a.rows }}" as="r" hint-placeholder-count="3">
+                                <div class="flex flex-col">
+                                  <sc-if value="{{ r.isThought }}" hint-placeholder-val="{{ false }}">
+                                    <div class="py-0.5 text-body-sm-regular text-secondary" style="font-style:italic">{{ r.text }}</div>
+                                  </sc-if>
+                                  <sc-if value="{{ r.isAction }}" hint-placeholder-val="{{ true }}">
+                                    <div class="rounded-md border border-subtle bg-surface-2">
+                                      <button type="button" onClick="{{ r.toggle }}" class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left">
+                                        <span class="shrink-0 text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">{{ r.toolIcon }}</span>
+                                        <span class="shrink-0 text-caption-sm-medium">{{ r.verb }}</span>
+                                        <span class="truncate text-caption-sm-regular font-code text-tertiary">{{ r.args }}</span>
+                                        <span class="ml-auto shrink-0 text-caption-sm-regular text-tertiary">{{ r.summary }}</span>
+                                        {{ r.chevronEl }}
+                                      </button>
+                                      <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                                        <div class="border-t border-subtle px-2.5 py-2 text-caption-sm-regular font-code text-secondary" style="white-space:pre-wrap;overflow-x:auto">{{ r.result }}</div>
+                                      </sc-if>
+                                    </div>
+                                  </sc-if>
+                                </div>
+                              </sc-for>
+                            </div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isResponse }}" hint-placeholder-val="{{ false }}">
+                        <div class="flex gap-2.5 py-1">
+                          <span class="grid size-5 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary" style="font-family:'Material Symbols Rounded';font-size:12px;line-height:1">smart_toy</span>
+                          <div class="flex flex-col gap-1" style="min-width:0">
+                            <div class="flex items-baseline gap-2">
+                              <span class="text-caption-sm-medium">{{ a.who }}</span>
+                              <span class="text-caption-sm-regular text-tertiary">{{ a.ts }}</span>
+                              <span class="rounded-sm bg-success-subtle px-1.5 py-0.5 text-caption-sm-regular text-success-primary">posted as comment</span>
+                            </div>
+                            <div class="text-body-sm-regular text-primary" style="white-space:pre-line">{{ a.text }}</div>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isElicitation }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg border border-subtle bg-warning-subtle px-3 py-2.5">
+                          <div class="mb-2 flex items-center gap-2">
+                            <span class="text-caption-sm-medium text-warning-primary">Needs an answer</span>
+                            <span class="text-caption-sm-regular text-tertiary">{{ a.ts }}</span>
+                            <span class="ml-auto rounded-sm px-1.5 py-0.5 text-caption-sm-regular text-warning-primary">elicitation → comment</span>
+                          </div>
+                          <div class="text-body-sm-regular text-primary" style="white-space:pre-line">{{ a.text }}</div>
+                          <div class="mt-3 flex flex-col gap-1.5">
+                            <sc-for list="{{ a.options }}" as="o" hint-placeholder-count="2">
+                              <button type="button" onClick="{{ o.pick }}" class="flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-2.5 py-2 text-left" style-hover="border-color:var(--border-color-accent-strong)">
+                                <span class="text-icon-tertiary shrink-0" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">source</span>
+                                <span class="flex flex-col" style="min-width:0">
+                                  <span class="text-caption-sm-medium font-code truncate">{{ o.remote }}</span>
+                                  <span class="text-caption-sm-regular font-code text-tertiary truncate">{{ o.cwd }}</span>
+                                </span>
+                              </button>
+                            </sc-for>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isPermission }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg px-3 py-2.5" style="background:var(--bg-warning-subtle);border:1px solid var(--border-color-strong)">
+                          <div class="mb-2 flex items-center gap-2">
+                            <span class="text-warning-primary shrink-0" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">lock_open_right</span>
+                            <span class="text-caption-sm-medium text-warning-primary">Permission needed · {{ a.title }}</span>
+                            <span class="ml-auto text-caption-sm-regular text-tertiary">{{ a.ts }}</span>
+                          </div>
+                          <div class="rounded-md border border-subtle bg-surface-1 px-2.5 py-2 text-caption-sm-regular font-code text-secondary" style="white-space:pre-wrap">{{ a.cmd }}</div>
+                          <div class="mt-2 flex items-center gap-2">
+                            <span class="text-caption-sm-regular text-tertiary font-code truncate">{{ a.scope }}</span>
+                            <span class="ml-auto shrink-0 rounded-full bg-layer-1 px-2 py-0.5 text-caption-sm-regular text-secondary">{{ a.risk }}</span>
+                          </div>
+                          <div class="mt-3 flex items-center gap-2">
+                            <x-import component-from-global-scope="PlanePropel.Button" variant="primary" size="sm" on-click="{{ a.allowRun }}" hint-size="150px,28px">Allow for this run</x-import>
+                            <x-import component-from-global-scope="PlanePropel.Button" variant="secondary" size="sm" on-click="{{ a.allowOnce }}" hint-size="96px,28px">Allow once</x-import>
+                            <span class="ml-auto"><x-import component-from-global-scope="PlanePropel.Button" variant="error-outline" size="sm" on-click="{{ a.deny }}" hint-size="70px,28px">Deny</x-import></span>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isApproval }}" hint-placeholder-val="{{ false }}">
+                        <div class="flex items-center gap-2 py-0.5">
+                          <span class="text-icon-success-primary shrink-0" style="font-family:'Material Symbols Rounded';font-size:14px;line-height:1">verified_user</span>
+                          <span class="truncate text-caption-sm-regular text-tertiary">{{ a.text }}</span>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isError }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg px-3 py-2.5" style="background:var(--bg-danger-subtle);border:1px solid var(--border-color-danger-strong)">
+                          <div class="mb-1 flex items-center gap-2">
+                            <span class="text-caption-sm-medium text-danger-primary">{{ a.who }}</span>
+                            <span class="text-caption-sm-regular text-tertiary">{{ a.ts }}</span>
+                            <span class="ml-auto rounded-sm px-1.5 py-0.5 text-caption-sm-regular text-danger-primary">error → comment</span>
+                          </div>
+                          <div class="text-body-sm-regular text-primary" style="white-space:pre-line">{{ a.text }}</div>
+                          <sc-if value="{{ a.hint }}" hint-placeholder-val="{{ false }}">
+                            <div class="mt-2 text-caption-sm-regular font-code text-secondary">{{ a.hint }}</div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ a.isPr }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg border border-subtle bg-surface-2 px-3 py-2.5">
+                          <div class="flex items-center gap-2">
+                            <span class="text-icon-success-primary shrink-0" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">merge</span>
+                            <span class="text-caption-sm-medium font-code text-link-primary truncate">{{ a.text }}</span>
+                            <span class="ml-auto shrink-0 rounded-full bg-layer-1 px-2 py-0.5 text-caption-sm-regular text-secondary">Draft</span>
+                          </div>
+                          <div class="mt-2 flex items-center gap-3 text-caption-sm-regular font-code text-tertiary">
+                            <span>{{ a.branch }}</span>
+                            <span>{{ a.diff }}</span>
+                          </div>
+                          <div class="mt-2 text-caption-sm-regular text-tertiary">Humans merge. The agent never pushes to the default branch.</div>
+                        </div>
+                      </sc-if>
+
+                    </div>
+                  </div>
+                </sc-for>
+
+                <sc-if value="{{ run.streaming }}" hint-placeholder-val="{{ false }}">
+                  <div class="relative flex gap-3 py-1.5">
+                    <div class="relative flex size-6 shrink-0 items-center justify-center rounded-md border border-subtle bg-layer-2 text-icon-accent-primary shadow-raised-100">
+                      <span style="font-family:'Material Symbols Rounded';font-size:13px;line-height:1">bolt</span>
+                    </div>
+                    <div class="flex items-center gap-2 py-0.5">
+                      <x-import component-from-global-scope="PlanePropel.Spinner" height="14px" width="14px" class-name="text-icon-tertiary" hint-size="14px,14px"></x-import>
+                      <span class="text-body-sm-regular text-tertiary" style="font-style:italic">working…</span>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+
+            <div class="border-t border-subtle px-4 py-3 shrink-0 flex flex-col gap-2">
+              <div class="relative flex flex-col rounded-lg border border-subtle bg-surface-2" style="overflow:hidden">
+                <sc-if value="{{ run.hasTasks }}" hint-placeholder-val="{{ false }}">
+                  <div class="flex flex-col border-b border-subtle">
+                    <button type="button" onClick="{{ toggleTasks }}" class="flex w-full items-center gap-2 px-3 text-left" style="min-height:30px">
+                      <span class="grid size-4 shrink-0 place-items-center">{{ icoPlan }}</span>
+                      <span class="text-body-sm-semibold text-primary">Plan</span>
+                      <span class="text-caption-sm-regular text-tertiary">{{ run.taskProgress }} · {{ run.taskEta }}</span>
+                      <span class="ml-auto text-icon-tertiary shrink-0" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">{{ tasksChevron }}</span>
+                    </button>
+                    <sc-if value="{{ tasksOpen }}" hint-placeholder-val="{{ true }}">
+                      <sc-for list="{{ run.tasks }}" as="t" hint-placeholder-count="4">
+                        <div class="flex items-center gap-2 border-t border-subtle px-3" style="min-height:30px">
+                          <span class="grid size-4 shrink-0 place-items-center">{{ t.iconEl }}</span>
+                          <span class="truncate text-caption-sm-regular" style="{{ t.textStyle }}">{{ t.label }}</span>
+                          <span class="ml-auto shrink-0 text-caption-sm-regular font-code text-tertiary">{{ t.meta }}</span>
+                        </div>
+                      </sc-for>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hasQueued }}" hint-placeholder-val="{{ false }}">
+                  <div class="flex flex-col border-b border-subtle">
+                    <button type="button" onClick="{{ toggleQueue }}" class="flex w-full items-center gap-2 px-3 text-left" style="min-height:30px">
+                      <span class="grid size-4 shrink-0 place-items-center">{{ icoQueue }}</span>
+                      <span class="text-body-sm-semibold text-primary">Queue</span>
+                      <span class="text-caption-sm-regular text-tertiary">{{ queuedCount }} waiting · sent after this step</span>
+                      <span class="ml-auto text-icon-tertiary shrink-0" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">{{ queueChevron }}</span>
+                    </button>
+                    <sc-if value="{{ queueOpen }}" hint-placeholder-val="{{ true }}">
+                      <sc-for list="{{ queued }}" as="q" hint-placeholder-count="0">
+                        <div class="flex items-center gap-2 border-t border-subtle px-3" style="min-height:30px">
+                          <span class="grid size-4 shrink-0 place-items-center rounded-full text-caption-sm-regular font-code text-tertiary" style="border:1px dashed var(--border-color-strong);font-size:9px">{{ q.n }}</span>
+                          <span class="truncate text-caption-sm-regular text-primary">{{ q.text }}</span>
+                          <button type="button" onClick="{{ q.sendNow }}" class="ml-auto shrink-0 text-caption-sm-regular text-link-primary">Send now</button>
+                          <button type="button" onClick="{{ q.remove }}" class="grid size-4 shrink-0 place-items-center text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:14px;line-height:1" style-hover="color:var(--txt-danger-primary)">close</button>
+                        </div>
+                      </sc-for>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <div class="flex items-center gap-2 px-3 py-2">
+                  <span class="flex-1" style="min-width:0"><x-import component-from-global-scope="PlanePropel.Input" mode="true-transparent" input-size="sm" ref="{{ inputRef }}" on-key-down="{{ onComposerKey }}" placeholder="{{ run.composerHint }}" class-name="w-full" hint-size="100%,28px"></x-import></span>
+                  <button type="button" onClick="{{ sendMessage }}" title="{{ run.sendTitle }}" class="grid shrink-0 place-items-center rounded-md" style="width:28px;height:28px;background:var(--bg-accent-subtle-hover);color:var(--txt-accent-primary);font-family:'Material Symbols Rounded';font-size:16px;line-height:1" style-hover="background:var(--bg-accent-primary);color:var(--txt-on-color)">send</button>
+                  <sc-if value="{{ run.canStop }}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{ askStop }}" title="Stop the current action and take over — the sandbox is kept" class="grid shrink-0 place-items-center rounded-md border border-subtle bg-surface-1" style="width:28px;height:28px;color:var(--txt-secondary)" style-hover="border-color:var(--border-color-danger-strong);color:var(--txt-danger-primary);background:var(--bg-danger-subtle)">
+                      <span class="block" style="width:9px;height:9px;border-radius:2px;border:1.5px solid currentColor"></span>
+                    </button>
+                  </sc-if>
+                </div>
+
+                <sc-if value="{{ run.canStop }}" hint-placeholder-val="{{ true }}">
+                  <div class="flex items-center gap-1.5 px-3" style="padding-bottom:7px">
+                    <span class="block shrink-0 rounded-full" style="width:5px;height:5px;background:var(--bg-accent-primary);animation:om-breathe 1.6s ease-in-out infinite"></span>
+                    <span class="text-caption-sm-regular text-tertiary truncate">{{ run.workingLabel }}</span>
+                    <span class="ml-auto shrink-0 text-caption-sm-regular font-code text-tertiary">{{ run.elapsed }}</span>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isNewProject }}" hint-placeholder-val="{{ false }}">
+          <div class="absolute flex items-start justify-center overflow-y-auto" style="inset:0;background:var(--bg-backdrop);z-index:35;padding:24px">
+            <div class="rounded-lg border border-subtle bg-surface-1 shadow-overlay-200 flex flex-col" style="width:720px;max-width:100%">
+              <div class="relative w-full rounded-lg" style="height:132px;background:repeating-linear-gradient(135deg,var(--bg-layer-2) 0 8px,var(--bg-layer-3) 8px 16px)">
+                <span class="absolute text-caption-sm-regular font-code text-tertiary" style="top:10px;left:12px">cover image</span>
+                <div class="absolute flex items-center gap-2" style="top:8px;right:8px">
+                  <span class="rounded-md border border-subtle bg-surface-1 px-2 py-1 text-caption-sm-regular text-secondary">Change cover</span>
+                  <span class="grid size-6 place-items-center rounded-md border border-subtle bg-surface-1 text-icon-secondary">{{ icoCloseOutline_size4shrink0 }}</span>
+                </div>
+                <div class="absolute" style="bottom:-22px;left:12px">
+                  <span class="grid place-items-center rounded-md border border-subtle bg-layer-2" style="height:44px;width:44px;font-size:20px">🛩️</span>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-3 px-5" style="padding-top:34px">
+                <div class="flex flex-wrap gap-2">
+                  <span style="flex:1 1 320px;min-width:0"><x-import component-from-global-scope="PlanePropel.Input" input-size="md" value="Plane CE" class-name="w-full" hint-size="100%,40px"></x-import></span>
+                  <span style="flex:0 1 120px;min-width:0"><x-import component-from-global-scope="PlanePropel.Input" input-size="md" value="PLAN" class-name="w-full" hint-size="100%,40px"></x-import></span>
+                </div>
+                <textarea rows="3" placeholder="Description" class="w-full rounded-md border border-subtle px-3 py-2 text-13" style="background:var(--bg-surface-2);color:var(--txt-primary);outline:none;resize:vertical;font-family:var(--font-body)">Self-hosted Plane and the agent runner on the Mac Mini.</textarea>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-subtle px-2 text-13 text-secondary" style-hover="background:var(--bg-layer-1-hover)">
+                    <span class="text-icon-secondary" style="font-family:'Material Symbols Rounded';font-size:14px;line-height:1">lock</span>Private
+                  </button>
+                  <button type="button" class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-subtle px-2 text-13 text-placeholder" style-hover="background:var(--bg-layer-1-hover)">
+                    <span class="text-icon-placeholder" style="font-family:'Material Symbols Rounded';font-size:14px;line-height:1">person</span>Lead
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-2 border-t border-subtle px-5 py-4" style="margin-top:16px">
+                <div class="flex items-center gap-2">
+                  <span class="text-icon-secondary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">source</span>
+                  <span class="text-body-sm-semibold">Git repository</span>
+                  <span class="ml-auto rounded-full bg-accent-subtle px-2 py-0.5 text-caption-sm-regular text-accent-primary">New</span>
+                </div>
+                <p class="text-caption-sm-regular text-secondary" style="margin:0">Cloned onto the Mini so agents mentioned in this project have its code as context. Q&amp;A reads the clone; code jobs branch a worktree from it.</p>
+                <sc-if value="{{ ghConnected }}" hint-placeholder-val="{{ true }}">
+                  <div class="flex flex-col gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-icon-tertiary shrink-0" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">deployed_code_account</span>
+                      <span class="text-caption-sm-regular text-secondary">GitHub</span>
+                      <span class="text-caption-sm-regular text-tertiary truncate">Repositories the app has been granted access to</span>
+                      <span class="ml-auto shrink-0 text-caption-sm-regular text-link-primary">Manage access on GitHub</span>
+                    </div>
+                    <div class="rounded-md border border-subtle bg-surface-2">
+                      <div class="flex flex-wrap items-center gap-2 border-b border-subtle px-2.5 py-2">
+                        {{ icoSearchOutline_size4shrink0texticontertiary }}
+                        <span class="text-caption-sm-regular text-placeholder" style="flex:1 1 140px">Search repositories…</span>
+                        <div class="flex shrink-0 items-center gap-1">
+                          <sc-for list="{{ owners }}" as="o" hint-placeholder-count="3">
+                            <button type="button" onClick="{{ o.pick }}" class="flex items-center gap-1.5 rounded-full px-2 py-1 text-caption-sm-regular" style="{{ o.style }}">
+                              <span class="grid size-4 shrink-0 place-items-center rounded-full" style="{{ o.avatarStyle }}">{{ o.initial }}</span>
+                              {{ o.label }}
+                            </button>
+                          </sc-for>
+                        </div>
+                      </div>
+                      <div style="max-height:186px;overflow-y:auto">
+                        <sc-for list="{{ repos }}" as="r" hint-placeholder-count="5">
+                          <button type="button" onClick="{{ r.pick }}" class="flex w-full items-center gap-2.5 border-b border-subtle px-2.5 py-2 text-left" style="{{ r.style }}">
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full" style="{{ r.avatarStyle }}">{{ r.initial }}</span>
+                            <span class="flex flex-col" style="min-width:0">
+                              <span class="truncate text-body-sm-medium font-code">{{ r.name }}</span>
+                              <span class="truncate text-caption-sm-regular text-tertiary">{{ r.meta }}</span>
+                            </span>
+                            <span class="ml-auto shrink-0 text-caption-sm-regular" style="{{ r.tagStyle }}">{{ r.tag }}</span>
+                          </button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ ghNotConnected }}" hint-placeholder-val="{{ false }}">
+                  <div class="flex items-start gap-2 rounded-md border border-dashed border-subtle px-3 py-3">
+                    <span class="shrink-0 text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1.2">link_off</span>
+                    <div class="flex flex-col gap-1" style="min-width:0">
+                      <span class="text-caption-sm-medium">No GitHub connection in this workspace</span>
+                      <span class="text-caption-sm-regular text-secondary">An admin connects GitHub once in Workspace settings → Integrations. After that every project picks its repository from that account.</span>
+                      <span class="text-caption-sm-regular text-link-primary">Open Workspace settings → Integrations</span>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ cloning }}" hint-placeholder-val="{{ false }}">
+                  <div class="flex items-center gap-2 rounded-md border border-subtle bg-surface-2 px-2.5 py-2">
+                    <x-import component-from-global-scope="PlanePropel.Spinner" height="14px" width="14px" class-name="text-icon-tertiary" hint-size="14px,14px"></x-import>
+                    <span class="text-caption-sm-regular text-secondary">Cloning to</span>
+                    <span class="truncate text-caption-sm-regular font-code text-secondary">{{ clonePath }}</span>
+                    <span class="ml-auto shrink-0 text-caption-sm-regular text-tertiary">42%</span>
+                  </div>
+                </sc-if>
+                <div class="flex items-start gap-2 rounded-md px-2.5 py-2" style="background:var(--bg-warning-subtle)">
+                  <span class="shrink-0 text-warning-primary" style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1.2">info</span>
+                  <span class="text-caption-sm-regular text-primary">Leave this empty and agents cannot be mentioned in this project — a CLI is never started without a working directory. You can add it later in Project settings → Agents.</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 border-t border-subtle px-5 py-4">
+                <x-import component-from-global-scope="PlanePropel.Button" variant="secondary" size="lg" hint-size="86px,36px">Cancel</x-import>
+                <x-import component-from-global-scope="PlanePropel.Button" variant="primary" size="lg" hint-size="130px,36px">Create project</x-import>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const PILL = {
+  created: ["--bg-layer-1", "--txt-secondary"],
+  in_progress: ["--bg-accent-subtle", "--txt-accent-primary"],
+  awaiting: ["--bg-warning-subtle", "--txt-warning-primary"],
+  approval: ["--bg-warning-subtle", "--txt-warning-primary"],
+  completed: ["--bg-success-subtle", "--txt-success-primary"],
+  stopped: ["--bg-layer-1", "--txt-secondary"],
+  failed: ["--bg-danger-subtle", "--txt-danger-primary"],
+  stale: ["--bg-layer-1", "--txt-warning-primary"],
+};
+
+const ROW = {
+  created: ["hourglass_empty", "Queued", "color:var(--txt-secondary)"],
+  in_progress: ["pending", "Working", "color:var(--txt-accent-primary)"],
+  awaiting: ["help", "Needs input", "color:var(--txt-warning-primary)"],
+  approval: ["lock_open_right", "Needs approval", "color:var(--txt-warning-primary)"],
+  completed: ["check_circle", "Finished", "color:var(--txt-success-primary)"],
+  stopped: ["stop_circle", "Stopped", "color:var(--txt-secondary)"],
+  failed: ["error", "Error", "color:var(--txt-danger-primary)"],
+  stale: ["schedule", "Stale", "color:var(--txt-warning-primary)"],
+};
+
+const A = {
+  prompt: (who, text, ts) => ({ type: "prompt", who, text, ts }),
+  thought: (text, ts) => ({ type: "thought", text, ts }),
+  action: (tool, args, result, dur) => ({ type: "action", tool, args, result, dur }),
+  response: (who, text, ts) => ({ type: "response", who, text, ts }),
+  elicit: (text, ts, options) => ({ type: "elicitation", text, ts, options }),
+  error: (who, text, ts, hint) => ({ type: "error", who, text, ts, hint }),
+  pr: (text, branch, diff) => ({ type: "pr", text, branch, diff }),
+  ask: (title, cmd, scope, ts, risk) => ({ type: "permission", title, cmd, scope, ts, risk }),
+  ok: (text, ts) => ({ type: "approval", text, ts }),
+};
+
+const QA = [
+  A.prompt("Kevin", "@Claude why do attachments over 10 MB disappear silently? Point me at where the limit is enforced.", "14:02"),
+  A.thought("Mapped repo found. Refreshing the read-only clone before I read anything.", "14:02"),
+  A.action("git", "pull --ff-only origin main · /srv/agents/mirrors/plane", "Updating 4f1c9ab..a7d3e10\nFast-forward\n 18 files changed, 402 insertions(+), 96 deletions(-)", "1.2s"),
+  A.thought("Two places could enforce an upload ceiling: the API settings and the web uploader.", "14:02"),
+  A.action("grep", "-rn \"FILE_SIZE_LIMIT\\|MAX_UPLOAD\" apps/api apps/web", "apps/api/plane/settings/common.py:214: FILE_SIZE_LIMIT = int(os.environ.get(\"FILE_SIZE_LIMIT\", 5242880))\napps/api/plane/app/views/asset.py:88:  if size > settings.FILE_SIZE_LIMIT:\napps/web/core/constants/upload.ts:6: export const MAX_UPLOAD = 10 * 1024 * 1024;", "0.8s"),
+  A.action("read", "apps/api/plane/app/views/asset.py:70-104", " 88  if size > settings.FILE_SIZE_LIMIT:\n 89      return Response(status=status.HTTP_400_BAD_REQUEST)\n 90  # NOTE: intake path swallows the 400 and still returns 200\n 96  return Response({\"asset_id\": asset.id}, status=200)", "0.5s"),
+  A.thought("The web client allows 10 MB, the API allows 5 MB, and the intake handler discards the API's 400.", "14:03"),
+  A.response("Claude", "Two limits disagree and the intake path hides the rejection.\n\n1. apps/web/core/constants/upload.ts sets MAX_UPLOAD to 10 MB — the picker accepts your 12 MB file.\n2. apps/api/plane/settings/common.py sets FILE_SIZE_LIMIT to 5 MB by default.\n3. apps/api/plane/app/views/asset.py:88 returns 400, but the intake handler returns 200 regardless, so the UI shows success with no attachment.\n\nA 12 MB file fails both limits; anything between 5 and 10 MB fails silently for the same reason.", "14:03"),
+];
+
+const CODE_TAIL = [
+  A.prompt("Kevin", "Fix it — make both limits read the same setting and surface the rejection.", "14:07"),
+  A.thought("Escalating this run to a code job. Booting the Docker sandbox and creating a worktree.", "14:07"),
+  A.action("sandbox", "docker run --rm plane-agent:1 · mem_limit 4g", "container 8c21f0 started\nworktree /srv/agents/work/PLAN-214 on agent/PLAN-214", "3.4s"),
+  A.ok("Kevin allowed writes in the worktree for this run · 14:07", "14:07"),
+  A.action("edit", "apps/web/core/constants/upload.ts", "-export const MAX_UPLOAD = 10 * 1024 * 1024;\n+export const MAX_UPLOAD = Number(env.FILE_SIZE_LIMIT ?? 5242880);", "0.3s"),
+  A.action("edit", "apps/api/plane/app/views/intake.py", "+    if not asset_response.ok:\n+        raise ValidationError(asset_response.error)", "0.4s"),
+  A.action("pytest", "-m unit apps/api/tests/asset", "23 passed, 2 skipped in 11.7s", "12.1s"),
+  A.ok("Kevin allowed the draft PR once · 14:11", "14:11"),
+  A.action("gh", "pr create --draft --base main --head agent/PLAN-214", "https://github.com/kevinle128/plane/pull/482", "2.6s"),
+  A.pr("kevinle128/plane#482 — Align upload limits and surface intake rejection", "agent/PLAN-214", "+41 −12 · 3 files"),
+  A.response("Claude", "Draft PR is up. Both limits now read FILE_SIZE_LIMIT and the intake path propagates the rejection instead of returning 200. Unit tests pass in the sandbox. Review and merge when ready — I won't push to main.", "14:12"),
+];
+
+const SCENES = {
+  mention: {
+    label: "1 · Mention", panel: false, card: false,
+    status: "created", statusLabel: "Created", elapsed: "—",
+  },
+  running: {
+    label: "2 · In progress", panel: true, card: true, streaming: true, canStop: true,
+    status: "in_progress", statusLabel: "In progress", elapsed: "00:41",
+    taskEta: "~1m left",
+    tasks: [
+      ["done", "Refresh the read-only clone"],
+      ["doing", "Find where the upload limit is enforced"],
+      ["todo", "Check the intake response path"],
+      ["todo", "Write the answer"],
+    ],
+    activities: QA.slice(0, 6),
+    last: ["terminal", "read apps/api/plane/app/views/asset.py:70-104"],
+    queued: ["Also check whether the mobile client has its own limit"],
+    comments: [],
+  },
+  awaiting: {
+    label: "3 · Elicitation", panel: true, card: true, canStop: true,
+    status: "awaiting", statusLabel: "Awaiting you", elapsed: "01:12",
+    banner: ["help", "This run is paused until you pick a repository. Nothing has been written.", "background:var(--bg-warning-subtle);color:var(--txt-warning-primary)"],
+    activities: [
+      QA[0],
+      A.thought("The project maps to two candidate remotes. I will not start the CLI without one stored cwd.", "14:03"),
+      A.elicit("Plane CE resolves to more than one git remote. Which clone should I read?", "14:03", [
+        { remote: "git@github.com:kevinle128/plane.git", cwd: "/srv/agents/mirrors/plane" },
+        { remote: "git@github.com:kevinle128/plane-fork.git", cwd: "/srv/agents/mirrors/plane-fork" },
+      ]),
+    ],
+    comments: [{ author: "Claude", meta: "asked 3 minutes ago", tag: "elicitation", tagKind: "warning", body: "Plane CE resolves to more than one git remote. Which clone should I read? Answer in the session panel." }],
+  },
+  completed: {
+    label: "4 · Completed", panel: true, card: true,
+    status: "completed", statusLabel: "Completed", elapsed: "01:08",
+    activities: QA,
+    last: ["check_circle", "Answered: two limits disagree; intake swallows the 400"],
+    comments: [{ author: "Claude", meta: "replied 9 minutes ago", tag: "response", tagKind: "success", body: "Two limits disagree and the intake path hides the rejection. MAX_UPLOAD is 10 MB in the web client, FILE_SIZE_LIMIT is 5 MB in the API, and the intake handler returns 200 even when the asset endpoint returns 400." }],
+  },
+  code: {
+    label: "5 · Code job + PR", panel: true, card: true,
+    taskEta: "6m 24s",
+    tasks: [
+      ["done", "Locate both upload limits"],
+      ["done", "Create worktree on agent/PLAN-214"],
+      ["done", "Make both limits read FILE_SIZE_LIMIT"],
+      ["done", "Propagate the intake rejection"],
+      ["done", "Run the unit suite in the sandbox"],
+      ["done", "Open a draft pull request"],
+    ],
+    status: "completed", statusLabel: "Completed", elapsed: "06:24", kind: "Code job",
+    activities: QA.concat(CODE_TAIL),
+    last: ["merge", "Draft PR #482 on agent/PLAN-214"],
+    cwd: "worktree /srv/agents/work/PLAN-214 · agent/PLAN-214 · docker",
+    comments: [{ author: "Claude", meta: "replied 2 minutes ago", tag: "response", tagKind: "success", body: "Draft PR is up. Both limits now read FILE_SIZE_LIMIT and the intake path propagates the rejection. Unit tests pass in the sandbox.", link: "kevinle128/plane#482" }],
+  },
+  permission: {
+    label: "6 · Permission", panel: true, card: true, canStop: true, kind: "Code job · awaiting approval",
+    status: "approval", statusLabel: "Needs approval", elapsed: "03:18",
+    banner: ["lock_open_right", "Claude is holding before its first write. Nothing has been changed in the worktree yet.", "background:var(--bg-warning-subtle);color:var(--txt-warning-primary)"],
+    taskEta: "held at 14:07",
+    tasks: [
+      ["done", "Locate both upload limits"],
+      ["done", "Create worktree on agent/PLAN-214"],
+      ["doing", "Make both limits read FILE_SIZE_LIMIT"],
+      ["todo", "Propagate the intake rejection"],
+      ["todo", "Run the unit suite in the sandbox"],
+      ["todo", "Open a draft pull request"],
+    ],
+    activities: QA.concat(CODE_TAIL.slice(0, 3)).concat([
+      A.ask("Write to the worktree", "edit apps/web/core/constants/upload.ts · apps/api/plane/app/views/intake.py", "worktree /srv/agents/work/PLAN-214 on agent/PLAN-214 · docker", "14:07", "2 files"),
+    ]),
+    last: ["lock_open_right", "Asking to write 2 files in the worktree"],
+    queued: ["When the limits are aligned, add a test for the 10 MB boundary"],
+    cwd: "worktree /srv/agents/work/PLAN-214 · agent/PLAN-214 · docker",
+    comments: [{ author: "Claude", meta: "asked 1 minute ago", tag: "elicitation", tagKind: "warning", body: "Waiting for approval to write 2 files in the worktree on agent/PLAN-214. Approve in the session panel." }],
+  },
+  failed: {
+    label: "7 · Failed", panel: true, card: true,
+    status: "failed", statusLabel: "Failed", elapsed: "00:03",
+    banner: ["error", "Preflight failed before the run started. No container was booted.", "background:var(--bg-danger-subtle);color:var(--txt-danger-primary)"],
+    activities: [
+      QA[0],
+      A.thought("Preflighting CLI auth before moving to in progress.", "14:02"),
+      A.error("Claude", "The Claude Code CLI on the Mini is logged out, so this run failed immediately.", "14:02", "claude auth status → error: credentials expired (2026-09-19)"),
+    ],
+    last: ["error", "CLI logged out — run failed at preflight"],
+    comments: [{ author: "Claude", meta: "failed 1 minute ago", tag: "error", tagKind: "danger", body: "Run failed: the Claude Code CLI on the Mini is logged out. Re-run `claude login` on the Mini, then mention me again to start a new run." }],
+  },
+  stale: {
+    label: "8 · Stale", panel: true, card: true,
+    status: "stale", statusLabel: "Stale", elapsed: "07:36",
+    banner: ["schedule", "No update for 5 minutes. Plane is up, so the worker is probably down — this run is not being driven.", "background:var(--bg-warning-subtle);color:var(--txt-warning-primary)"],
+    activities: QA.slice(0, 5),
+    last: ["schedule", "Last update 5m ago — grep -rn FILE_SIZE_LIMIT"],
+    comments: [],
+  },
+  capacity: {
+    label: "9 · At capacity", panel: true, card: true,
+    status: "failed", statusLabel: "Refused", elapsed: "04:02",
+    banner: ["memory", "The Mini is already running 2 of 2 code jobs. Nothing was queued.", "background:var(--bg-danger-subtle);color:var(--txt-danger-primary)"],
+    activities: QA.concat([
+      CODE_TAIL[0],
+      A.error("Claude", "Cannot start a code job: Docker is at capacity (2 of 2 code jobs running). I did not boot another container and did not queue this request — the Q&A answer above still stands.", "14:07", "PLANE_AGENT_MAX_CODE_JOBS=2 · mem_limit 4g each"),
+    ]),
+    last: ["memory", "Code job refused — Docker at capacity"],
+    comments: [{ author: "Claude", meta: "failed 30 seconds ago", tag: "error", tagKind: "danger", body: "Cannot start a code job: the Mini is running 2 of 2 code jobs. Nothing was queued. Stop another run or try again when one finishes." }],
+  },
+  stopped: {
+    label: "10 · Stopped to steer", panel: true, card: true, canStop: false,
+    taskEta: "paused at 14:10",
+    tasks: [
+      ["done", "Locate both upload limits"],
+      ["done", "Create worktree on agent/PLAN-214"],
+      ["doing", "Make both limits read FILE_SIZE_LIMIT"],
+      ["todo", "Propagate the intake rejection"],
+      ["todo", "Run the unit suite in the sandbox"],
+      ["todo", "Open a draft pull request"],
+    ],
+    status: "awaiting", statusLabel: "Waiting for you", elapsed: "02:51",
+    banner: ["pan_tool", "Kevin stopped the action Claude was running. The sandbox and worktree are kept and the run is still alive — say what to do next. Queued messages were discarded.", "background:var(--bg-warning-subtle);color:var(--txt-warning-primary)"],
+    activities: QA.concat(CODE_TAIL.slice(0, 4)).concat([
+      A.elicit("Stopped mid-edit by Kevin at 14:10 — I dropped the action I was running and 1 queued message. The worktree on agent/PLAN-214 keeps the first change. Tell me what to do next, or say resume.", "14:10", []),
+    ]),
+    last: ["pan_tool", "Stopped by Kevin mid-edit — waiting for direction"],
+    cwd: "worktree /srv/agents/work/PLAN-214 · agent/PLAN-214 · kept",
+    comments: [],
+  },
+  settings: { label: "11 · Integrations", panel: false, card: false, status: "created", statusLabel: "—", elapsed: "—" },
+  newproject: { label: "12 · New project", panel: false, card: false, status: "created", statusLabel: "—", elapsed: "—" },
+};
+
+const AGENTS = [
+  {
+    key: "claude", name: "Claude", handle: "@Claude", iconCmp: "PlanePropel.AgentOutline", icon: "smart_toy",
+    cli: "claude-code 2.1.4 on the Mini", lastRun: "last run 2 minutes ago",
+    harness: "claude-code",
+    instructions: "Answer from the project's clone, not from memory. Cite file paths and line numbers. Do not write anything until the user asks you to implement or fix, and open a draft PR — never merge.",
+  },
+  {
+    key: "codex", name: "Codex", handle: "@Codex", iconCmp: "PlanePropel.AgentAltOutline", icon: "terminal",
+    cli: "codex 0.9.2 on the Mini", lastRun: "no runs since the connection failed",
+    harness: "codex",
+    instructions: "Prefer small, reviewable diffs. Run the unit suite before opening a draft PR.",
+  },
+  {
+    key: "grok", name: "Grok", handle: "@Grok", iconCmp: "PlanePropel.AgentAltOutline", icon: "terminal",
+    cli: "grok-cli 0.3.0 on the Mini", lastRun: "no runs yet",
+    harness: "grok",
+    instructions: "Answer from the project's clone. Keep diffs small and open a draft PR for review.",
+  },
+  {
+    key: "omp", name: "Omp", handle: "@Omp", iconCmp: "PlanePropel.AgentOutline", icon: "bolt",
+    cli: "omp 0.4.1 on the Mini", lastRun: "no runs yet",
+    harness: "omp",
+    instructions: "Read the project's clone before answering. Keep diffs small and open a draft PR for review.",
+  },
+];
+
+const CONNECTORS = [
+  { group: "Essentials", name: "GitHub", icon: "deployed_code_account", blurb: "Bind a project to a repository, clone it on the Mini, and open draft pull requests.", state: "on", meta: "github.com/kevinle128" },
+  { group: "Harnesses", name: "Claude Code", icon: "smart_toy", blurb: "Mention @Claude on a work item; the CLI runs on the Mini.", state: "on", meta: "claude-code 2.1.4", agent: "Claude", harnessKey: "claude" },
+  { group: "Harnesses", name: "Codex CLI", icon: "terminal", blurb: "Mention @Codex on a work item; the CLI runs on the Mini.", state: "expired", meta: "codex 0.9.2", agent: "Codex", harnessKey: "codex" },
+  { group: "Harnesses", name: "Grok CLI", icon: "terminal", blurb: "Mention @Grok on a work item; the CLI runs on the Mini.", state: "off", meta: "grok-cli 0.3.0", agent: "Grok", harnessKey: "grok" },
+  { group: "Harnesses", name: "Omp", icon: "bolt", blurb: "Mention @Omp on a work item; the CLI runs on the Mini.", state: "off", meta: "omp 0.4.1", agent: "Omp", harnessKey: "omp" },
+];
+
+const DETECTED = [
+  { name: "Claude", icon: "smart_toy", path: "/opt/homebrew/bin/claude · 2.1.4" },
+  { name: "Codex", icon: "terminal", path: "/opt/homebrew/bin/codex · 0.9.2" },
+  { name: "Grok", icon: "terminal", path: "/opt/homebrew/bin/grok · 0.3.0" },
+  { name: "Omp", icon: "bolt", path: "/opt/homebrew/bin/omp · 0.4.1" },
+  { name: "Aider", icon: "code", path: "/opt/homebrew/bin/aider · 0.71" },
+  { name: "Cursor", icon: "cloud", path: "cloud agent — sends work off the Mini", unsupported: true },
+];
+
+const OWNERS = [
+  { login: "All", count: 9, tint: "var(--bg-layer-3)", fg: "var(--txt-secondary)" },
+  { login: "kevinle128", count: 4, kind: "Personal", access: "All repositories · 4 visible", tint: "var(--label-indigo-bg)", fg: "var(--label-indigo-text)" },
+  { login: "mini-labs", count: 3, kind: "Organisation", access: "All repositories · 3 visible · installed by Kevin", tint: "var(--label-emerald-bg)", fg: "var(--label-emerald-text)" },
+  { login: "plane-community", count: 2, kind: "Organisation", access: "Only selected repositories · 2 of 41", tint: "var(--label-orange-bg)", fg: "var(--label-orange-text)" },
+];
+
+const REPOS = [
+  { owner: "kevinle128", name: "kevinle128/plane", meta: "Personal · TypeScript · pushed 2 hours ago", private: true },
+  { owner: "kevinle128", name: "kevinle128/agent-runner", meta: "Personal · Python · pushed yesterday", private: true },
+  { owner: "kevinle128", name: "kevinle128/mini-infra", meta: "Personal · Shell · pushed 6 days ago", private: true },
+  { owner: "kevinle128", name: "kevinle128/dotfiles", meta: "Personal · Shell · pushed 2 months ago", private: true },
+  { owner: "mini-labs", name: "mini-labs/plane-ee", meta: "Organization · TypeScript · pushed 40 minutes ago", private: true },
+  { owner: "mini-labs", name: "mini-labs/runner-images", meta: "Organization · Dockerfile · pushed 4 days ago", private: true },
+  { owner: "mini-labs", name: "mini-labs/design-tokens", meta: "Organization · CSS · pushed 3 weeks ago", private: true },
+  { owner: "plane-community", name: "plane-community/docs-site", meta: "Organization · MDX · pushed 5 days ago", private: false },
+  { owner: "plane-community", name: "plane-community/examples", meta: "Organization · TypeScript · pushed 2 months ago", private: false },
+];
+
+const PROPS = [
+  { iconKey: "property.state", label: "State", value: "In progress" },
+  { iconKey: "property.members", label: "Assignees", value: "Kevin Le" },
+  { iconKey: "property.priority", label: "Priority", value: "High" },
+  { iconKey: "property.user", label: "Created by", value: "Kevin Le" },
+  { iconKey: "property.start-date", label: "Start date", value: "Sep 18, 2026" },
+  { iconKey: "property.due-date", label: "Due date", value: "Sep 25, 2026" },
+  { iconKey: "property.estimate", label: "Estimate", value: "3 points" },
+  { iconKey: "project.module", label: "Modules", value: "Intake" },
+  { iconKey: "project.cycle", label: "Cycle", value: "Cycle 12" },
+  { iconKey: "property.parent", label: "Parent", value: "None" },
+  { iconKey: "property.label", label: "Labels", value: "bug · intake" },
+];
+
+const HARNESSES = [
+  { key: "claude", name: "Claude Code", handle: "@Claude", bin: "/opt/homebrew/bin/claude · 2.1.4", login: "claude login", base: "connected",
+    models: [["claude-sonnet-4-5", "default · balanced"], ["claude-opus-4-1", "slowest, best on large refactors"], ["claude-haiku-4-5", "cheapest, Q&A only"]] },
+  { key: "codex", name: "Codex CLI", handle: "@Codex", bin: "/opt/homebrew/bin/codex · 0.9.2", login: "codex login", base: "error",
+    models: [["gpt-5-codex", "default"], ["gpt-5", "general"], ["o4-mini", "fast"]] },
+  { key: "grok", name: "Grok CLI", handle: "@Grok", bin: "/opt/homebrew/bin/grok · 0.3.0", login: "grok login", base: "idle",
+    models: [["grok-code-fast-1", "default"], ["grok-4", "general"]] },
+  { key: "omp", name: "Omp", handle: "@Omp", bin: "/opt/homebrew/bin/omp · 0.4.1", login: "omp login", base: "idle",
+    models: [["omp-default", "default"], ["omp-fast", "fast"]] },
+];
+
+const HSTATE = {
+  idle: { label: "Not connected", badge: "neutral", tag: "background:var(--bg-layer-1);color:var(--txt-tertiary)", act: "Connect", variant: "primary", next: "connecting" },
+  connecting: { label: "Connecting", badge: "brand", tag: "background:var(--bg-accent-subtle);color:var(--txt-accent-primary)" },
+  error: { label: "Connection failed", badge: "danger", tag: "background:var(--bg-danger-subtle);color:var(--txt-danger-primary)", act: "Retry", variant: "secondary", next: "connecting" },
+  connected: { label: "Connected", badge: "success", tag: "background:var(--bg-success-subtle);color:var(--txt-success-primary)", alt: "Disconnect", altNext: "idle" },
+};
+
+const ORDER = ["mention", "running", "awaiting", "completed", "code", "permission", "failed", "stale", "capacity", "stopped", "settings", "newproject"];
+
+class Component extends DCLogic {
+  state = { scene: "running", theme: "light", panelOpen: true, panelW: 540, stopDialog: false, closed: {}, queued: SCENES.running.queued || [], agent: 0, tab: "Model", gh: "connected", repo: "", owner: "All", page: "connectors", conn: {}, model: {}, modelMenu: false, ghDetail: false, harness: "" };
+
+  rootRef = React.createRef();
+  inputRef = React.createRef();
+  handleRef = React.createRef();
+
+  sendMessage = () => {
+    const el = this.inputRef.current;
+    const text = (el && el.value.trim()) || "";
+    if (!text) return;
+    el.value = "";
+    const st = SCENES[this.state.scene];
+    const live = st.status === "in_progress" || st.status === "awaiting";
+    if (live) this.setState((s) => ({ queued: s.queued.concat(text) }));
+  };
+
+  componentDidMount() {
+    document.documentElement.setAttribute("data-theme", this.state.theme);
+  }
+
+  connMeta = (k) => {
+    const h = HARNESSES.find((x) => x.key === k);
+    const st = this.state.conn[k] || h.base;
+    const d = HSTATE[st];
+    return {
+      status: d.label, badge: d.badge,
+      tagStyle: d.tag + ";border-radius:999px;padding:2px 8px",
+      isIdle: st === "idle", isConnecting: st === "connecting",
+      isConnected: st === "connected", isError: st === "error",
+      rowStyle: st === "error" ? "background:var(--bg-danger-subtle)" : "",
+      hasAct: !!d.act, act: d.act, actVariant: d.variant || "secondary",
+      hasAlt: !!d.alt, alt: d.alt,
+      errDetail: h.login.split(" ")[0] + " exited 1 · not logged in (provider returned 401). Sign in with " + h.login + " on your machine, then retry.",
+      connHint: st === "idle"
+        ? "Installed on your machine. Connect to verify it and read the models it offers."
+        : st === "connecting"
+        ? "Connecting and asking the agent for its model list."
+        : st === "error"
+        ? "Plane reached the agent but it refused the session, so no models could be read."
+        : "Verified. Runs go to this agent on your machine.",
+      doAct: () => this.connectHarness(k, d.next),
+      doAlt: () => this.setState((s) => ({ conn: { ...s.conn, [k]: d.altNext } })),
+    };
+  };
+
+  connectHarness = (key, next) => {
+    this.setState((s) => ({ conn: { ...s.conn, [key]: next } }));
+    if (next !== "connecting") return;
+    clearTimeout(this.connTimers && this.connTimers[key]);
+    this.connTimers = this.connTimers || {};
+    this.connTimers[key] = setTimeout(() => {
+      this.setState((s) => ({ conn: { ...s.conn, [key]: "connected" } }));
+    }, 900);
+  };
+
+  setScene = (key) => {
+    const s = SCENES[key];
+    this.setState({ scene: key, panelOpen: !!s.panel, stopDialog: false, closed: {}, queued: (s.queued || []).slice(), harness: "" });
+  };
+
+  startResize = (e) => {
+    e.preventDefault();
+    const x0 = e.clientX, w0 = this.state.panelW;
+    const move = (ev) => this.setState({ panelW: Math.max(380, Math.min(960, w0 + (x0 - ev.clientX))) });
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+    };
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  };
+
+  toggleTheme = () => {
+    const next = this.state.theme === "light" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", next);
+    if (this.rootRef.current) this.rootRef.current.setAttribute("data-theme", next);
+    this.setState({ theme: next });
+  };
+
+  ico(name, className) {
+    const P = window.PlanePropel || {};
+    const C = P[name];
+    return C ? React.createElement(C, { className, key: name + className }) : null;
+  }
+
+  renderVals() {
+    const removed = this.state.removed || {};
+    const installs = OWNERS.filter((o) => o.login !== "All" && !removed[o.login]);
+    const ghOk = this.state.gh === "connected" && installs.length > 0;
+    const selectedAgent = AGENTS.find((a) => a.name === this.state.harness) || AGENTS[0];
+    const dupHandle = AGENTS.some((a) => a.handle.toLowerCase() === (this.state.handle || "").trim().toLowerCase());
+    const key = this.state.scene;
+    const s = SCENES[key];
+    const [pillBg, pillFg] = PILL[s.status] || PILL.created;
+
+    const TOOLS = {
+      git: ["sync", "Synced the clone"],
+      grep: ["search", "Searched codebase"],
+      read: ["description", "Read file"],
+      edit: ["edit_document", "Edited file"],
+      pytest: ["science", "Ran tests"],
+      gh: ["merge", "Opened pull request"],
+      sandbox: ["deployed_code", "Started sandbox"],
+    };
+
+    const acts = (s.activities || []).map((a, i) => {
+      const id = key + "-" + i;
+      const open = !!this.state.closed[id];
+      const lines = (a.result || "").split("\n");
+      const [toolIcon, verb] = TOOLS[a.tool] || ["terminal", "Ran command"];
+      let summary = a.dur;
+      if (a.tool === "grep") summary = lines.length + " matches";
+      else if (a.tool === "read") summary = lines.length + " lines";
+      else if (a.tool === "edit") {
+        const plus = lines.filter((l) => l.startsWith("+")).length;
+        const minus = lines.filter((l) => l.startsWith("-")).length;
+        summary = "+" + plus + " −" + minus;
+      } else if (a.tool === "pytest") summary = "passed";
+      return {
+        ...a, open, toolIcon, verb, summary,
+        dur: a.type === "thought" ? Math.max(2, Math.round((a.text || "").length / 22)) + "s" : a.dur,
+        chevronEl: this.ico(open ? "ChevronDownOutline" : "ChevronRightOutline", "size-3.5 shrink-0 text-icon-tertiary"),
+        isPrompt: a.type === "prompt", isThought: a.type === "thought", isAction: a.type === "action",
+        isResponse: a.type === "response", isElicitation: a.type === "elicitation",
+        isError: a.type === "error", isPr: a.type === "pr",
+        isPermission: a.type === "permission", isApproval: a.type === "approval",
+        allowRun: () => this.setScene("code"),
+        allowOnce: () => this.setScene("code"),
+        deny: () => this.setScene("stopped"),
+        toggle: () => this.setState((st) => ({ closed: { ...st.closed, [id]: !st.closed[id] } })),
+        options: (a.options || []).map((o) => ({ ...o, pick: () => this.setScene("running") })),
+      };
+    });
+
+    const live = s.status === "in_progress" || s.status === "awaiting";
+    const groups = [];
+    let batch = null;
+    acts.forEach((a) => {
+      if (a.type === "thought" || a.type === "action") {
+        if (!batch) {
+          const bid = key + "-batch-" + groups.length;
+          batch = {
+            isBatch: true, rows: [], secs: 0, plus: 0, minus: 0, steps: 0, id: bid,
+            open: live ? !this.state.closed[bid] : !!this.state.closed[bid],
+            toggle: () => this.setState((st) => ({ closed: { ...st.closed, [bid]: !st.closed[bid] } })),
+          };
+          groups.push(batch);
+        }
+        batch.rows.push(a);
+        if (a.type === "action") {
+          batch.steps += 1;
+          batch.secs += parseFloat(a.dur) || 0;
+          (a.result || "").split("\n").forEach((l) => {
+            if (l.startsWith("+")) batch.plus += 1;
+            else if (l.startsWith("-")) batch.minus += 1;
+          });
+        }
+      } else {
+        batch = null;
+        groups.push(a);
+      }
+    });
+    groups.forEach((g) => {
+      if (!g.isBatch) return;
+      const m = Math.floor(g.secs / 60);
+      const dur = m ? m + "m " + Math.round(g.secs % 60) + "s" : Math.round(g.secs) + "s";
+      g.title = live ? "Working…" : "Worked for " + dur;
+      g.meta = live ? g.steps + " steps so far" : g.steps + " steps";
+      g.diff = g.plus || g.minus ? "+" + g.plus + " −" + g.minus : "";
+      g.chevronEl = this.ico(g.open ? "ChevronDownOutline" : "ChevronRightOutline", "size-4 shrink-0 text-icon-tertiary");
+    });
+
+    const tagStyles = {
+      success: "background:var(--bg-success-subtle);color:var(--txt-success-primary)",
+      warning: "background:var(--bg-warning-subtle);color:var(--txt-warning-primary)",
+      danger: "background:var(--bg-danger-subtle);color:var(--txt-danger-primary)",
+    };
+
+    return {
+      icoMoreHorizontalOutline_size4shrink0: this.ico("MoreHorizontalOutline", "size-4 shrink-0"),
+      icoChevronRightOutline_size4shrink0: this.ico("ChevronRightOutline", "size-4 shrink-0"),
+      icoAddWorkItemOutline_size4shrink0: this.ico("AddWorkItemOutline", "size-4 shrink-0"),
+      icoHomeOutline_size4shrink0: this.ico("HomeOutline", "size-4 shrink-0"),
+      icoYourWorkOutline_size4shrink0: this.ico("YourWorkOutline", "size-4 shrink-0"),
+      icoProjectsOutline_size4shrink0: this.ico("ProjectsOutline", "size-4 shrink-0"),
+      icoDraftsOutline_size4shrink0: this.ico("DraftsOutline", "size-4 shrink-0"),
+      icoChevronRightOutline_size35texticonplaceholdershrink0: this.ico("ChevronRightOutline", "size-3.5 text-icon-placeholder shrink-0"),
+      icoSubscribeOutline_h3w3shrink0: this.ico("SubscribeOutline", "h-3 w-3 shrink-0"),
+      icoLinkOutline_size4shrink0: this.ico("LinkOutline", "size-4 shrink-0"),
+      icoAgentOutline_size4: this.ico("AgentOutline", "size-4"),
+      icoAgentOutline_size35: this.ico("AgentOutline", "size-3.5"),
+      icoAgentOutline_size3: this.ico("AgentOutline", "size-3"),
+      icoViewsOutline_h35w35shrink0: this.ico("ViewsOutline", "h-3.5 w-3.5 shrink-0"),
+      icoRelationsOutline_h35w35shrink0: this.ico("RelationsOutline", "h-3.5 w-3.5 shrink-0"),
+      icoLinkOutline_h35w35shrink0: this.ico("LinkOutline", "h-3.5 w-3.5 shrink-0"),
+      icoAttachOutline_h35w35shrink0: this.ico("AttachOutline", "h-3.5 w-3.5 shrink-0"),
+      icoSortAscendingOutline_size4shrink0: this.ico("SortAscendingOutline", "size-4 shrink-0"),
+      icoFilterOutline_size4shrink0: this.ico("FilterOutline", "size-4 shrink-0"),
+      icoHierarchyOutline_h35w35: this.ico("HierarchyOutline", "h-3.5 w-3.5"),
+      icoLabelsOutline_h35w35: this.ico("LabelsOutline", "h-3.5 w-3.5"),
+      icoReplyOutline_h35w35textsecondary: this.ico("ReplyOutline", "h-3.5 w-3.5 text-secondary"),
+      icoChevronRightOutline_size4shrink0texticontertiary: this.ico("ChevronRightOutline", "size-4 shrink-0 text-icon-tertiary"),
+      icoCloseOutline_size4shrink0: this.ico("CloseOutline", "size-4 shrink-0"),
+      icoSearchOutline_size4shrink0texticontertiary: this.ico("SearchOutline", "size-4 shrink-0 text-icon-tertiary"),
+      icoLock: this.ico("LockOutline", "h-3.5 w-3.5 text-primary"),
+      icoGlobe: this.ico("GlobeOutline", "h-3.5 w-3.5 text-placeholder"),
+      icoBold: this.ico("BoldOutline", "h-3.5 w-3.5"),
+      icoItalic: this.ico("ItalicOutline", "h-3.5 w-3.5"),
+      icoUnderline: this.ico("UnderlineOutline", "h-3.5 w-3.5"),
+      icoStrike: this.ico("StrikethroughOutline", "h-3.5 w-3.5"),
+      icoAlignLeft: this.ico("AlignLeftOutline", "h-3.5 w-3.5"),
+      icoAlignCenter: this.ico("AlignCenterOutline", "h-3.5 w-3.5"),
+      icoAlignRight: this.ico("AlignRightOutline", "h-3.5 w-3.5"),
+      icoList: this.ico("ListOutline", "h-3.5 w-3.5"),
+      icoNumberedList: this.ico("NumberedListOutline", "h-3.5 w-3.5"),
+      icoToDo: this.ico("ToDoOutline", "h-3.5 w-3.5"),
+      icoQuote: this.ico("QuoteOutline", "h-3.5 w-3.5"),
+      icoCode: this.ico("CodeOutline", "h-3.5 w-3.5"),
+      icoImage: this.ico("ImageOutline", "h-3.5 w-3.5"),
+      issueKey: "PLAN-214",
+      crumb1: key === "settings" ? "Mini Workspace" : "Plane CE",
+      crumb2: key === "settings" ? "Settings" : "Work items",
+      crumb3: key === "settings" ? (this.state.ghDetail ? "GitHub" : this.state.harness ? this.state.harness : "Integrations") : "PLAN-214",
+      themeLabel: this.state.theme === "light" ? "Dark theme" : "Light theme",
+      toggleTheme: this.toggleTheme,
+      rootRef: this.rootRef,
+      scenes: ORDER.map((k) => ({
+        label: SCENES[k].label,
+        go: () => this.setScene(k),
+        btnStyle: k === key
+          ? "background:var(--bg-inverse);color:var(--txt-inverse)"
+          : "color:var(--txt-secondary)",
+      })),
+      isSettings: key === "settings",
+      isNewProject: key === "newproject",
+      isIssue: key !== "settings",
+      isMentionScene: key === "mention",
+      notMentionScene: key !== "mention",
+      showRunCard: !!s.card,
+      panelOpen: this.state.panelOpen && !!s.panel,
+      stopDialog: this.state.stopDialog,
+      openPanel: () => this.setState({ panelOpen: true }),
+      closePanel: () => this.setState({ panelOpen: false }),
+      askStop: () => this.setScene("stopped"),
+      cancelStop: () => this.setState({ stopDialog: false }),
+      confirmStop: () => this.setScene("stopped"),
+      pickClaude: () => this.setScene("running"),
+      pickCodex: () => this.setScene("running"),
+      timeline: groups,
+      tasksOpen: !this.state.closed["__tasks"],
+      toggleTasks: () => this.setState((st) => ({ closed: { ...st.closed, __tasks: !st.closed.__tasks } })),
+      tasksChevron: this.state.closed["__tasks"] ? "chevron_right" : "expand_more",
+      run: {
+        hasTasks: !!s.tasks,
+        tasks: (s.tasks || []).map((t, i) => ({
+          label: t[1],
+          iconEl: t[0] === "done"
+            ? React.createElement("span", { className: "grid place-items-center rounded-full", style: { width: 14, height: 14, background: "var(--bg-success-subtle)" } }, this.ico("TickOutline", "size-3 text-icon-success-primary"))
+            : t[0] === "doing"
+              ? React.createElement("span", { className: "grid place-items-center rounded-full", style: { width: 14, height: 14, background: "var(--bg-accent-subtle)" } }, React.createElement(PlanePropel.Spinner, { height: "10px", width: "10px", className: "text-icon-accent-primary" }))
+              : React.createElement("span", { className: "block rounded-full", style: { width: 10, height: 10, border: "1px dashed var(--border-color-strong)", background: "var(--bg-surface-1)" } }),
+          textStyle: t[0] === "todo" ? "color:var(--txt-tertiary)" : t[0] === "doing" ? "color:var(--txt-primary);font-weight:500" : "color:var(--txt-secondary)",
+          topLine: i === 0 ? "background:transparent" : (t[0] === "todo" ? "border-left:1px dashed var(--border-color-strong)" : "background:var(--border-color-strong)"),
+          botLine: i === (s.tasks || []).length - 1 ? "background:transparent" : ((s.tasks[i + 1][0] === "todo") ? "border-left:1px dashed var(--border-color-strong)" : "background:var(--border-color-strong)"),
+          meta: t[0] === "doing" ? "now" : "",
+        })),
+        taskProgress: s.tasks ? s.tasks.filter((t) => t[0] === "done").length + " of " + s.tasks.length : "",
+        taskEta: s.taskEta || "",
+        taskBarStyle: s.tasks
+          ? "height:100%;border-radius:9999px;background:var(--bg-accent-primary);width:" +
+            Math.round((s.tasks.filter((t) => t[0] === "done").length / s.tasks.length) * 100) + "%"
+          : "",
+        bot: "Claude",
+        kindLabel: s.kind || "Q&A · read-only clone",
+        statusLabel: s.statusLabel,
+        elapsed: s.elapsed,
+        started: "14:02 today",
+        streaming: !!s.streaming,
+        canStop: !!s.canStop,
+        workingLabel: s.status === "in_progress"
+          ? "Working — messages queue until the current step lands"
+          : s.status === "approval"
+          ? "Holding before its first write, waiting on your approval"
+          : "Waiting on you — the sandbox is kept alive",
+        composerHint: s.status === "in_progress" ? "Queue a message for Claude…" : "Reply to Claude…",
+        sendTitle: s.status === "in_progress" ? "Queue this message" : "Send",
+        badgeVariant: { in_progress: "brand", awaiting: "warning", approval: "warning", completed: "success", failed: "danger", stale: "warning", stopped: "neutral", created: "neutral" }[s.status] || "neutral",
+        pillStyle: "background:var(" + pillBg + ");color:var(" + pillFg + ")",
+        dotStyle: "width:6px;height:6px;border-radius:9999px;background:currentColor;display:inline-block",
+        ago: { mention: "now", running: "now", awaiting: "3m", completed: "9m", code: "2m", permission: "1m", failed: "1m", stale: "8m", capacity: "30s", stopped: "5m" }[key] || "now",
+        rowIcon: ROW[s.status][0],
+        rowLabel: ROW[s.status][1],
+        rowIconStyle: "font-family:'Material Symbols Rounded';font-size:15px;line-height:1;" + ROW[s.status][2],
+        rowLabelStyle: ROW[s.status][2],
+        lastIcon: (s.last || ["hourglass_empty", "Waiting for pickup"])[0],
+        lastLine: (s.last || ["hourglass_empty", "Waiting for pickup"])[1],
+        cwdLine: s.cwd || "cwd /srv/agents/mirrors/plane · read-only · OS sandbox",
+        countLine: (s.activities || []).length + " activities",
+        banner: s.banner ? s.banner[1] : "",
+        bannerIcon: s.banner ? s.banner[0] : "",
+        bannerStyle: s.banner ? s.banner[2] : "",
+      },
+      feedComments: (s.comments || []).map((c) => ({
+        ...c,
+        tagStyle: tagStyles[c.tagKind],
+        hasLink: !!c.link,
+      })),
+      quickPrompts: key === "code" || key === "capacity"
+        ? [{ label: "Explain the diff", go: () => {} }, { label: "Run the e2e suite", go: () => {} }]
+        : [
+            { label: "Implement this fix", go: () => this.setScene("code") },
+            { label: "Which tests cover it?", go: () => {} },
+          ],
+      hasQueued: this.state.queued.length > 0,
+      queueOpen: !this.state.closed["__queue"],
+      toggleQueue: () => this.setState((st) => ({ closed: { ...st.closed, __queue: !st.closed.__queue } })),
+      queueChevron: this.state.closed["__queue"] ? "chevron_right" : "expand_more",
+      icoQueue: this.ico("ClockOutline", "size-3.5 text-icon-tertiary"),
+      queuedCount: this.state.queued.length,
+      queued: this.state.queued.map((q, i) => ({
+        text: q, n: i + 1,
+        hint: i === 0 ? "· next" : "",
+        topLine: i === 0 ? "background:transparent" : "border-left:1px dashed var(--border-color-strong)",
+        sendNow: () => this.setState((st) => ({ queued: st.queued.filter((_, j) => j !== i) })),
+        remove: () => this.setState((st) => ({ queued: st.queued.filter((_, j) => j !== i) })),
+      })),
+      panelW: this.state.panelW,
+      startResize: this.startResize,
+      inputRef: this.inputRef,
+      sendMessage: this.sendMessage,
+      onComposerKey: (e) => {
+        if (e.key === "Enter") this.sendMessage();
+      },
+      properties: PROPS.map((p) => ({
+        ...p,
+        iconEl: window.PlanePropel && window.PlanePropel.Icon
+          ? React.createElement(window.PlanePropel.Icon, { name: p.iconKey, className: "size-4 shrink-0" })
+          : null,
+      })),
+      addOpen: !!this.state.addOpen,
+      openAdd: () => this.setState({ addOpen: true, pick: "", handle: "@Aider" }),
+      closeAdd: () => this.setState({ addOpen: false }),
+      handleRef: this.handleRef,
+      onHandleChange: () => this.setState({ handle: (this.handleRef.current && this.handleRef.current.value) || "" }),
+      handleFieldStyle:
+        "background:var(--bg-surface-2);color:var(--txt-primary);outline:none;border:1px solid " +
+        (dupHandle ? "var(--border-color-danger-strong)" : "var(--border-color-subtle)"),
+      handleHint: dupHandle
+        ? "An agent with this handle already exists in this workspace."
+        : "Unique in this workspace. This is what people type in a comment.",
+      handleHintStyle: dupHandle ? "color:var(--txt-danger-primary)" : "color:var(--txt-tertiary)",
+      addDisabled: dupHandle || !this.state.pick,
+      detected: DETECTED.map((d) => {
+        const taken = AGENTS.some((a) => a.name === d.name);
+        const blocked = taken || d.unsupported;
+        const picked = this.state.pick === d.name;
+        return {
+          ...d,
+          pick: () => { if (!blocked) this.setState({ pick: d.name, handle: "@" + d.name }); },
+          tag: taken ? "Already added" : d.unsupported ? "Not in v1" : picked ? "Selected" : "Add",
+          tagStyle: taken || d.unsupported ? "color:var(--txt-disabled)" : "color:var(--txt-accent-primary)",
+          style:
+            "border-color:" + (picked ? "var(--border-color-accent-strong)" : "var(--border-color-subtle)") +
+            ";background:" + (picked ? "var(--bg-layer-1-selected)" : "var(--bg-surface-1)") +
+            (blocked ? ";opacity:.55" : ""),
+        };
+      }),
+      isListView: !this.state.harness && !this.state.ghDetail && key === "settings",
+      isAgentDetail: !!this.state.harness && key === "settings",
+      isGithubDetail: this.state.ghDetail && key === "settings",
+      isAgentsPage: !!this.state.harness,
+      backToList: () => this.setState({ harness: "", ghDetail: false }),
+      icoBack: this.ico("ArrowNarrowLeftOutline", "size-4 shrink-0"),
+      icoBuilding: this.ico("BuildingOutline", "size-3.5"),
+      icoBillings: this.ico("BillingsOutline", "size-3.5"),
+      icoExport: this.ico("ExportOutline", "size-3.5"),
+      icoWebhooks: this.ico("WebhooksOutline", "size-3.5"),
+      icoIntegrations: this.ico("IntegrationsOutline", "size-3.5"),
+      icoTick: this.ico("TickOutline", "size-3.5 shrink-0 text-icon-accent-primary"),
+      icoGithub: this.ico("GithubIcon", "size-5"),
+      icoChevronDown: this.ico("ChevronDownOutline", "size-3.5 shrink-0 text-icon-tertiary"),
+      icoSearchSm: this.ico("SearchOutline", "size-3.5 shrink-0 text-icon-tertiary"),
+      icoInbox: this.ico("InboxOutline", "size-4 shrink-0"),
+      icoHelp: this.ico("HelpOutline", "size-5 shrink-0"),
+      icoHelpNav: this.ico("HelpOutline", "size-4 shrink-0"),
+      icoInboxNav: this.ico("InboxOutline", "size-4 shrink-0"),
+      icoSidePanel: this.ico("SidePanelIcon", "size-4 shrink-0"),
+      icoMembers: this.ico("MembersOutline", "size-3.5"),
+      goConnectors: () => this.setState({ page: "connectors", conn: {}, model: {}, modelMenu: false, ghDetail: false, harness: "" }),
+      navConnectorsStyle: this.state.page === "connectors"
+        ? "background:var(--bg-layer-1-selected);color:var(--txt-primary);font-weight:500"
+        : "color:var(--txt-secondary)",
+      pageTitle: this.state.ghDetail ? "GitHub" : this.state.harness ? selectedAgent.name : "Integrations",
+      pagePath: this.state.harness
+        ? "/mini/settings/integrations/" + this.state.harness.toLowerCase()
+        : "/mini/settings/integrations",
+      pageBlurb: this.state.ghDetail ? "Bind projects to repositories, clone them on the Mini, and let agents open draft pull requests." : this.state.harness
+        ? "This harness is a mentionable identity in the workspace. The repository comes from the project it is mentioned in."
+        : "Services this workspace is authorised to talk to. Connect once here; every project can then point at a repository, channel or board from the connected account.",
+      integrationGroups: ["Essentials", "Harnesses"].map((title) => ({
+        title: title.toUpperCase(),
+        isAgents: title === "Harnesses",
+        items: CONNECTORS.filter((c) => c.group === title).map((c) => ({
+          ...c,
+          isAgent: !!c.agent,
+          open: () => {
+            if (c.agent) this.setState({ harness: c.agent });
+            else if (c.name === "GitHub" && ghOk) this.setState({ ghDetail: true });
+          },
+          tag: c.harnessKey ? this.connMeta(c.harnessKey).status : c.state === "on" ? "Connected" : c.state === "soon" ? "Not in v1" : "Connect",
+          tagStyle: c.harnessKey
+            ? (this.connMeta(c.harnessKey).isConnected
+                ? "color:var(--txt-success-primary)"
+                : this.connMeta(c.harnessKey).isError
+                ? "color:var(--txt-danger-primary)"
+                : "color:var(--txt-tertiary)")
+            : c.state === "on" ? "color:var(--txt-success-primary)"
+            : c.state === "soon" ? "color:var(--txt-disabled)" : "color:var(--txt-accent-primary)",
+          meta: c.meta || "",
+        })),
+      })),
+      ghNotConnected: !ghOk,
+      ghConnected: ghOk,
+      ghIdle: !ghOk && this.state.gh !== "pairing",
+      installations: installs.map((o) => ({
+        login: o.login,
+        initials: o.login.slice(0, 2).toUpperCase(),
+        kind: o.kind || (o.login === "kevinle128" ? "Personal" : "Organisation"),
+        access: o.access || (o.count ? o.count + " repositories" : "All repositories"),
+        remove: () => this.setState((st) => ({ removed: { ...st.removed, [o.login]: true } })),
+      })),
+      cloning: ghOk && !!this.state.repo,
+      clonePath: "/srv/agents/mirrors/" + (this.state.repo || "").split("/").pop(),
+      owners: OWNERS.map((o) => {
+        const active = (this.state.owner || "All") === o.login;
+        return {
+          label: o.login === "All" ? "All " + o.count : o.login,
+          initial: o.login === "All" ? "∗" : o.login[0].toUpperCase(),
+          pick: () => this.setState({ owner: o.login }),
+          avatarStyle: "background:" + o.tint + ";color:" + o.fg + ";font-size:8px;font-weight:600",
+          style: active
+            ? "background:var(--bg-layer-1-selected);color:var(--txt-primary);border:1px solid var(--border-color-strong)"
+            : "color:var(--txt-secondary);border:1px solid var(--border-color-subtle)",
+        };
+      }),
+      repos: REPOS.filter((r) => !this.state.owner || this.state.owner === "All" || r.owner === this.state.owner).map((r) => {
+        const o = OWNERS.find((x) => x.login === r.owner) || OWNERS[0];
+        return {
+          name: r.name,
+          meta: r.meta + (r.private ? " · private" : " · public"),
+          initial: r.owner[0].toUpperCase(),
+          avatarStyle: "background:" + o.tint + ";color:" + o.fg + ";font-size:9px;font-weight:600",
+          tag: r.taken ? "Used by " + r.taken : this.state.repo === r.name ? "Selected" : "",
+          tagStyle: r.taken ? "color:var(--txt-disabled)" : "color:var(--txt-accent-primary)",
+          pick: () => { if (!r.taken) this.setState({ repo: r.name }); },
+          style:
+            "background:" + (this.state.repo === r.name ? "var(--bg-layer-1-selected)" : "transparent") +
+            (r.taken ? ";opacity:.55" : ""),
+        };
+      }),
+      ghPairing: this.state.gh === "pairing",
+      ghConnect: () => this.setState({ gh: "pairing" }),
+      ghDone: () => this.setState({ gh: "connected", removed: {} }),
+      ghReset: () => this.setState({ gh: "idle", ghDetail: false }),
+      agents: AGENTS.map((g) => ({
+        ...g,
+        ...this.connMeta(g.key),
+        select: () => this.setState({ harness: g.name }),
+        cardStyle: g.name === selectedAgent.name
+          ? "background:var(--bg-layer-1-selected);border-color:var(--border-color-accent-strong)"
+          : "background:var(--bg-surface-1);border-color:var(--border-color-subtle)",
+      })),
+      agent: (() => {
+        const m = this.connMeta(selectedAgent.key);
+        const h = HARNESSES.find((x) => x.key === selectedAgent.key);
+        const sel = this.state.model[selectedAgent.key] || h.models[0][0];
+        return {
+          ...selectedAgent, ...m,
+          enabled: !this.state.closed["__agentOff"],
+          modelKnown: m.isConnected, modelUnknown: !m.isConnected,
+          model: sel,
+          subtitle: m.isConnected ? selectedAgent.cli + " · " + selectedAgent.lastRun : selectedAgent.cli,
+          models: h.models.map(([name, note]) => ({
+            name, note, isSel: name === sel,
+            style: name === sel ? "background:var(--bg-layer-1-selected)" : "",
+            pick: () => this.setState((st) => ({ model: { ...st.model, [selectedAgent.key]: name }, modelMenu: false })),
+          })),
+        };
+      })(),
+      modelMenuOpen: !!this.state.modelMenu,
+      toggleModelMenu: () => this.setState((st) => ({ modelMenu: !st.modelMenu })),
+      icoPlan: this.ico("ToDoOutline", "size-3.5 text-icon-tertiary"),
+      icoTickSm: this.ico("TickOutline", "size-3.5 shrink-0 text-icon-accent-primary"),
+      toggleAgent: () => this.setState((st) => ({ closed: { ...st.closed, __agentOff: !st.closed.__agentOff } })),
+      repoBindings: [
+        { emoji: "🛩️", project: "Plane CE", remote: "git@github.com:kevinle128/plane.git", cwd: "/srv/agents/mirrors/plane", ok: true },
+        { emoji: "📓", project: "Docs", remote: "no remote resolved", cwd: "not set", warn: true, warnLabel: "Code jobs blocked" },
+      ],
+    };
+
+  }
+}
+
+
+</script>
+</body>
+</html>
