@@ -119,7 +119,10 @@
       "disconnected": "{provider} is disconnected.",
       "github_revoke_in_provider": "Plane did not revoke the old token because it could not use it. Revoke it in GitHub under Settings, Applications, Authorized GitHub Apps.",
       "open_github_authorizations": "Open GitHub settings",
-      "reconnect_generic": "Plane cannot use the saved {provider} connection. Connect again to continue."
+      "reconnect_generic": "Plane cannot use the saved {provider} connection. Connect again to continue.",
+      "gitlab_disconnect_confirm_content": "Plane deletes the stored GitLab token and stops using it. Plane does not revoke the token in GitLab: revoke it in the group settings under Access tokens. Projects keep their repository binding for history, but new agent work fails until GitLab is connected again.",
+      "gitlab_revoke_in_provider": "Revoke the Group Access Token in GitLab now: group Settings, Access tokens.",
+      "open_gitlab_token_settings": "Open GitLab access tokens"
     },
     "repository": {
       "title": "Repository",

@@ -76,6 +76,11 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Green: `pytest plane/tests/contract/app -k 'agent or project_app'` 203 passed; blocks agent-run 19 passed; web and blocks typecheck 11/11.
 - Change: each picker group heading and its `role="group"` label now name the provider in text ("GitLab · platform/tools"), so the provider is not shown by the icon alone.
 
+### G4 Disconnect GitLab (revoke-free)
+
+- Test first: 3 of 6 cases failed (`DELETE gitlab/connection/` was a 404). The 403/401 catalog case, the member 403 and the "group cannot be removed alone" (400) cases already held from G2 and 1.3.
+- Green: GitLab disconnect 6 passed; `pytest plane/tests/contract/app -k agent` 182 passed; `ruff check plane` clean; web typecheck 10/10; i18n in sync. The test asserts that the HTTP seam receives no call during disconnect.
+
 ## Deviations from the plan
 
 1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.

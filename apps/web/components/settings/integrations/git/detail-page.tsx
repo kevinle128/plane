@@ -37,23 +37,26 @@ const DESCRIPTION_KEYS: Record<TAgentGitProvider, string> = {
 
 const DISCONNECT_CONFIRM_KEYS: Record<TAgentGitProvider, string> = {
   github: "agent_git.connection.github_disconnect_confirm_content",
-  gitlab: "agent_git.connection.github_disconnect_confirm_content",
+  gitlab: "agent_git.connection.gitlab_disconnect_confirm_content",
 };
 
-const REVOKE_HINTS: Record<TAgentGitProvider, { messageKey: string; href: string }> = {
+const REVOKE_HINTS: Record<TAgentGitProvider, { messageKey: string; linkKey: string }> = {
   github: {
     messageKey: "agent_git.connection.github_revoke_in_provider",
-    href: "https://github.com/settings/apps/authorizations",
+    linkKey: "agent_git.connection.open_github_authorizations",
   },
   gitlab: {
-    messageKey: "agent_git.connection.github_revoke_in_provider",
-    href: "https://github.com/settings/apps/authorizations",
+    messageKey: "agent_git.connection.gitlab_revoke_in_provider",
+    linkKey: "agent_git.connection.open_gitlab_token_settings",
   },
 };
+
+const GITHUB_AUTHORIZATIONS_URL = "https://github.com/settings/apps/authorizations";
 
 function DisconnectResultNotice({ result }: { result: TAgentGitDisconnectResult }) {
   const { t } = useTranslation();
   const hint = REVOKE_HINTS[result.provider];
+  const revokeHref = result.provider === "github" ? GITHUB_AUTHORIZATIONS_URL : result.revoke_url;
   return (
     <div
       role="status"
@@ -63,14 +66,8 @@ function DisconnectResultNotice({ result }: { result: TAgentGitDisconnectResult 
         {t("agent_git.connection.disconnected", { provider: agentGitProviderLabel(result.provider) })}{" "}
         {result.revoke_in_provider && t(hint.messageKey)}
       </span>
-      {result.revoke_in_provider && (
-        <AnchorButton
-          variant="secondary"
-          size="sm"
-          href={hint.href}
-          external
-          label={t("agent_git.connection.open_github_authorizations")}
-        />
+      {result.revoke_in_provider && revokeHref && (
+        <AnchorButton variant="secondary" size="sm" href={revokeHref} external label={t(hint.linkKey)} />
       )}
     </div>
   );
@@ -210,15 +207,12 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
           className="flex flex-wrap items-center gap-2 rounded-md bg-warning-subtle px-3 py-2 text-body-sm-regular text-warning-primary"
         >
           <span className="flex-1">{reconnectMessage}</span>
-          {canEdit && provider === "github" && disconnectAction}
+          {canEdit && disconnectAction}
         </div>
       )}
       {!isLoading && isConnected && connection && (
         <>
-          <ConnectionMetaStrip
-            connection={connection}
-            action={canEdit && provider === "github" ? disconnectAction : undefined}
-          />
+          <ConnectionMetaStrip connection={connection} action={canEdit ? disconnectAction : undefined} />
           <ConnectionWarnings connection={connection} />
           <GitAccountsList workspaceSlug={workspaceSlug} connection={connection} canEdit={canEdit} />
           <GitChangeRequestPolicy workspaceSlug={workspaceSlug} provider={provider} canEdit={canEdit} />

@@ -297,3 +297,36 @@ def usable_token(connection_id):
     if error:
         raise error
     return token
+
+
+def access_token_settings_url(connection):
+    """Group page where an admin revokes the Group Access Token."""
+    group = (
+        AgentGitAccount.objects.filter(connection=connection, state=AgentGitAccountState.ATTACHED)
+        .values_list("login", flat=True)
+        .first()
+    )
+    return f"{connection.base_url}/groups/{group}/-/settings/access_tokens" if group else ""
+
+
+def disconnect(workspace):
+    """Forget the stored GitLab token without any GitLab call. Returns ``(connection, revoke_url)``.
+
+    Plane does not revoke the Group Access Token; the admin revokes it in the
+    group settings. Bindings stay for history and become unavailable.
+    """
+    with transaction.atomic():
+        connection = (
+            AgentGitConnection.objects.select_for_update().filter(workspace=workspace, provider=PROVIDER).first()
+        )
+        if connection is None:
+            raise _error("provider_disconnected", http_status=404)
+        revoke_url = access_token_settings_url(connection)
+        git_connection.clear_tokens(connection)
+        connection.status = AgentGitConnectionStatus.DISCONNECTED
+        connection.last_error = ""
+        connection.save(
+            update_fields=["access_token", "refresh_token", "token_expires_at", "status", "last_error", "updated_at"]
+        )
+    logger.info("gitlab connection %s disconnected without a provider call", connection.id)
+    return connection, revoke_url

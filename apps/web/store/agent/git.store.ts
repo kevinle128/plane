@@ -137,7 +137,7 @@ export class AgentGitStore implements IAgentGitStore {
   disconnect = async (workspaceSlug: string, provider: TAgentGitProvider) => {
     const result = await this.service.disconnect(workspaceSlug, provider);
     runInAction(() => {
-      const { revoke_in_provider: _revoke, ...connection } = result;
+      const { revoke_in_provider: _revoke, revoke_url: _revokeUrl, ...connection } = result;
       this.connectionsByWorkspace[workspaceSlug] = {
         ...this.connectionsByWorkspace[workspaceSlug],
         [provider]: connection,

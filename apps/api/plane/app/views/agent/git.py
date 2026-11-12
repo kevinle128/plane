@@ -146,15 +146,21 @@ class AgentGitConnectionEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def delete(self, request, slug, provider):
-        if require_provider(provider) != AgentGitProvider.GITHUB:
-            raise Http404
+        require_provider(provider)
         workspace = Workspace.objects.get(slug=slug)
+        revoke_url = ""
         try:
-            connection, revoke_in_provider = github_connection.disconnect(workspace)
+            if provider == AgentGitProvider.GITHUB:
+                connection, revoke_in_provider = github_connection.disconnect(workspace)
+            else:
+                # GitLab disconnect is revoke-free: the admin revokes the token in GitLab.
+                connection, revoke_url = gitlab_connection.disconnect(workspace)
+                revoke_in_provider = True
         except ProviderError as error:
             return provider_error_response(error)
         data = AgentGitConnectionSerializer(connection).data
         data["revoke_in_provider"] = revoke_in_provider
+        data["revoke_url"] = revoke_url
         return Response(data, status=status.HTTP_200_OK)
 
 

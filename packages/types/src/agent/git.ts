@@ -46,6 +46,8 @@ export type TAgentGitConnection = {
 /** Result of a disconnect. `revoke_in_provider` asks the admin to revoke the token at the provider. */
 export type TAgentGitDisconnectResult = TAgentGitConnection & {
   revoke_in_provider: boolean;
+  /** Provider page where the admin revokes the token; empty for GitHub. */
+  revoke_url: string;
 };
 
 export type TAgentGitAccountState = "candidate" | "attached" | "detached";
