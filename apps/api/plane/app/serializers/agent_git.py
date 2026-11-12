@@ -91,6 +91,7 @@ class AgentGithubDeviceAuthorizationSerializer(_NoSecretsMixin, BaseSerializer):
             "expires_at",
             "interval",
             "last_error",
+            "created_at",
         ]
         read_only_fields = fields
 

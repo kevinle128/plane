@@ -9,6 +9,7 @@ from datetime import timedelta
 import pytest
 from django.db import connection as db_connection
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 
 from plane.agent.git_providers.base import ProviderError
@@ -60,6 +61,8 @@ class TestDeviceFlowStart:
         assert response.data["status"] == "pending"
         assert response.data["expires_at"]
         assert "device_code" not in response.data
+        lifetime = parse_datetime(response.data["expires_at"]) - parse_datetime(response.data["created_at"])
+        assert abs(lifetime.total_seconds() - 900) < 5
         row = AgentGithubDeviceAuthorization.objects.get(pk=response.data["id"])
         assert row.device_code != GITHUB_DEVICE_CODE
         assert decrypt_data(row.device_code) == GITHUB_DEVICE_CODE
@@ -87,6 +90,24 @@ class TestDeviceFlowStart:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["error"] == "device_flow_disabled"
+
+    @pytest.mark.django_db
+    def test_created_at_is_set_by_the_server_and_not_writable(
+        self, session_client, workspace, fake_http, github_app_env
+    ):
+        fake_http.add("POST", "github.com/login/device/code", github_device_code_response())
+
+        response = session_client.post(
+            device_authorization_url(workspace.slug),
+            {"kind": "user", "created_at": "2000-01-01T00:00:00Z"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        created_at = parse_datetime(response.data["created_at"])
+        assert abs((timezone.now() - created_at).total_seconds()) < 60
+        row = AgentGithubDeviceAuthorization.objects.get(pk=response.data["id"])
+        assert row.created_at == created_at
 
     @pytest.mark.django_db
     def test_start_rejects_unknown_kind(self, session_client, workspace, fake_http, github_app_env):
