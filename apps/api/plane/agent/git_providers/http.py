@@ -10,10 +10,13 @@ with the operator allowlists ``AGENT_GIT_ALLOWED_HOSTS`` and
 ``AGENT_GIT_ALLOWED_IPS``, caps the response body, enforces per-read
 timeouts and an absolute deadline per call, and maps transport failures to
 fixed reason codes of the form ``<provider>_<reason>``. The deadline is a
-:class:`SocketDeadline` armed before the connection opens: when it passes,
-the socket is shut down, so a server that sends the status line, headers,
-chunk-size lines, body or trailers one byte at a time cannot hold the call
-past its budget. A connection CA
+:class:`SocketDeadline` armed before the first connect: each TCP connect
+attempt, on each resolved address, waits at most the time that remains, and
+when the deadline passes the socket is shut down, so a server that drops
+SYN packets on many addresses or sends the status line, headers, chunk-size
+lines, body or trailers one byte at a time cannot hold the call past its
+budget. DNS resolution runs before the first connect and is not limited by
+the deadline. A connection CA
 bundle is written to a private file and passed as ``verify`` for that
 request only; every other request keeps system trust. Tests replace
 :func:`request` and nothing else.
@@ -239,7 +242,7 @@ def request(
                 verify=ca_bundle_path(ca_bundle) if ca_bundle else True,
                 allowed_hosts=settings.AGENT_GIT_ALLOWED_HOSTS,
                 allowed_ips=settings.AGENT_GIT_ALLOWED_IPS,
-                on_socket=socket_deadline.attach,
+                deadline=socket_deadline,
                 **extra,
             )
         except (ValueError, requests.exceptions.RequestException) as error:

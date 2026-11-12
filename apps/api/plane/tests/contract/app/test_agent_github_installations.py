@@ -12,6 +12,7 @@ from plane.tests.agent_git_fixtures import (
     GITHUB_ACCESS_TOKEN,
     GITHUB_REFRESH_TOKEN,
     accounts_url,
+    add_github_connect_routes,
     connect_github,
     device_authorization_url,
     github_device_code_response,
@@ -145,6 +146,38 @@ class TestInstallationSync:
 
         github = next(item for item in listed.data if item["provider"] == "github")
         assert github["install_url"] == "https://github.com/apps/plane-agents-test/installations/new"
+
+    @pytest.mark.django_db
+    def test_all_installation_pages_after_connect_share_one_deadline(
+        self, session_client, workspace, fake_http, github_app_env
+    ):
+        import time
+
+        from plane.agent.services import github_connection
+
+        add_github_connect_routes(fake_http)
+        next_page = '<https://api.github.com/user/installations?per_page=100&page=2>; rel="next"'
+        fake_http.add(
+            "GET",
+            "api.github.com/user/installations",
+            json_response(200, {"installations": [github_installation(111, "plane-mini")]}, {"Link": next_page}),
+            github_installations_response(github_installation(222, "kevinle128")),
+        )
+        started = time.monotonic()
+        start = session_client.post(device_authorization_url(workspace.slug), {"kind": "user"}, format="json")
+        session_client.post(device_authorization_url(workspace.slug, start.data["id"], "poll"), {}, format="json")
+
+        calls = [call for call in fake_http.calls if call["host_path"] == "api.github.com/user/installations"]
+        deadlines = {call["deadline"] for call in calls}
+        assert len(calls) == 2
+        assert len(deadlines) == 1
+        (deadline,) = deadlines
+        assert deadline is not None
+        assert deadline <= started + github_connection.INSTALLATION_SYNC_BUDGET_SECONDS + 1
+        assert set(AgentGitAccount.objects.filter(workspace=workspace).values_list("external_id", flat=True)) == {
+            "111",
+            "222",
+        }
 
     @pytest.mark.django_db
     def test_installation_sync_sends_no_token_in_logs(

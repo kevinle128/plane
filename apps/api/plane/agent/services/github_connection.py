@@ -307,10 +307,14 @@ def _release_attached_installations(connection):
 # Installations
 
 MAX_INSTALLATION_PAGES = 50
+# One deadline for all pages of one sync. The sync after connect runs while
+# row locks are held, so the budget stays small.
+INSTALLATION_SYNC_BUDGET_SECONDS = 60
 
 
 def _list_installations(token):
     installations = []
+    deadline = http.new_deadline(INSTALLATION_SYNC_BUDGET_SECONDS)
     for page in range(1, MAX_INSTALLATION_PAGES + 1):
         response = http.request(
             "GET",
@@ -318,6 +322,7 @@ def _list_installations(token):
             provider=PROVIDER,
             headers=api_headers(token),
             params={"per_page": 100, "page": page},
+            deadline=deadline,
         )
         raise_for_status(response)
         page_items = response.json_object().get("installations")

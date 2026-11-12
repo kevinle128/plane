@@ -548,6 +548,47 @@ class _DrippingServer:
         self._thread.join(timeout=5)
 
 
+class _FullAcceptQueueListener:
+    """A listener on all local addresses whose accept queue is full, so a new TCP connect hangs.
+
+    It never accepts. Linux drops the SYN of a new connection while the queue
+    is full, so ``connect`` waits until its timeout. The test is skipped on a
+    kernel that refuses or accepts the connection instead.
+    """
+
+    def __enter__(self):
+        import socket
+
+        self._fillers = []
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self._socket.bind(("0.0.0.0", 0))
+            self._socket.listen(0)
+            self.port = self._socket.getsockname()[1]
+            for _ in range(16):
+                filler = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                filler.settimeout(0.3)
+                try:
+                    filler.connect(("127.0.0.1", self.port))
+                except socket.timeout:
+                    filler.close()
+                    return self
+                except OSError:
+                    filler.close()
+                    break
+                self._fillers.append(filler)
+        except BaseException:
+            self.__exit__()
+            raise
+        self.__exit__()
+        pytest.skip("this kernel does not hold a TCP connect when the accept queue is full")
+
+    def __exit__(self, *exc):
+        for filler in self._fillers:
+            filler.close()
+        self._socket.close()
+
+
 _CHUNKED_HEAD = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
 _SLOW_SERVER_CASES = ["fixed-length-body", "chunk-size-line", "trailer-lines", "status-line-and-headers"]
 
@@ -687,7 +728,8 @@ class TestAgentGitHttpSeam:
             elapsed = time.monotonic() - started
 
         assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
-        assert elapsed < budget + 0.5
+        # The server needs 5 s, so this margin still proves the deadline ended the call.
+        assert elapsed < budget + 1.0
 
     @pytest.mark.parametrize("case", ["trailer-lines", "status-line-and-headers"])
     def test_slow_tls_server_is_stopped_at_the_budget(self, settings, monkeypatch, tmp_path, case):
@@ -709,7 +751,32 @@ class TestAgentGitHttpSeam:
             elapsed = time.monotonic() - started
 
         assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
-        assert elapsed < budget + 0.5
+        # The server needs 5 s, so this margin still proves the deadline ended the call.
+        assert elapsed < budget + 1.0
+
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_hanging_connect_on_many_addresses_is_stopped_at_the_budget(self, mock_resolve, settings, monkeypatch):
+        import time
+
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["git.example.com"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        budget = 1.5
+        monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
+        # Without a limit across addresses, 4 addresses would take 4 x 1.0 s.
+        monkeypatch.setattr(http, "CONNECT_TIMEOUT_SECONDS", 1.0)
+        # Patch the resolver above the socket module: urllib3 still resolves each IP literal itself.
+        mock_resolve.return_value = [f"127.0.0.{last}" for last in range(1, 5)]
+        with _FullAcceptQueueListener() as listener:
+            started = time.monotonic()
+            with pytest.raises(ProviderError) as raised:
+                http.request("GET", f"http://git.example.com:{listener.port}/api/v4/version", provider="gitlab")
+            elapsed = time.monotonic() - started
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        assert elapsed < budget + 1.0
 
     def test_complete_chunked_response_with_trailers_is_read_and_leaves_no_timer(self, settings):
         import threading
@@ -804,6 +871,31 @@ class TestSocketDeadline:
             left.settimeout(5)
             assert left.recv(1) == b""
 
+    def test_remaining_counts_down_to_zero_at_expiry(self):
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        with SocketDeadline(0.2) as deadline:
+            assert 0 < deadline.remaining() <= 0.2
+            time.sleep(0.4)
+            assert deadline.expired
+            assert deadline.remaining() == 0.0
+        with SocketDeadline(-1) as spent:
+            assert spent.remaining() == 0.0
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.ip_address.socket.getaddrinfo")
+    def test_no_address_is_tried_after_the_deadline(self, mock_resolve, mock_session_cls):
+        from plane.utils.url_security import SocketDeadline
+
+        mock_resolve.return_value = [_addr("93.184.216.34"), _addr("93.184.216.35")]
+        with SocketDeadline(0) as deadline:
+            with pytest.raises(requests.exceptions.ConnectTimeout):
+                pinned_fetch("GET", "https://example.com/late", deadline=deadline)
+
+        mock_session_cls.return_value.request.assert_not_called()
+
     def test_cancel_before_expiry_keeps_the_socket_open_and_stops_the_timer(self):
         import socket
         import threading
@@ -832,4 +924,4 @@ class TestSocketDeadline:
         pinned_fetch("GET", "http://example.com/hook")
 
         session.mount.assert_not_called()
-        assert "on_socket" not in session.request.call_args.kwargs
+        assert "deadline" not in session.request.call_args.kwargs
