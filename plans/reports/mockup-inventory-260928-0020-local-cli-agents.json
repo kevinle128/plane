@@ -1,0 +1,2125 @@
+{
+  "target": "design_handoff_local_cli_agents",
+  "source_fingerprint": "8a2ad4a376958cb8c23fd9f025690ee49f450db0d5807eb60106285f3e549d68",
+  "mockup_inventory": [
+    {
+      "id": "I001",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Workspace and project navigation",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Workspace-and-project-navigation",
+          "detail": "Mini Workspace sidebar shows Home, Your work, Inbox, Projects, Drafts, Plane CE, Work items, Cycles, Modules, Views, Pages, and Intake."
+        }
+      ]
+    },
+    {
+      "id": "I002",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "New work item button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=New-work-item-button",
+          "detail": "New work item appears in the workspace sidebar."
+        }
+      ]
+    },
+    {
+      "id": "I003",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Work item breadcrumb",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Work-item-breadcrumb",
+          "detail": "Breadcrumb shows Plane CE > Work items > PLAN-214."
+        }
+      ]
+    },
+    {
+      "id": "I004",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Subscribe button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Subscribe-button",
+          "detail": "Subscribe appears at the upper right of PLAN-214."
+        }
+      ]
+    },
+    {
+      "id": "I005",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Work item title and description",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Work-item-title-and-description",
+          "detail": "PLAN-214 shows its title, upload problem description, reactions, and bug label."
+        }
+      ]
+    },
+    {
+      "id": "I006",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Add sub-work item button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Add-sub-work-item-button",
+          "detail": "The work item action row shows Add sub-work item."
+        }
+      ]
+    },
+    {
+      "id": "I007",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Add relation button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Add-relation-button",
+          "detail": "The work item action row shows Add relation."
+        }
+      ]
+    },
+    {
+      "id": "I008",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Add link button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Add-link-button",
+          "detail": "The work item action row shows Add link."
+        }
+      ]
+    },
+    {
+      "id": "I009",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Attach button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Attach-button",
+          "detail": "The work item action row shows Attach."
+        }
+      ]
+    },
+    {
+      "id": "I010",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Activity history",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Activity-history",
+          "detail": "Activity shows creation, label update, and Kevin’s @Claude comment."
+        }
+      ]
+    },
+    {
+      "id": "I011",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Comment composer and formatting toolbar",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Comment-composer-and-formatting-toolbar",
+          "detail": "The work item has Add comment, formatting controls, and Comment."
+        }
+      ]
+    },
+    {
+      "id": "I012",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "work item",
+      "control_or_state": "Properties sidebar",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=work-item;element=Properties-sidebar",
+          "detail": "Properties shows state, assignee, priority, creator, dates, estimate, module, cycle, parent, and labels."
+        }
+      ]
+    },
+    {
+      "id": "I013",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "mention",
+      "control_or_state": "Agent mention suggestions",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=mention;element=Agent-mention-suggestions",
+          "detail": "Typing @Cl in the comment composer shows Claude, Codex, and a user suggestion."
+        }
+      ]
+    },
+    {
+      "id": "I014",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Run activity card",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Run-activity-card",
+          "detail": "The activity feed shows Claude started by Kevin, Q&A and read-only clone, Working, current action, and elapsed time."
+        }
+      ]
+    },
+    {
+      "id": "I015",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Open run panel from activity card",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Open-run-panel-from-activity-card",
+          "detail": "Selecting the activity run card shows the run detail panel."
+        }
+      ]
+    },
+    {
+      "id": "I016",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Run panel header and status",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Run-panel-header-and-status",
+          "detail": "The panel header shows Claude, PLAN-214, Q&A read-only clone, start time, In progress, and elapsed time."
+        }
+      ]
+    },
+    {
+      "id": "I017",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Close and reopen run panel",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Close-and-reopen-run-panel",
+          "detail": "The panel has a close button, and the activity run card remains available to reopen it."
+        }
+      ]
+    },
+    {
+      "id": "I018",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Resizable run panel",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Resizable-run-panel",
+          "detail": "A drag boundary between work item and panel changes panel width."
+        }
+      ]
+    },
+    {
+      "id": "I019",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Live activity batch",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Live-activity-batch",
+          "detail": "The panel groups thoughts and actions under Working with step count."
+        }
+      ]
+    },
+    {
+      "id": "I020",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running expanded action",
+      "control_or_state": "Action result expansion",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running-expanded-action;element=Action-result-expansion",
+          "detail": "Selecting Synced the clone reveals its command result."
+        }
+      ]
+    },
+    {
+      "id": "I021",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running collapsed activity",
+      "control_or_state": "Activity batch disclosure",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running-collapsed-activity;element=Activity-batch-disclosure",
+          "detail": "The Working group can collapse its thought and tool rows."
+        }
+      ]
+    },
+    {
+      "id": "I022",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Streaming indicator",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Streaming-indicator",
+          "detail": "The panel shows a loading indicator and working text after the latest action."
+        }
+      ]
+    },
+    {
+      "id": "I023",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Plan progress and task list",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Plan-progress-and-task-list",
+          "detail": "Plan shows 1 of 4, time estimate, completed, current, and remaining tasks."
+        }
+      ]
+    },
+    {
+      "id": "I024",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running collapsed plan",
+      "control_or_state": "Plan disclosure",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running-collapsed-plan;element=Plan-disclosure",
+          "detail": "Selecting Plan hides or reveals its task list."
+        }
+      ]
+    },
+    {
+      "id": "I025",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Queue count and waiting item",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Queue-count-and-waiting-item",
+          "detail": "Queue shows one waiting message and states that it sends after the current step."
+        }
+      ]
+    },
+    {
+      "id": "I026",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running collapsed queue",
+      "control_or_state": "Queue disclosure",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running-collapsed-queue;element=Queue-disclosure",
+          "detail": "Selecting Queue hides or reveals queued items."
+        }
+      ]
+    },
+    {
+      "id": "I027",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Send now queued-item button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Send-now-queued-item-button",
+          "detail": "The waiting message has Send now."
+        }
+      ]
+    },
+    {
+      "id": "I028",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Remove queued-item button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Remove-queued-item-button",
+          "detail": "The waiting message has a close button."
+        }
+      ]
+    },
+    {
+      "id": "I029",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Run composer queue action",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Run-composer-queue-action",
+          "detail": "The run composer says Queue a message for Claude and its send button says Queue this message."
+        }
+      ]
+    },
+    {
+      "id": "I030",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "running",
+      "control_or_state": "Stop current action button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=running;element=Stop-current-action-button",
+          "detail": "The run composer offers Stop the current action and take over, with sandbox kept."
+        }
+      ]
+    },
+    {
+      "id": "I031",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "stopped",
+      "control_or_state": "Stopped run state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=stopped;element=Stopped-run-state",
+          "detail": "The panel says Kevin stopped the action, kept sandbox and worktree, discarded one queued message, and waits for direction."
+        }
+      ]
+    },
+    {
+      "id": "I032",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "awaiting",
+      "control_or_state": "Repository elicitation state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=awaiting;element=Repository-elicitation-state",
+          "detail": "The run asks which clone to read and says no write occurred."
+        }
+      ]
+    },
+    {
+      "id": "I033",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "awaiting",
+      "control_or_state": "Repository choice buttons",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=awaiting;element=Repository-choice-buttons",
+          "detail": "The elicitation shows plane and plane-fork remotes with their local clone paths."
+        }
+      ]
+    },
+    {
+      "id": "I034",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "awaiting",
+      "control_or_state": "Run reply composer",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=awaiting;element=Run-reply-composer",
+          "detail": "The paused panel provides a reply field and Send."
+        }
+      ]
+    },
+    {
+      "id": "I035",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "completed",
+      "control_or_state": "Completed Q&A state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=completed;element=Completed-Q&A-state",
+          "detail": "The run shows Finished, answer summary, a response in the panel, and a response comment in Activity."
+        }
+      ]
+    },
+    {
+      "id": "I036",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "completed",
+      "control_or_state": "Collapsed completed activity",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=completed;element=Collapsed-completed-activity",
+          "detail": "Completed tool activity is grouped as Worked for 3s and starts collapsed."
+        }
+      ]
+    },
+    {
+      "id": "I037",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "code",
+      "control_or_state": "Code job completed state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=code;element=Code-job-completed-state",
+          "detail": "The panel shows Code job, six completed plan steps, approval records, tests, and a draft pull request."
+        }
+      ]
+    },
+    {
+      "id": "I038",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "code",
+      "control_or_state": "Draft pull request card",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=code;element=Draft-pull-request-card",
+          "detail": "The run shows repository PR #482, Draft, branch, diff size, and human merge note."
+        }
+      ]
+    },
+    {
+      "id": "I039",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "permission",
+      "control_or_state": "Write approval state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=permission;element=Write-approval-state",
+          "detail": "The panel holds before the first write, names two files and the worktree, and shows a Needs approval card."
+        }
+      ]
+    },
+    {
+      "id": "I040",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "permission",
+      "control_or_state": "Allow for this run button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=permission;element=Allow-for-this-run-button",
+          "detail": "The write request offers Allow for this run."
+        }
+      ]
+    },
+    {
+      "id": "I041",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "permission",
+      "control_or_state": "Allow once button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=permission;element=Allow-once-button",
+          "detail": "The write request offers Allow once."
+        }
+      ]
+    },
+    {
+      "id": "I042",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "permission",
+      "control_or_state": "Deny button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=permission;element=Deny-button",
+          "detail": "The write request offers Deny."
+        }
+      ]
+    },
+    {
+      "id": "I043",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "failed",
+      "control_or_state": "CLI authentication failure state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=failed;element=CLI-authentication-failure-state",
+          "detail": "The run shows failed preflight, no container, expired credentials, and a comment with login guidance."
+        }
+      ]
+    },
+    {
+      "id": "I044",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "stale",
+      "control_or_state": "Stale worker state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=stale;element=Stale-worker-state",
+          "detail": "The run says no update for five minutes and warns that the worker is probably down."
+        }
+      ]
+    },
+    {
+      "id": "I045",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "capacity",
+      "control_or_state": "Docker capacity refusal state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=capacity;element=Docker-capacity-refusal-state",
+          "detail": "The run reports two of two code jobs, no queue, and no new container."
+        }
+      ]
+    },
+    {
+      "id": "I046",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "settings list",
+      "control_or_state": "Integrations navigation and cards",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=settings-list;element=Integrations-navigation-and-cards",
+          "detail": "Workspace settings > Integrations shows GitHub and Claude Code, Codex CLI, Grok CLI, and Omp cards with connection states."
+        }
+      ]
+    },
+    {
+      "id": "I047",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "GitHub connection details",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=GitHub-connection-details",
+          "detail": "The detail shows enabled-by, scopes, connection installations, personal account, and PR defaults."
+        }
+      ]
+    },
+    {
+      "id": "I048",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "Disconnect GitHub button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=Disconnect-GitHub-button",
+          "detail": "GitHub detail has Disconnect."
+        }
+      ]
+    },
+    {
+      "id": "I049",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "Remove GitHub installation button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=Remove-GitHub-installation-button",
+          "detail": "Each listed GitHub installation has Remove."
+        }
+      ]
+    },
+    {
+      "id": "I050",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "Connect organisation button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=Connect-organisation-button",
+          "detail": "Connections has Connect organisation."
+        }
+      ]
+    },
+    {
+      "id": "I051",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "Draft PR switch",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=Draft-PR-switch",
+          "detail": "Open pull requests as drafts is enabled."
+        }
+      ]
+    },
+    {
+      "id": "I052",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "PR conclusions switch",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=PR-conclusions-switch",
+          "detail": "Post run conclusions as PR comments is disabled."
+        }
+      ]
+    },
+    {
+      "id": "I053",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "Branch format selector",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=Branch-format-selector",
+          "detail": "Branch format shows agent/identifier."
+        }
+      ]
+    },
+    {
+      "id": "I054",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub disconnected",
+      "control_or_state": "GitHub install prompt",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-disconnected;element=GitHub-install-prompt",
+          "detail": "After Disconnect, Integrations shows an install prompt and Authenticate with GitHub."
+        }
+      ]
+    },
+    {
+      "id": "I055",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub pairing",
+      "control_or_state": "GitHub device pairing state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-pairing;element=GitHub-device-pairing-state",
+          "detail": "After Authenticate with GitHub, the page shows device URL, code, expiry, I entered the code, and Cancel."
+        }
+      ]
+    },
+    {
+      "id": "I056",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub pairing",
+      "control_or_state": "I entered the code button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-pairing;element=I-entered-the-code-button",
+          "detail": "The device pairing state has I entered the code."
+        }
+      ]
+    },
+    {
+      "id": "I057",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub pairing",
+      "control_or_state": "Cancel pairing button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-pairing;element=Cancel-pairing-button",
+          "detail": "The device pairing state has Cancel."
+        }
+      ]
+    },
+    {
+      "id": "I058",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent detail",
+      "control_or_state": "Agent selector",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-detail;element=Agent-selector",
+          "detail": "The agent detail page lists Claude, Codex, Grok, and Omp with handles and connection states."
+        }
+      ]
+    },
+    {
+      "id": "I059",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent detail",
+      "control_or_state": "Mentionable switch",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-detail;element=Mentionable-switch",
+          "detail": "Agent detail shows a Mentionable switch."
+        }
+      ]
+    },
+    {
+      "id": "I060",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent detail",
+      "control_or_state": "Agent name field",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-detail;element=Agent-name-field",
+          "detail": "Agent detail shows an editable Name field."
+        }
+      ]
+    },
+    {
+      "id": "I061",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent detail",
+      "control_or_state": "Agent instructions field",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-detail;element=Agent-instructions-field",
+          "detail": "Agent detail shows an editable Instructions area."
+        }
+      ]
+    },
+    {
+      "id": "I062",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent connected",
+      "control_or_state": "Agent model selector",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-connected;element=Agent-model-selector",
+          "detail": "A connected agent has a model selector with model choices."
+        }
+      ]
+    },
+    {
+      "id": "I063",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent failed",
+      "control_or_state": "Connection failure and Retry",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-failed;element=Connection-failure-and-Retry",
+          "detail": "Codex detail shows failed login, no model, and Retry."
+        }
+      ]
+    },
+    {
+      "id": "I064",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent connecting",
+      "control_or_state": "Automatic connection transition",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-connecting;element=Automatic-connection-transition",
+          "detail": "Retry shows Connecting and then Connected, with model selection available."
+        }
+      ]
+    },
+    {
+      "id": "I065",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent connected",
+      "control_or_state": "Agent Disconnect button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-connected;element=Agent-Disconnect-button",
+          "detail": "Connected agent detail shows Disconnect."
+        }
+      ]
+    },
+    {
+      "id": "I066",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent idle",
+      "control_or_state": "Agent Connect button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-idle;element=Agent-Connect-button",
+          "detail": "A disconnected or idle agent detail shows Connect."
+        }
+      ]
+    },
+    {
+      "id": "I067",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project",
+      "control_or_state": "Project identity fields",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project;element=Project-identity-fields",
+          "detail": "New project shows cover, name, identifier, description, privacy, and lead fields."
+        }
+      ]
+    },
+    {
+      "id": "I068",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project",
+      "control_or_state": "Git repository picker",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project;element=Git-repository-picker",
+          "detail": "New project lists repositories from granted GitHub accounts."
+        }
+      ]
+    },
+    {
+      "id": "I069",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project filtered",
+      "control_or_state": "Repository owner filters",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project-filtered;element=Repository-owner-filters",
+          "detail": "Owner buttons filter the repository list to the selected owner."
+        }
+      ]
+    },
+    {
+      "id": "I070",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project selected",
+      "control_or_state": "Repository selection and clone progress",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project-selected;element=Repository-selection-and-clone-progress",
+          "detail": "Selecting mini-labs/plane-ee marks it Selected and shows cloning to a mirror path."
+        }
+      ]
+    },
+    {
+      "id": "I071",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project",
+      "control_or_state": "No repository warning",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project;element=No-repository-warning",
+          "detail": "The form says agents cannot be mentioned without a repository working directory."
+        }
+      ]
+    },
+    {
+      "id": "I072",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project",
+      "control_or_state": "Create project button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project;element=Create-project-button",
+          "detail": "The form shows Create project."
+        }
+      ]
+    },
+    {
+      "id": "I073",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project",
+      "control_or_state": "Cancel project button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project;element=Cancel-project-button",
+          "detail": "The form shows Cancel."
+        }
+      ]
+    },
+    {
+      "id": "I074",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "mention selected",
+      "control_or_state": "Selecting Claude mention",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=mention-selected;element=Selecting-Claude-mention",
+          "detail": "Selecting Claude in the suggestion list opens the In progress run scene."
+        }
+      ]
+    },
+    {
+      "id": "I075",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "mention selected",
+      "control_or_state": "Selecting Codex mention",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=mention-selected;element=Selecting-Codex-mention",
+          "detail": "The suggestion list includes Codex; its handler opens the In progress run scene."
+        }
+      ]
+    },
+    {
+      "id": "I076",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "new project disconnected",
+      "control_or_state": "No GitHub connection project state",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=new-project-disconnected;element=No-GitHub-connection-project-state",
+          "detail": "The repository section shows No GitHub connection and directs an admin to Workspace settings > Integrations."
+        }
+      ]
+    },
+    {
+      "id": "I077",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "GitHub detail",
+      "control_or_state": "GitHub Integrations back button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=GitHub-detail;element=GitHub-Integrations-back-button",
+          "detail": "The detail page has an Integrations back button."
+        }
+      ]
+    },
+    {
+      "id": "I078",
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_state": "agent detail",
+      "control_or_state": "Agent Integrations back button",
+      "visible_evidence": [
+        {
+          "kind": "rendered",
+          "source": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html#state=agent-detail;element=Agent-Integrations-back-button",
+          "detail": "The agent detail page has an Integrations back button."
+        }
+      ]
+    }
+  ],
+  "comparison_sources": [
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/workspace/sidebar/project-navigation.tsx",
+      "sha256": "54b34854ebeef5db23e8b20a03c9dd27ae3102ad817119916dbcda886e06b021"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/workspace/sidebar/quick-actions.tsx",
+      "sha256": "f396fee726898c6e3673124b8c07072ae12efa050b855dab31b58bfff4cc8f06"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail/root.tsx",
+      "sha256": "accabc319b57905c47db8b01a52ee9c08f5129a576c2d4fcbf0770ffa560a5d8"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail/main-content.tsx",
+      "sha256": "afba7a2869d44c0498bbd2efaaa83c6f66040d8b7ad1d38f0bb17c193aa793b4"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail/issue-activity/root.tsx",
+      "sha256": "b5a643ad1bcabf5188c726a841e2ae6b1511e5eb3fe61c8019978dd7274cb375"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx",
+      "sha256": "43c22ec0c4297165da55ec73de4d06a08db79d3ac35b1f952efeb23be7c0d2e2"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail/subscription.tsx",
+      "sha256": "1ad60d362e0e3862554f00b173846d268adc2e64900f68cdacc13899295f7cba"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail-widgets/action-buttons.tsx",
+      "sha256": "b470335e77c4e0d53b18f1f66117e67054f5d89279cc2e6bd5e6e597c1e60689"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/issues/issue-detail/sidebar.tsx",
+      "sha256": "a18b2c1c6ed1dcfeb7ebcb34e518432aaa16b6f084559cceb8ae0dee9874671b"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/app/(all)/[workspaceSlug]/(settings)/settings/(workspace)/integrations/page.tsx",
+      "sha256": "572b5f0687405e11c57cbcee5430a16514e41112a762554949b6cb19c6966c94"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/integration/single-integration-card.tsx",
+      "sha256": "052b4aa133bfed890b81e92e699cf12ba282c23fe5d9c9ea11b8c527654e6288"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/projects/create/root.tsx",
+      "sha256": "f5dc8e58a224557bed7a6ed89889d403f909efa9fd70960dbe255030c34f6528"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/projects/create/attributes.tsx",
+      "sha256": "c3aec6d8af22178cb82d0da017878c03611f4b0098b5a81b5260c3f4299fbaeb"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/project/create/common-attributes.tsx",
+      "sha256": "5d766c52ffb92ad55640dcd86885e71a5749802451102e51830a3ca134c3eea1"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/web/core/components/project/create/project-create-buttons.tsx",
+      "sha256": "2c8f70920825aa57db726271dc7e9bd04d723e6abcc7b259d7addcf5e2151819"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/api/plane/db/models/issue.py",
+      "sha256": "ae65e270f1e7e1edd51869d077fad82be04839b449b2a63e9afbf7b5b057542f"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/api/plane/db/models/project.py",
+      "sha256": "38c57a3857f8ef7d0013ecc24887c47248e010cc82115f805829b6d99f5a6c41"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/api/plane/tests/contract/api/test_issues.py",
+      "sha256": "fd2c61cbd97faf8c761ebece99051f6783ebf9e0a46943e48e85b6a6decff76a"
+    },
+    {
+      "kind": "implementation",
+      "path": "apps/api/plane/tests/contract/api/test_projects.py",
+      "sha256": "06213e7272474ab1a1b2d8e426c93b1b174b82971cdff88003dd56368ab85635"
+    }
+  ],
+  "provisional_classifications": [
+    {
+      "inventory_id": "I001",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/workspace/sidebar/project-navigation.tsx#projectNavigation",
+          "detail": "The current sidebar has project navigation."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I002",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/workspace/sidebar/quick-actions.tsx#QuickActions",
+          "detail": "The current sidebar has New work item."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I003",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/main-content.tsx#IssueMainContent",
+          "detail": "The current work item has a title, description, reactions, widgets, and activity."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I004",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/subscription.tsx#IssueSubscription",
+          "detail": "The current work item has Subscribe."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I005",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/main-content.tsx#IssueMainContent",
+          "detail": "The current work item has a title, description, reactions, widgets, and activity."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I006",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail-widgets/action-buttons.tsx#IssueDetailWidgetActionButtons",
+          "detail": "The current work item has sub-item, relation, link, and attachment actions."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I007",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail-widgets/action-buttons.tsx#IssueDetailWidgetActionButtons",
+          "detail": "The current work item has sub-item, relation, link, and attachment actions."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I008",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail-widgets/action-buttons.tsx#IssueDetailWidgetActionButtons",
+          "detail": "The current work item has sub-item, relation, link, and attachment actions."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I009",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail-widgets/action-buttons.tsx#IssueDetailWidgetActionButtons",
+          "detail": "The current work item has sub-item, relation, link, and attachment actions."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I010",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current activity and composer exist, but the approved agent mention and run context add behavior.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/root.tsx#IssueActivity",
+          "detail": "The current activity renders comments and standard history but does not mount an Agent Run panel."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I011",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current activity and composer exist, but the approved agent mention and run context add behavior.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/root.tsx#IssueActivity",
+          "detail": "The current activity renders comments and standard history but does not mount an Agent Run panel."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I012",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/sidebar.tsx#IssueDetailsSidebar",
+          "detail": "The current properties sidebar already has state, assignee, priority, dates, estimate, module, cycle, parent, and labels."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I013",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I014",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I015",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I016",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I017",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I018",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I019",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I020",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I021",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I022",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I023",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I024",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I025",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I026",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I027",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I028",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I029",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I030",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I031",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I032",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I033",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I034",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I035",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I036",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I037",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I038",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I039",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I040",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I041",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I042",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I043",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I044",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I045",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I046",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current integrations page exists, but the approved CLI harness cards add behavior.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I047",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I048",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I049",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I050",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I051",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I052",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I053",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I054",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I055",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I056",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I057",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I058",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I059",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I060",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I061",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I062",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I063",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I064",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I065",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I066",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I067",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/project/create/common-attributes.tsx#ProjectCommonAttributes",
+          "detail": "The current project form has name, identifier, and description."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I068",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/projects/create/root.tsx#CreateProjectForm",
+          "detail": "The current create project form mounts common attributes and ProjectAttributes, with no repository picker or clone state."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I069",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/projects/create/root.tsx#CreateProjectForm",
+          "detail": "The current create project form mounts common attributes and ProjectAttributes, with no repository picker or clone state."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I070",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/projects/create/root.tsx#CreateProjectForm",
+          "detail": "The current create project form mounts common attributes and ProjectAttributes, with no repository picker or clone state."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I071",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/projects/create/root.tsx#CreateProjectForm",
+          "detail": "The current create project form mounts common attributes and ProjectAttributes, with no repository picker or clone state."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I072",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/project/create/project-create-buttons.tsx#ProjectCreateButtons",
+          "detail": "The current project form has Cancel and Create project."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I073",
+      "coverage_role": "UNCHANGED_CONTEXT",
+      "reason": "The current implementation exposes this same visible product control or context.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/project/create/project-create-buttons.tsx#ProjectCreateButtons",
+          "detail": "The current project form has Cancel and Create project."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I074",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I075",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/issues/issue-detail/issue-activity/activity-comment-root.tsx#IssueActivityCommentRoot",
+          "detail": "The current comment/activity list renders CommentCard and IssueActivityItem, with no Agent Run card."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I076",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/projects/create/root.tsx#CreateProjectForm",
+          "detail": "The current create project form mounts common attributes and ProjectAttributes, with no repository picker or clone state."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I077",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    },
+    {
+      "inventory_id": "I078",
+      "coverage_role": "CHANGE_FEATURE",
+      "reason": "The current implementation does not expose the approved local CLI Agent behavior or repository binding shown by this row.",
+      "classification_evidence": [
+        {
+          "kind": "implementation",
+          "source": "apps/web/core/components/integration/single-integration-card.tsx#SingleIntegrationCard",
+          "detail": "The current integration card defines only GitHub and Slack UI and install/uninstall actions; no CLI harness or agent PR controls appear."
+        }
+      ]
+    }
+  ],
+  "user_answers": [
+    {
+      "kind": "user_answer",
+      "source": "user_answer:completed-epics-260928",
+      "detail": "No completed Epic records exist"
+    },
+    {
+      "kind": "user_answer",
+      "source": "user_answer:send-now-260928",
+      "detail": "Send it to the active run now"
+    },
+    {
+      "kind": "user_answer",
+      "source": "user_answer:approval-scope-260928",
+      "detail": "Run-wide versus one action"
+    },
+    {
+      "kind": "user_answer",
+      "source": "user_answer:codex-mention-260928",
+      "detail": "Yes, start Codex"
+    }
+  ],
+  "status": "BLOCKED_MISSING_COMPLETED_EPIC_EVIDENCE",
+  "note": "This is a frozen mockup inventory and provisional implementation comparison, not a validated schema-version-3 manifest. No completed Epic exists to provide the required epic classification evidence.",
+  "sources": [
+    {
+      "path": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "sha256": "fac5383bc11e55266f4d464c44fc34f3c6d2b840329f777a9cb7fdffff6ff19f"
+    },
+    {
+      "path": "claude-design/design_handoff_local_cli_agents/_ds/plane-propel-85052822-e844-4817-9eef-981c38dc9eae/_ds_bundle.js",
+      "sha256": "b944c5aa9ac7c2e20d89922e22c1ac3c5fc8944f19865908c6ca2dcc9273a22c"
+    },
+    {
+      "path": "claude-design/design_handoff_local_cli_agents/support.js",
+      "sha256": "8fe7df74405f3c55f49b7249c74ea1397e65d07dea2b1bd3b4a489bec2e28cbe"
+    }
+  ],
+  "source_reviews": [
+    {
+      "mockup_file": "claude-design/design_handoff_local_cli_agents/Agent Runs.dc.html",
+      "rendered_states": [
+        "mention and suggestions",
+        "running",
+        "running with expanded action",
+        "running with collapsed plan and queue",
+        "awaiting repository selection",
+        "completed Q&A",
+        "completed code job and PR",
+        "permission request",
+        "failed CLI preflight",
+        "stale worker",
+        "Docker at capacity",
+        "stopped to steer",
+        "integrations list",
+        "GitHub connected detail",
+        "GitHub disconnected prompt",
+        "GitHub device pairing",
+        "Claude connected detail and model menu",
+        "Codex failed connection",
+        "Codex connecting and connected",
+        "new project repository list",
+        "new project filtered by owner",
+        "new project with selected repository and clone progress",
+        "new project without GitHub connection",
+        "Grok idle agent detail"
+      ],
+      "interaction_code_reviewed": true
+    }
+  ]
+}

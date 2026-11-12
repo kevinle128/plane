@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chuông một địa chỉ — Plane @agent trên Mac Mini</title>
+<style>
+:root {
+  --bg: #0b0d0f;
+  --ink: #efe8d8;
+  --mute: #c4bba8;
+  --dim: #9e9584;
+  --line: #2c343c;
+  --panel: #13171b;
+  --inset: #0e1114;
+  --user: #f0a24a;
+  --user-dim: #8a5a20;
+  --coach: #6ec4d4;
+  --coach-dim: #2a5c66;
+  --ok: #86c48a;
+  --bad: #e07050;
+  --brass: #c4a574;
+  --copper: #c48454;
+  --hazard: #d4a03a;
+  --rail: 3.4rem;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+  font-size: 17px;
+  line-height: 1.55;
+  min-height: 100vh;
+}
+button, input { font: inherit; color: inherit; }
+a { color: var(--brass); }
+code, .mono, kbd {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+.skip {
+  position: absolute; left: -999px; top: 0;
+}
+.skip:focus { left: 1rem; top: 1rem; background: var(--ink); color: var(--bg); padding: .4rem .7rem; z-index: 20; }
+
+/* ── rack rail ── */
+.rack {
+  position: fixed; inset: 0 auto 0 0; width: var(--rail);
+  background: #101418;
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center;
+  padding: .7rem 0; gap: .35rem; z-index: 8;
+}
+.rack a {
+  width: 1.55rem; height: 1.55rem;
+  border: 1px solid var(--line);
+  background: var(--inset);
+  color: var(--mute);
+  text-decoration: none;
+  font-size: 10px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  display: grid; place-items: center;
+  letter-spacing: 0;
+}
+.rack a[aria-current="true"] {
+  background: var(--brass); color: #1a1208; border-color: var(--brass);
+}
+.rack .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok); box-shadow: 0 0 8px var(--ok); margin: .4rem 0 .2rem;
+}
+
+/* ── page ── */
+.page { margin-left: var(--rail); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 1.25rem 1.25rem 5rem; }
+
+/* ── chips / who ── */
+.who {
+  display: inline-block;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: .12rem .4rem;
+  border: 1px solid;
+  vertical-align: .12em;
+  margin-right: .25rem;
+}
+.who.user { color: var(--user); border-color: var(--user-dim); background: #1c140c; }
+.who.coach { color: var(--coach); border-color: var(--coach-dim); background: #0c181c; }
+.who.dec { color: var(--ok); border-color: #2a5a30; background: #101810; }
+.who.dir { color: var(--brass); border-color: #5a4830; background: #18140c; }
+.who.q { color: var(--hazard); border-color: #5a4820; background: #18140c; }
+.who.ins { color: var(--mute); border-color: var(--line); background: var(--inset); }
+
+.idea {
+  margin: .85rem 0;
+  padding: .75rem .9rem .75rem .85rem;
+  border-left: 3px solid var(--line);
+  background: var(--inset);
+}
+.idea.user { border-left-color: var(--user); }
+.idea.coach { border-left-color: var(--coach); }
+.idea.dec { border-left-color: var(--ok); }
+.idea p { margin: .35rem 0 0; }
+.idea p:first-child { margin-top: 0; }
+
+h1, h2, h3 { font-weight: 650; letter-spacing: -.02em; line-height: 1.2; }
+h1 { font-size: clamp(1.8rem, 4.5vw, 2.6rem); margin: 0 0 .4rem; }
+h2 {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: .78rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0 0 .55rem;
+  font-weight: 600;
+}
+h3 { font-size: 1.2rem; margin: 0 0 .5rem; }
+p { margin: .55rem 0; color: var(--ink); }
+.lede { font-size: 1.18rem; color: var(--ink); }
+.mute { color: var(--mute); }
+.dim { color: var(--dim); }
+
+/* ── mast ── */
+.mast {
+  padding: 1.4rem 0 1.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.plate {
+  display: flex; flex-wrap: wrap; gap: .4rem .7rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: .9rem;
+}
+.plate b { color: var(--ok); font-weight: 600; }
+.mast h1 em { font-style: normal; color: var(--brass); }
+.meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .7rem;
+  margin-top: 1.1rem;
+}
+.meta-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: .75rem .85rem;
+}
+.meta-box .k {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.legend {
+  display: flex; flex-wrap: wrap; gap: .5rem .9rem;
+  margin-top: 1rem;
+  font-size: 14px;
+  color: var(--mute);
+}
+
+/* ── stations ── */
+.station {
+  margin: 0;
+  padding: 2.1rem 0 2.3rem;
+  border-bottom: 1px solid var(--line);
+}
+.station-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  margin-bottom: .8rem;
+}
+.idx {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: .12em;
+}
+
+/* ── JTBD doorbell ── */
+#jtbd { background:
+  radial-gradient(1200px 280px at 80% 0%, #1a140c 0%, transparent 60%);
+}
+.schematic {
+  margin: 1.1rem 0 1.2rem;
+  background: #0c0f12;
+  border: 1px solid var(--line);
+  padding: 1rem .8rem 1.1rem;
+  overflow: hidden;
+}
+.schematic svg { width: 100%; height: auto; display: block; }
+.job-plate {
+  margin: 1rem 0;
+  padding: 1rem 1.05rem;
+  background: linear-gradient(#1a1610, #14110c);
+  border: 1px solid #5a4830;
+  box-shadow: inset 0 1px 0 #3a3020;
+}
+.job-plate .k {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.job-plate p { font-size: 1.12rem; margin: .35rem 0 0; }
+.fail-flag {
+  display: inline-block;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--bad);
+  border: 1px solid #6a3028;
+  padding: .15rem .45rem;
+}
+
+/* ── layers ── */
+.layers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .7rem;
+  margin: 1rem 0;
+}
+.layer {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: .85rem .9rem;
+  min-height: 8.5rem;
+}
+.layer .k {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin-bottom: .4rem;
+}
+.layer.a .k { color: var(--brass); }
+.layer.b .k { color: var(--copper); }
+.layer ul { margin: .3rem 0 0; padding: 0 0 0 1.1rem; color: var(--mute); }
+.layer li { margin: .2rem 0; }
+
+/* ── sandcastle graft ── */
+#transfer {
+  background: linear-gradient(180deg, #0c1218 0%, var(--bg) 42%);
+}
+.graft {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: .55rem;
+  align-items: stretch;
+  margin: 1rem 0;
+}
+.org {
+  border: 1px dashed #3a5860;
+  background: #0e161a;
+  padding: .85rem;
+}
+.host {
+  border: 1px solid #5a4830;
+  background: #16120c;
+  padding: .85rem;
+}
+.org h3, .host h3 { font-size: 1rem; }
+.graft-arrow {
+  display: flex; align-items: center; justify-content: center;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--coach);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.trait {
+  display: inline-block;
+  margin: .2rem .25rem .2rem 0;
+  padding: .18rem .45rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  border: 1px solid #3a5860;
+  color: var(--coach);
+  background: #0c181c;
+}
+.host .trait { border-color: #5a4830; color: var(--brass); background: #1c160c; }
+.switches {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  margin: .7rem 0 0;
+}
+.sw {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: .35rem .55rem;
+  border: 1px solid var(--line);
+  background: var(--inset);
+  color: var(--mute);
+}
+.sw.on { border-color: var(--ok); color: var(--ok); }
+
+/* ── constraint blueprint ── */
+#constraint {
+  background-color: #0b1218;
+  background-image:
+    linear-gradient(rgba(80,120,150,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80,120,150,.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+#constraint .inner {
+  background: rgba(11,18,24,.72);
+  padding: .2rem 0 0;
+}
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .7rem;
+  margin: 1rem 0;
+}
+.real, .ghost {
+  padding: .85rem .9rem;
+  min-height: 10rem;
+}
+.real {
+  background: #12161a;
+  border: 2px solid #6a7a84;
+}
+.ghost {
+  background: transparent;
+  border: 2px dashed #3a444c;
+  color: var(--mute);
+}
+.stamp {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  margin-bottom: .5rem;
+}
+.real .stamp { color: var(--ink); }
+.ghost .stamp { color: var(--dim); }
+.ghost li { text-decoration: line-through; color: var(--dim); }
+.real ul, .ghost ul { margin: 0; padding-left: 1.1rem; }
+
+/* ── 60 min conveyor ── */
+#ship60 { background: linear-gradient(180deg, #16120c 0%, var(--bg) 50%); }
+.tape {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  margin: 1.1rem 0;
+  border: 1px solid #5a4830;
+  overflow: hidden;
+}
+.frame {
+  padding: .7rem .55rem .8rem;
+  background: #1a160f;
+  border-right: 1px solid #3a3020;
+  min-height: 8.2rem;
+}
+.frame:last-child { border-right: 0; }
+.frame .n {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--brass);
+  letter-spacing: .12em;
+}
+.frame p { margin: .35rem 0 0; font-size: 14px; color: var(--ink); }
+.timer {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 2rem;
+  color: var(--brass);
+  letter-spacing: .08em;
+}
+.ui-sketch {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: .7rem;
+  margin: 1rem 0;
+}
+.issue-stream, .run-panel {
+  background: #101418;
+  border: 1px solid var(--line);
+  min-height: 16rem;
+}
+.issue-stream { padding: .7rem; }
+.run-panel { padding: 0; display: flex; flex-direction: column; }
+.fake-comment {
+  font-size: 14px;
+  color: var(--mute);
+  padding: .45rem 0;
+  border-bottom: 1px solid #1e242a;
+}
+.run-card {
+  margin: .6rem 0;
+  padding: .7rem .75rem;
+  background: #161c22;
+  border: 1px solid #3a4a54;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  display: block;
+}
+.run-card:hover, .run-card:focus { border-color: var(--coach); outline: none; }
+.run-card .top {
+  display: flex; justify-content: space-between; gap: .5rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.led {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ok); box-shadow: 0 0 7px var(--ok); margin-right: .35rem;
+}
+.panel-bar {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: .5rem .7rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--brass);
+  display: flex; justify-content: space-between;
+}
+.trace { padding: .55rem .7rem .8rem; flex: 1; overflow: auto; }
+.row {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  padding: .35rem 0;
+  border-bottom: 1px solid #1c2228;
+  color: var(--mute);
+}
+.row b { color: var(--coach); font-weight: 600; }
+.row.act b { color: var(--brass); }
+.row.err b { color: var(--bad); }
+.reply-box {
+  border-top: 1px solid var(--line);
+  padding: .5rem .7rem;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+/* ── failure hazard ── */
+#fail {
+  background: #120e0c;
+}
+.hazard-bar {
+  height: 14px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #d4a03a 0 10px,
+    #1a1208 10px 20px
+  );
+  margin: 0 0 1rem;
+}
+.fails {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .65rem;
+  margin: .8rem 0 1rem;
+}
+.warn {
+  background: #1a1210;
+  border: 1px solid #6a3830;
+  padding: .8rem .75rem;
+}
+.warn h3 {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: .85rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--bad);
+}
+.warn p { font-size: 15px; margin: .35rem 0 0; color: var(--ink); }
+
+/* ── three tiers ── */
+.tiers { margin: 1rem 0; display: grid; gap: .45rem; }
+.tier {
+  display: grid;
+  grid-template-columns: 4.6rem 1fr;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.tier .lvl {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: grid; place-items: center;
+  padding: .6rem .3rem;
+  text-align: center;
+  color: #1a1208;
+}
+.tier.t1 .lvl { background: #8aa0a8; }
+.tier.t2 .lvl { background: var(--brass); }
+.tier.t3 .lvl { background: var(--copper); }
+.tier .body { padding: .65rem .8rem; }
+.tier .body strong { display: block; margin-bottom: .15rem; }
+.tier .body span { color: var(--mute); font-size: 15px; }
+
+/* ── right tree ── */
+.trees {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .55rem;
+  margin: 1rem 0;
+}
+.tree {
+  border: 1px solid var(--line);
+  padding: .75rem .7rem;
+  background: var(--inset);
+  min-height: 9.5rem;
+}
+.tree.no {
+  border-color: #6a3028;
+  background: #160e0c;
+}
+.tree.no .k { color: var(--bad); }
+.tree.qa .k { color: var(--coach); }
+.tree.code .k { color: var(--brass); }
+.tree .k {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.tree code {
+  display: block;
+  margin-top: .45rem;
+  font-size: 13px;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+/* ── starburst ── */
+#star { background: radial-gradient(circle at 50% 42%, #182028 0%, var(--bg) 58%); }
+.burst-wrap { position: relative; margin: 1.2rem auto 1.4rem; max-width: 640px; }
+.burst {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 640px;
+  margin: 0 auto;
+}
+.core {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 7.2rem; height: 7.2rem;
+  border-radius: 50%;
+  border: 2px solid var(--brass);
+  background: #16120c;
+  display: grid; place-items: center;
+  text-align: center;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--brass);
+  z-index: 2;
+}
+.ray {
+  position: absolute;
+  width: 42%;
+  left: 29%;
+  top: 50%;
+  transform-origin: center;
+  margin-top: -1.7rem;
+}
+.ray .bubble {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: .45rem .55rem;
+  font-size: 13.5px;
+  color: var(--ink);
+  max-width: 13.5rem;
+}
+.ray.r1 { transform: rotate(-90deg) translateY(-11.5rem) rotate(90deg); }
+.ray.r2 { transform: rotate(-30deg) translateY(-11.5rem) rotate(30deg); }
+.ray.r3 { transform: rotate(30deg) translateY(-11.5rem) rotate(-30deg); }
+.ray.r4 { transform: rotate(90deg) translateY(-11.5rem) rotate(-90deg); }
+.ray.r5 { transform: rotate(150deg) translateY(-11.5rem) rotate(-150deg); }
+.ray.r6 { transform: rotate(210deg) translateY(-11.5rem) rotate(-210deg); }
+.ray .bubble .ans {
+  display: block;
+  margin-top: .25rem;
+  color: var(--ok);
+  font-size: 13px;
+}
+
+/* ── role ── */
+#role { background: linear-gradient(180deg, #0c1612 0%, var(--bg) 55%); }
+.monitors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .7rem;
+  margin: 1rem 0;
+}
+.mon {
+  background: #0a100e;
+  border: 1px solid #2a3a34;
+  padding: .8rem .85rem;
+}
+.mon .screen-k {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ok);
+}
+.script {
+  margin: 1rem 0 0;
+  border-left: 3px solid #2a5a40;
+  padding: .2rem 0 .2rem .9rem;
+}
+.script p { margin: .45rem 0; }
+.script .name {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* ── worst ── */
+#worst { background: #160c0c; }
+.stamp-scene {
+  position: relative;
+  margin: 1rem 0;
+  background: #120a0a;
+  border: 1px solid #6a3028;
+  padding: 1.3rem 1rem 1.4rem;
+  overflow: hidden;
+  min-height: 12rem;
+}
+.folder-draw {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: var(--mute);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.censor {
+  position: absolute;
+  right: 8%;
+  top: 22%;
+  transform: rotate(-18deg);
+  border: 4px solid var(--bad);
+  color: var(--bad);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: .18em;
+  padding: .25rem .7rem;
+  text-transform: uppercase;
+  background: rgba(22,12,12,.55);
+  pointer-events: none;
+}
+.flip {
+  margin-top: .9rem;
+  padding: .85rem .9rem;
+  background: #101810;
+  border: 1px solid #2a5a30;
+}
+.flip .k {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ok);
+}
+
+/* ── spine climax ── */
+#spine {
+  background:
+    radial-gradient(900px 420px at 50% 0%, #1c160c 0%, var(--bg) 70%);
+  padding-top: 2.4rem;
+  padding-bottom: 2.6rem;
+  border-bottom: 1px solid var(--line);
+}
+#spine h2 { color: var(--brass); font-size: .9rem; }
+.spine-title {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  margin: 0 0 1.1rem;
+  letter-spacing: -.03em;
+}
+.vertebrae { margin: 1.2rem auto 0; max-width: 560px; }
+.v {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: .7rem;
+  position: relative;
+}
+.v + .v { margin-top: 0; }
+.v .bone {
+  display: flex; flex-direction: column; align-items: center;
+}
+.v .knob {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--brass);
+  box-shadow: 0 0 10px #c4a57488;
+  flex: 0 0 auto;
+  margin-top: .45rem;
+}
+.v .wire {
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(var(--brass), #5a4830);
+  min-height: 1.4rem;
+}
+.v:last-child .wire { display: none; }
+.v .plate-v {
+  background: #16120c;
+  border: 1px solid #5a4830;
+  padding: .75rem .85rem .85rem;
+  margin-bottom: .55rem;
+}
+.v .plate-v strong { display: block; font-size: 1.05rem; margin-bottom: .2rem; }
+.v .plate-v span { color: var(--mute); font-size: 15px; }
+.through {
+  margin-top: 1.4rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--brass);
+  background: #14100a;
+  font-size: 1.05rem;
+}
+
+/* ── locked ── */
+#locked { padding-top: 2.2rem; }
+.lock-groups { display: grid; gap: 1.1rem; margin-top: 1rem; }
+.lock-g {
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.lock-g h3 {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0;
+  padding: .6rem .8rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--inset);
+}
+.lock-g ol {
+  margin: 0;
+  padding: .4rem .8rem .6rem 2.1rem;
+}
+.lock-g li {
+  padding: .45rem 0;
+  border-bottom: 1px solid #1c2228;
+  color: var(--ink);
+}
+.lock-g li:last-child { border-bottom: 0; }
+.lock-g li::marker { color: var(--dim); font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+.endplate {
+  margin-top: 2rem;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--line);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* ── mobile nav ── */
+.mnav {
+  display: none;
+  position: sticky; top: 0; z-index: 9;
+  background: #101418;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  padding: .45rem .6rem;
+}
+.mnav a {
+  display: inline-block;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--mute);
+  text-decoration: none;
+  padding: .35rem .5rem;
+  border: 1px solid var(--line);
+  margin-right: .3rem;
+}
+.mnav a[aria-current="true"] { color: #1a1208; background: var(--brass); border-color: var(--brass); }
+
+@media (max-width: 820px) {
+  .rack { display: none; }
+  .page { margin-left: 0; }
+  .mnav { display: block; }
+  .meta-row, .layers, .graft, .split, .ui-sketch, .fails, .monitors, .trees {
+    grid-template-columns: 1fr;
+  }
+  .graft-arrow {
+    writing-mode: horizontal-tb;
+    transform: none;
+    padding: .3rem 0;
+  }
+  .tape { grid-template-columns: 1fr 1fr; }
+  .frame { border-right: 0; border-bottom: 1px solid #3a3020; min-height: 0; }
+  .burst { aspect-ratio: auto; height: auto; }
+  .ray {
+    position: static;
+    width: auto;
+    transform: none !important;
+    margin: .4rem 0;
+  }
+  .ray .bubble { max-width: none; }
+  .core {
+    position: static;
+    transform: none;
+    width: auto; height: auto;
+    border-radius: 0;
+    padding: .7rem;
+    margin: 0 auto .8rem;
+  }
+  .censor { right: 4%; top: 12%; font-size: 1.4rem; }
+}
+@media (max-width: 520px) {
+  .tape { grid-template-columns: 1fr; }
+  .wrap { padding-left: .9rem; padding-right: .9rem; }
+  body { font-size: 16.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .led { box-shadow: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#jtbd">Bỏ qua mục lục</a>
+
+<nav class="rack" aria-label="Kỹ thuật">
+  <span class="dot" title="phiên hoàn tất"></span>
+  <a href="#mast" title="Đầu trang">00</a>
+  <a href="#jtbd" title="Job to Be Done">01</a>
+  <a href="#transfer" title="Trait Transfer">02</a>
+  <a href="#constraint" title="Constraint Mapping">03</a>
+  <a href="#ship60" title="Ship in 60 Minutes">04</a>
+  <a href="#fail" title="Failure Analysis">05</a>
+  <a href="#star" title="Starbursting">06</a>
+  <a href="#role" title="Role Playing">07</a>
+  <a href="#worst" title="Worst Possible Idea">08</a>
+  <a href="#spine" title="Xương sống">09</a>
+  <a href="#locked" title="Khóa v1">10</a>
+</nav>
+
+<nav class="mnav" aria-label="Kỹ thuật (điện thoại)">
+  <a href="#jtbd">JTBD</a>
+  <a href="#transfer">Sandcastle</a>
+  <a href="#constraint">Ràng buộc</a>
+  <a href="#ship60">60 phút</a>
+  <a href="#fail">Hỏng</a>
+  <a href="#star">Starburst</a>
+  <a href="#role">Đóng vai</a>
+  <a href="#worst">Cấm</a>
+  <a href="#spine">Xương sống</a>
+  <a href="#locked">Khóa v1</a>
+</nav>
+
+<div class="page">
+<div class="wrap">
+
+<header class="mast" id="mast">
+  <div class="plate">
+    <span>Phiên BMAD · 2026-09-06</span>
+    <span>Cập nhật 2026-09-11</span>
+    <span>Chế độ: partner</span>
+    <span><b>● hoàn tất</b></span>
+  </div>
+  <h1>Chuông <em>một</em> địa chỉ</h1>
+  <p class="lede">Self-hosted Plane <code>@agent</code>. Không subscription. Không LLM nhét trong app. Claude Code và Codex ngồi trên một Mac Mini — Mini là chuông cửa, Tailscale chỉ để người vào.</p>
+  <div class="meta-row">
+    <div class="meta-box">
+      <div class="k">Mục tiêu</div>
+      <p class="mute" style="margin:.35rem 0 0">Mention / gán bot trên work item. Máy local nhận việc. PR hoặc comment trở lại Plane. CE tự xây.</p>
+    </div>
+    <div class="meta-box">
+      <div class="k">Hướng đi</div>
+      <p class="mute" style="margin:.35rem 0 0"><span class="who user">người dùng</span> Tự build @agent trên CE. v1 = CLI local. Không cloud agent. Plane + Claude + Codex cùng một Mini.</p>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="who user">người dùng</span> ý / quyết định của đội</span>
+    <span><span class="who coach">coach</span> ý coach</span>
+    <span><span class="who dec">khóa</span> quyết định v1</span>
+  </div>
+</header>
+
+<!-- 1 JTBD -->
+<section class="station" id="jtbd">
+  <div class="station-head">
+    <h2>Kỹ thuật 01 · Job to Be Done</h2>
+    <span class="idx">CHUÔNG CỬA</span>
+  </div>
+  <h3>Việc cần làm không phải UI @mention</h3>
+  <div class="job-plate">
+    <div class="k">Tấm việc · coach</div>
+    <p>Đưa work item cho máy đang chạy trên bàn ai đó — nhận PR / comment về — không rời Plane.</p>
+  </div>
+
+  <div class="schematic" role="img" aria-label="Sơ đồ: người vào Plane qua Tailscale; Mini là chuông cửa duy nhất; poll localhost.">
+    <svg viewBox="0 0 860 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse">
+          <path d="M0 6 L6 0" stroke="#2a3238" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="860" height="280" fill="#0c0f12"/>
+      <text x="24" y="28" fill="#9e9584" font-family="ui-monospace, Menlo, monospace" font-size="11" letter-spacing="1.4">INGRESS NGƯỜI · TAILSCALE</text>
+      <rect x="24" y="44" width="150" height="70" fill="#13171b" stroke="#2c343c"/>
+      <text x="40" y="76" fill="#efe8d8" font-size="14" font-family="-apple-system, sans-serif">Người A</text>
+      <text x="40" y="96" fill="#c4bba8" font-size="12" font-family="-apple-system, sans-serif">browser</text>
+      <rect x="24" y="132" width="150" height="70" fill="#13171b" stroke="#2c343c"/>
+      <text x="40" y="164" fill="#efe8d8" font-size="14" font-family="-apple-system, sans-serif">Người B</text>
+      <text x="40" y="184" fill="#c4bba8" font-size="12" font-family="-apple-system, sans-serif">phone</text>
+      <path d="M174 79 H230 V168 H174" fill="none" stroke="#c4a574" stroke-width="1.5"/>
+      <path d="M230 124 H290" stroke="#c4a574" stroke-width="1.5" marker-end=""/>
+      <text x="200" y="116" fill="#c4a574" font-size="10" font-family="ui-monospace, Menlo, monospace">TS</text>
+
+      <rect x="290" y="88" width="180" height="72" fill="#16120c" stroke="#c4a574"/>
+      <text x="304" y="118" fill="#c4a574" font-size="11" font-family="ui-monospace, Menlo, monospace">PLANE WEB</text>
+      <text x="304" y="140" fill="#efe8d8" font-size="13" font-family="-apple-system, sans-serif">work item · @Claude</text>
+
+      <text x="490" y="80" fill="#6ec4d4" font-size="10" font-family="ui-monospace, Menlo, monospace">LOCALHOST POLL</text>
+      <path d="M470 124 H560" stroke="#6ec4d4" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+      <rect x="560" y="48" width="276" height="184" fill="#101418" stroke="#6ec4d4" stroke-width="2"/>
+      <circle cx="584" cy="72" r="6" fill="#86c48a"/>
+      <text x="598" y="76" fill="#86c48a" font-size="11" font-family="ui-monospace, Menlo, monospace">LISTENING</text>
+      <text x="584" y="108" fill="#efe8d8" font-size="20" font-family="-apple-system, sans-serif">MAC MINI</text>
+      <text x="584" y="132" fill="#c4a574" font-size="12" font-family="ui-monospace, Menlo, monospace">CHUÔNG CỬA · 1 ĐỊA CHỈ</text>
+      <rect x="584" y="150" width="228" height="28" fill="#0c0f12" stroke="#2c343c"/>
+      <text x="596" y="169" fill="#c4bba8" font-size="12" font-family="ui-monospace, Menlo, monospace">claude  ·  codex  ·  docker</text>
+      <rect x="584" y="186" width="228" height="28" fill="#0c0f12" stroke="#2c343c"/>
+      <text x="596" y="205" fill="#c4bba8" font-size="12" font-family="ui-monospace, Menlo, monospace">Plane CE cùng hộp</text>
+    </svg>
+  </div>
+
+  <p><span class="who user">người dùng</span> Worker là laptop/desktop đã chạy Claude Code, Codex, hoặc Amp — không phải sandbox thuê ngoài. Plane, Claude Code, Codex sống cùng Mac Mini. Đội vào Plane bằng Tailscale. Chuông chỉ có <strong>một địa chỉ: Mini</strong>. v1 không định tuyến từng laptop.</p>
+  <p><span class="who coach">coach</span> Job là chuông tới một bàn cụ thể: Plane ping máy đang bật, đã login, đang nghe. Máy ngủ thì fail <span class="fail-flag">rõ</span> — không im. v1 là worker cùng hộp: poll/webhook localhost, CLI chạy trên Mini, comment/PR về API local. Tailscale không phải đường agent.</p>
+
+  <p class="mute"><span class="who ins">ngành</span> Linear: agent là app-user, người vẫn là assignee, webhook session, thought trong 10s. Plane trả phí: OAuth app + Enable App Mentions + bot user + Agent Run. CE không có thứ đó. CLI local là kiểu bàn giao “Work on issue” riêng — không phải product agent trên mây.</p>
+
+  <div class="layers">
+    <div class="layer a">
+      <div class="k">Lớp A · danh từ Plane</div>
+      <p>Mention · bản ghi job · comment · card · panel. Đội nhìn thấy Plane, không nhìn thấy đĩa.</p>
+      <ul>
+        <li>@Claude / @Codex trên work item</li>
+        <li>Agent Run + hoạt động</li>
+        <li>Kết luận thành comment</li>
+      </ul>
+    </div>
+    <div class="layer b">
+      <div class="k">Lớp B · đĩa / runner</div>
+      <p>Cách Claude/Codex chạm file. Worktree, sandbox, mirror — chỉ khi runner cần.</p>
+      <ul>
+        <li><code>runner.run({ agent, sandbox })</code></li>
+        <li>Hàng đợi, trần RAM Mini</li>
+        <li>Cây git đúng, không cwd deploy</li>
+      </ul>
+    </div>
+  </div>
+  <p><span class="who coach">coach</span> Product agent Linear/Plane <em>không</em> dùng git worktree. Session của họ là comment + activity; Cursor/Codex mây nhận VM. Worktree là pattern CLI-trên-một-máy (Cyrus, <code>claude --bg</code>). Tách lớp: Plane = mention + job + comment. Runner = cách đụng đĩa. Worktree chỉ khi v1 vừa code vừa chạy hai job cùng lúc trên Mini.</p>
+  <p><span class="who dec">khóa</span> Cho phép nhiều job song song — không hàng đợi một file. Cùng một work item = một session, không đẻ trùng. RAM Mini là trần mềm; vượt thì comment “at capacity” rồi từ chối cứng, không boot Docker thêm.</p>
+</section>
+
+<!-- 2 Trait Transfer -->
+<section class="station" id="transfer">
+  <div class="station-head">
+    <h2>Kỹ thuật 02 · Trait Transfer / Sandcastle</h2>
+    <span class="idx">GHÉP TRAITS</span>
+  </div>
+  <h3>Lấy xương Sandcastle, không lấy đám mây Linear</h3>
+  <p><span class="who user">người dùng</span> Có sandbox được không? Thiết kế nhiều loại sandbox. Xem <code>mattpocock/sandcastle</code>. Worktree khi cần — theo Sandcastle.</p>
+  <p class="mute"><span class="who ins">ngành</span> Ba lớp sandbox: (1) CLI OS — Claude Seatbelt / Codex workspace-write, không phải checkout thứ hai. (2) Worktree — tách file giữa các job. (3) Docker/VM clone — tách khỏi host như Linear cloud. Mini đã chạy Docker cho Plane. Sandcastle tách agent / sandbox / chiến lược nhánh: docker, podman, vercel, noSandbox. Worktree độc lập. AFK bắt buộc có sandbox provider; interactive có thể noSandbox.</p>
+
+  <div class="graft">
+    <div class="org">
+      <h3>Nguồn · Sandcastle</h3>
+      <span class="trait">worktree optional</span>
+      <span class="trait">head</span>
+      <span class="trait">merge-to-head</span>
+      <span class="trait">named-branch</span>
+      <span class="trait">1 run / worktree</span>
+      <span class="trait">docker bind-mount</span>
+      <span class="trait">giữ cây bẩn</span>
+      <p class="mute" style="margin-top:.7rem">AFK đòi sandbox provider. Interactive được phép noSandbox.</p>
+    </div>
+    <div class="graft-arrow">ghép →</div>
+    <div class="host">
+      <h3>Chủ · job Plane</h3>
+      <span class="trait">job gọi runner.run</span>
+      <span class="trait">registry sandbox</span>
+      <span class="trait">Q&amp;A ≠ code</span>
+      <span class="trait">cùng run leo thang</span>
+      <span class="trait">Agent Run không đổi khi đổi provider</span>
+      <p class="mute" style="margin-top:.7rem">Đổi docker / Seatbelt / sau này: UI Plane đứng yên.</p>
+    </div>
+  </div>
+
+  <p><span class="who q">hỏi</span> Việc dính issue thì checkout nhánh; check A/B/C thì có lẽ không. Nền tảng khác quyết thế nào?</p>
+  <p><span class="who coach">coach</span> Coding agent (Cursor cloud, Copilot <code>copilot/issue-N</code>, Codex) luôn nhánh mới + PR từ issue. Linear @Linear trong comment là Q&amp;A, không git. Sandcastle <code>head</code> = ghi cây hiện tại; named branch = worktree bền. Gợi ý: work item + ý định code → nhánh <code>agent/&lt;issue-id&gt;</code> + worktree + draft PR. Q&amp;A / check / không repo → không worktree, chỉ comment. Cùng issue thì nối lại cùng nhánh.</p>
+  <p><span class="who dec">khóa</span> Job code dính issue: named branch + worktree + draft PR. Q&amp;A / check: không worktree, chỉ comment.</p>
+  <div class="switches" aria-label="Chiến lược nhánh">
+    <span class="sw">head · Q&amp;A</span>
+    <span class="sw on">named-branch · code</span>
+    <span class="sw">merge-to-head · không v1</span>
+  </div>
+</section>
+
+<!-- 3 Constraint -->
+<section class="station" id="constraint">
+  <div class="inner">
+  <div class="station-head">
+    <h2>Kỹ thuật 03 · Constraint Mapping</h2>
+    <span class="idx">ĐỊA HÌNH THẬT</span>
+  </div>
+  <h3>Thép hàn / tường tưởng</h3>
+  <div class="split">
+    <div class="real">
+      <div class="stamp">Ràng buộc thật</div>
+      <ul>
+        <li>CE không có AgentRun / OAuth apps</li>
+        <li>Một hộp Mini, Docker đã chạy Plane</li>
+        <li>Tailscale = ingress người, không phải agent</li>
+        <li>Không cần webhook công cộng nếu runner poll localhost</li>
+        <li>Phải xây cả hai nửa: picker mention + runner Mini</li>
+      </ul>
+    </div>
+    <div class="ghost">
+      <div class="stamp">Tường tưởng — gạch bỏ</div>
+      <ul>
+        <li>Phải clone Plane EE</li>
+        <li>Phải có URL cloud</li>
+        <li>Mini-first, UI sau</li>
+        <li>Webhook công cộng / tunnel</li>
+      </ul>
+    </div>
+  </div>
+  <p><span class="who q">hỏi</span> Mention picker khác Mini runner chỗ nào?</p>
+  <p><span class="who coach">coach</span> Picker là danh từ Plane: bot hiện trong danh sách mention, comment <code>@Claude</code> mở Agent Run. Runner là máy: process trên Mini thấy mention, ack, chạm đĩa, trả activity. Một bên là UI đội; một bên là chuông.</p>
+  <p><span class="who dec">khóa</span> Xây cả hai nửa cùng lúc. Cần vòng đầy đủ — không Mini-first.</p>
+  </div>
+</section>
+
+<!-- 4 Ship 60 -->
+<section class="station" id="ship60">
+  <div class="station-head">
+    <h2>Kỹ thuật 04 · Ship in 60 Minutes</h2>
+    <span class="idx">VÒNG MỎNG NHẤT</span>
+  </div>
+  <p class="timer" aria-hidden="true">60:00</p>
+  <h3>Băng chuyền đầy đủ, bỏ OAuth / EE / webhook công</h3>
+  <div class="tape" aria-label="Sáu ga của vòng v1">
+    <div class="frame"><div class="n">01</div><p>Bot Claude + Codex trong mention list</p></div>
+    <div class="frame"><div class="n">02</div><p>Comment @Claude trên issue</p></div>
+    <div class="frame"><div class="n">03</div><p>Worker Mini thấy → comment ack</p></div>
+    <div class="frame"><div class="n">04</div><p>Card Agent Run + panel timeline bền</p></div>
+    <div class="frame"><div class="n">05</div><p>Mặc định Q&amp;A · leo thang mới code</p></div>
+    <div class="frame"><div class="n">06</div><p>Comment kết luận · draft PR nếu implement</p></div>
+  </div>
+
+  <p><span class="who dec">khóa</span> Agent Run UI là bắt buộc: sau khi giao việc, thấy agent làm gì, tool nào, kết quả ra sao. Bố cục như Linear / Plane trả phí — stream sống trên work item, kết luận là comment. Cố ý lệch Plane ephemeral: giữ nguyên thought / action / tool trong Agent UI. Không đổ tool vào Activity log của issue — sẽ chôn mất đổi trạng thái.</p>
+  <p><span class="who ins">coach đã đối chiếu tài liệu</span> Linear Agent Session: thought / action / response / elicitation / error; 10s hoặc unresponsive; thought/action ephemeral rồi bị thay; response thành comment; changelog gọi session sheet. Plane trả phí: Agent Run cùng loại activity; thought/action ephemeral trong Agent UI rồi bị thay. <strong>Không xác minh:</strong> screenshot Plane Cloud, CE đã có UI này, pixel panel-vs-comment của bản mình. Linear UI (docs + changelog, không click sản phẩm sống): issue giữ CARD session trong activity; click mở PANEL/SHEET trên issue, không sang site khác.</p>
+  <p><span class="who dir">hướng</span> Đang ở Plane nên theo cơ chế Plane, không theo extras Linear (delegate / assign / tên session-sheet). <span class="who dec">khóa</span> v1 Agent UI = kiểu Linear về mặt nhìn: card trên work item, click mở panel timeline bền. Danh từ Plane giữ: @mention → Agent Run → activities → response/elicitation comment. Reply trong panel tiếp cùng một run.</p>
+
+  <div class="ui-sketch" aria-label="Phác card và panel Agent Run">
+    <div class="issue-stream">
+      <div class="fake-comment">work item · comments</div>
+      <div class="fake-comment">Ng. A: API login trả 500 khi hết hạn token.</div>
+      <button class="run-card" id="runcard" type="button" aria-expanded="true" aria-controls="runpanel">
+        <div class="top"><span><span class="led"></span>@Claude</span><span>in_progress · 2m14s</span></div>
+        <p style="margin:.4rem 0 0;font-size:14px;color:var(--ink)">Q&amp;A · đọc mirror GitHub · chưa nhánh</p>
+      </button>
+      <div class="fake-comment mute">Kết luận sẽ thành comment — không phải từng tool.</div>
+    </div>
+    <div class="run-panel" id="runpanel">
+      <div class="panel-bar"><span>Agent Run · panel</span><span>durable = true</span></div>
+      <div class="trace">
+        <div class="row"><b>thought</b> · issue mô tả 500 khi token hết hạn</div>
+        <div class="row act"><b>action</b> · Read path=apps/api/…/auth.py</div>
+        <div class="row"><b>thought</b> · refresh không bắt 401 trước retry</div>
+        <div class="row act"><b>action</b> · Grep pattern=refresh_token</div>
+        <div class="row"><b>response</b> → comment trên issue</div>
+      </div>
+      <div class="reply-box">Trả lời trong panel = cùng Agent Run · “làm đi” leo thang thành code</div>
+    </div>
+  </div>
+
+  <p><span class="who dec">khóa</span> Mention v1 chỉ <code>@Claude</code> và <code>@Codex</code> — Amp để sau. Mặc định mention = Q&amp;A (panel + comment, không nhánh). Job code (named branch + worktree + draft PR) chỉ khi người dùng <em>xin implement / fix</em>. Leo thang Q&amp;A → code trên <strong>cùng Agent Run</strong>: một timeline, không card thứ hai. Cùng run nối thêm thought rồi mở worktree + draft PR; panel cuộn tiếp.</p>
+  <p><span class="who coach">coach</span> Chuông an toàn: <code>@Claude</code> xã giao không bao giờ tự mở PR. Trong thread, “làm đi / implement” mới viết đĩa.</p>
+</section>
+
+<!-- 5 Failure -->
+<section class="station" id="fail">
+  <div class="hazard-bar" aria-hidden="true"></div>
+  <div class="station-head">
+    <h2>Kỹ thuật 05 · Failure Analysis</h2>
+    <span class="idx">BA NỖI SỢ</span>
+  </div>
+  <h3>Sai repo · CLI hết hạn · Docker nuốt RAM</h3>
+  <p><span class="who user">người dùng</span> Ba hỏng đáng sợ nhất: nhầm repo, login CLI hết hạn, Docker ăn RAM.</p>
+  <div class="fails">
+    <article class="warn">
+      <h3>01 · Sai repo</h3>
+      <p>Không bao giờ mặc định cwd Mini (repo Plane). Code escalate phải bind repo trước — map project→git hoặc elicitation — không thì từ chối docker write.</p>
+    </article>
+    <article class="warn">
+      <h3>02 · CLI logout</h3>
+      <p>Preflight <code>claude</code>/<code>codex</code> auth trên Mini trước <code>in_progress</code>. Fail Agent Run bằng error activity + comment. Không để container treo.</p>
+    </article>
+    <article class="warn">
+      <h3>03 · RAM Docker</h3>
+      <p>Stack Plane chia Mini. Trần số container agent + <code>mem_limit</code> từng hộp + chừa RAM cho Plane. At-capacity = từ chối cứng, không queue rồi vẫn boot docker.</p>
+    </article>
+  </div>
+  <p class="mute"><span class="who ins">ngành</span> Không đoán câm (Linear user đốt credit vì sai repo). Resolve lớp: map project/team→repo đứng, override comment/label, elicitation nếu 0 hoặc &gt;1. Copilot mặc định repo GitHub của issue — default đó không tồn tại trên Plane/Linear. Codex last-used-env là chân súng đã ghi trong docs.</p>
+  <p><span class="who dec">khóa</span> v1 bind repo: project Plane map một git remote (config đứng). Comment được override. 0 hoặc &gt;1 ứng viên → elicitation trên cùng run, không docker write cho tới khi bind. Không Mini cwd. Không last-used.</p>
+
+  <p><span class="who dir">hướng</span> Không phải job nào cũng cần Docker. Câu hỏi không cần container. Đã có CLI OS sandbox (Seatbelt / Codex workspace-write) — đừng với Docker chỉ để trả lời câu hỏi về code.</p>
+  <p><span class="who coach">coach</span> Ba tầng: (1) Q&amp;A chỉ issue = không sandbox, không git. (2) Q&amp;A đọc code = CLI OS sandbox trên Mini, không docker, không nhánh/PR. (3) Implement = docker + worktree + named branch. Docker là cô lập cho ghi/đồng thời — không phải để hỏi.</p>
+
+  <div class="tiers" aria-label="Ba tầng sandbox">
+    <div class="tier t1">
+      <div class="lvl">Tầng 1<br>hỏi</div>
+      <div class="body">
+        <strong>Q&amp;A trên chữ issue</strong>
+        <span>Không sandbox. Không git. Không hộp RAM. Panel + comment.</span>
+      </div>
+    </div>
+    <div class="tier t2">
+      <div class="lvl">Tầng 2<br>đọc</div>
+      <div class="body">
+        <strong>Q&amp;A đọc code · CLI OS sandbox</strong>
+        <span>Seatbelt / workspace-write chặn ghi. Snapshot GitHub (mirror), không cây host Mini. Không docker, không nhánh.</span>
+      </div>
+    </div>
+    <div class="tier t3">
+      <div class="lvl">Tầng 3<br>ghi</div>
+      <div class="body">
+        <strong>Implement · docker + worktree</strong>
+        <span>Nhánh <code>agent/&lt;issue-id&gt;</code> + draft PR. Docker là provider v1 cho job ghi. Registry vẫn cắm thêm loại sau.</span>
+      </div>
+    </div>
+  </div>
+
+  <p><span class="who dec">khóa</span> Q&amp;A chưa có worktree: kéo latest từ GitHub trước khi trả lời; chưa có clone thì clone. Clone nằm cạnh worker, không phải checkout deploy Plane; path cấu hình được. KISS: mirror + setting worker qua env trên Mini, không UI Plane. Clone/pull dùng SSH key sẵn trên Mini — không git token trong Plane. Cùng run đã implement thì đọc worktree job đó (cả edit dở), không GitHub, không folder host Mini. Pull <code>--ff-only</code> vào snapshot; không fast-forward thì fail run, không trả lời từ file lệch.</p>
+  <p class="mute"><span class="who ins">hai lệch</span> Mini có edit chưa commit mà GitHub không có — hoặc GitHub có commit Mini chưa pull. Agent mây clone tươi từ GitHub vào VM, không đụng folder local. Isolator local (Cyrus, Claude worktree, VS Code New Worktree, Sandcastle) bắt đầu từ một commit, không từ file uncommitted. Sandcastle: ff-only từ origin nếu sạch; bẩn thì cảnh báo và dùng nguyên, không pull đè. Không bao giờ <code>git checkout .</code> trên folder chính (bug mất data Kiro/Claude).</p>
+  <p><span class="who user">người dùng</span> Mâu thuẫn cần gỡ: clone chỉ để Q&amp;A thì không bị sửa, câu trả lời khớp snapshot đó. Nếu người hỏi khi agent đang làm trong worktree, câu trả lời phải từ <em>worktree đó</em> — không GitHub, không folder host Mini.</p>
+
+  <h3 style="margin-top:1.4rem">Cây đúng</h3>
+  <div class="trees">
+    <div class="tree no">
+      <div class="k">Cấm</div>
+      <code>/plane-deploy</code>
+      <p class="mute">Checkout live Plane trên Mini. Không phải workspace agent. Không Q&amp;A. Không worktree.</p>
+    </div>
+    <div class="tree qa">
+      <div class="k">Q&amp;A · mirror</div>
+      <code>$MIRROR/&lt;project&gt;</code>
+      <p class="mute">Clone / <code>pull --ff-only</code> từ GitHub. SSH Mini. Env var. Cạnh worker.</p>
+    </div>
+    <div class="tree code">
+      <div class="k">Code · docker worktree</div>
+      <code>agent/&lt;issue-id&gt;</code>
+      <p class="mute">Bind-mount worktree. Draft PR về GitHub đã map. Không pull origin giữa chừng.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 Starburst -->
+<section class="station" id="star">
+  <div class="station-head">
+    <h2>Kỹ thuật 06 · Starbursting</h2>
+    <span class="idx">SÁU TIA</span>
+  </div>
+  <h3>Lỗ còn lại, bắn ra rồi khóa</h3>
+  <div class="burst-wrap">
+    <div class="burst">
+      <div class="core">v1<br>đã khóa</div>
+      <div class="ray r1"><div class="bubble">Ai được @mention?<span class="ans">Mọi người comment được · KISS</span></div></div>
+      <div class="ray r2"><div class="bubble">Stop trong panel là gì?<span class="ans">Giết process/Docker · giữ worktree</span></div></div>
+      <div class="ray r3"><div class="bubble">Draft PR đi đâu?<span class="ans">GitHub của repo đã map</span></div></div>
+      <div class="ray r4"><div class="bubble">Stale hay failed khi CLI logout?<span class="ans">Failed ngay · không stale</span></div></div>
+      <div class="ray r5"><div class="bubble">Kéo origin vào worktree đang chạy?<span class="ans">Không. Fetch chỉ lúc tạo worktree</span></div></div>
+      <div class="ray r6"><div class="bubble">Worker thấy mention bằng gì?<span class="ans">Poll API Plane localhost · không webhook công · không tunnel</span></div></div>
+    </div>
+  </div>
+  <p class="mute"><span class="who ins">đối thủ</span> Mention = member workspace comment được (Copilot write-only là chuyện GitHub). Stop Linear/Plane = tín hiệu halt rồi response; Copilot Stop giết Actions, giữ commit đã push; Cursor Stop trong chat có thể fail. Auth fail = lỗi hiện ngay (Codex link-to-connect), không để stale. Linear/Cyrus cần HTTPS webhook công — Plane ta cùng Mini nên poll localhost khớp.</p>
+</section>
+
+<!-- 7 Role -->
+<section class="station" id="role">
+  <div class="station-head">
+    <h2>Kỹ thuật 07 · Role Playing</h2>
+    <span class="idx">HAI MÀN HÌNH</span>
+  </div>
+  <h3>Web tới được = Mini đang sống</h3>
+  <div class="monitors">
+    <div class="mon">
+      <div class="screen-k">● Plane web · Tailscale</div>
+      <p>Nếu browser đội mở được Plane, Mini đang up. Mini chết thì không có web. Ngủ / chết hộp không phải failure riêng.</p>
+    </div>
+    <div class="mon">
+      <div class="screen-k">○ Plane up · worker down</div>
+      <p>Còn lại đúng một kịch: web sống, process agent chết. Không heartbeat worker riêng.</p>
+    </div>
+  </div>
+  <div class="script">
+    <p><span class="name">Người dùng</span> Plane với được trên Tailscale thì Mini đang bật. Đừng thiết kế “chuông ngủ” như lỗi thứ hai.</p>
+    <p><span class="name">Coach</span> Vậy tín hiệu duy nhất là Plane stale.</p>
+    <p><span class="name">Khóa</span> v1 dùng Plane stale (5 phút) khi worker down. Không heartbeat worker-offline riêng.</p>
+  </div>
+</section>
+
+<!-- 8 Worst -->
+<section class="station" id="worst">
+  <div class="station-head">
+    <h2>Kỹ thuật 08 · Worst Possible Idea</h2>
+    <span class="idx">LẬT NGƯỢC</span>
+  </div>
+  <h3>Ý tưởng tồi: @Claude ghi vào folder Plane đang chạy</h3>
+  <div class="stamp-scene">
+    <div class="folder-draw">
+      /opt/plane/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← live deploy<br>
+      &nbsp;&nbsp;apps/api/<br>
+      &nbsp;&nbsp;apps/web/<br>
+      &nbsp;&nbsp;.env<br>
+      &nbsp;&nbsp;docker-compose.yml<br>
+      <br>
+      Mini cwd = chính repo này.<br>
+      Agent “tiện tay” dùng luôn.
+    </div>
+    <div class="censor">Cấm</div>
+  </div>
+  <div class="flip">
+    <div class="k">Lật</div>
+    <p style="margin:.4rem 0 0">Không bao giờ dùng checkout deploy Plane làm workspace agent. Chỉ mirror và docker worktree. Agent chỉ mở draft PR — người merge. Agent không merge main.</p>
+  </div>
+  <p><span class="who dec">khóa</span> Draft PR only. Người merge. Agent không merge main. Không bao giờ dùng folder deploy Plane làm workspace agent. Phiên đủ — dừng sinh, gói.</p>
+</section>
+
+<!-- 9 Spine climax -->
+<section id="spine">
+  <h2>Tổng hợp · xương sống đội sở hữu</h2>
+  <p class="spine-title">Một chuông. Hai lớp. Cây đúng.</p>
+  <p class="lede mute">Không phải UI @mention. Không phải LLM trong app. Không phải Plane EE. Xương sống là máy của đội, danh từ Plane cho người, runner hình Sandcastle trên Mini, Tailscale chỉ để người đi vào.</p>
+  <div class="vertebrae">
+    <div class="v">
+      <div class="bone"><span class="knob"></span><span class="wire"></span></div>
+      <div class="plate-v"><strong>Mini = chuông cửa</strong><span>Một địa chỉ. Cùng hộp. Poll localhost. Tailscale cho người, không cho agent.</span></div>
+    </div>
+    <div class="v">
+      <div class="bone"><span class="knob"></span><span class="wire"></span></div>
+      <div class="plate-v"><strong>Cơ chế Plane</strong><span>@mention → Agent Run → activities → response/elicitation comment. Không delegate Linear. Không OAuth app.</span></div>
+    </div>
+    <div class="v">
+      <div class="bone"><span class="knob"></span><span class="wire"></span></div>
+      <div class="plate-v"><strong>Lịch sử Agent Run bền</strong><span>Card trên work item, panel đầy thought/tool sau khi chạy xong. Cố ý không ephemeral-wipe. Tool không tràn Activity log.</span></div>
+    </div>
+    <div class="v">
+      <div class="bone"><span class="knob"></span><span class="wire"></span></div>
+      <div class="plate-v"><strong>Mặc định Q&amp;A, cùng-run mới code</strong><span>@Claude xã giao không mở PR. “Làm đi” leo thang trên cùng timeline, không card thứ hai.</span></div>
+    </div>
+    <div class="v">
+      <div class="bone"><span class="knob"></span><span class="wire"></span></div>
+      <div class="plate-v"><strong>Cây đúng</strong><span>Q&amp;A: mirror GitHub cạnh worker. Code: docker worktree <code>agent/&lt;id&gt;</code>. Cùng run đang implement thì đọc worktree đó.</span></div>
+    </div>
+    <div class="v">
+      <div class="bone"><span class="knob"></span><span class="wire"></span></div>
+      <div class="plate-v"><strong>Không bao giờ folder deploy Plane</strong><span>Không cwd Mini. Không last-used. Không <code>git checkout .</code> trên cây sống.</span></div>
+    </div>
+  </div>
+  <p class="through">Sợi xuyên: danh từ Plane cho đội · runner hình Sandcastle trên Mini · Tailscale chỉ cho người.</p>
+</section>
+
+<!-- 10 Locked -->
+<section class="station" id="locked">
+  <div class="station-head">
+    <h2>Quyết định khóa v1</h2>
+    <span class="idx">QUÉT NHANH</span>
+  </div>
+  <p class="mute">Danh sách đứng yên sau phiên. Không mở thêm nhánh thiết kế.</p>
+  <div class="lock-groups">
+    <div class="lock-g">
+      <h3>Sản phẩm</h3>
+      <ol>
+        <li>Tự build @agent trên CE. Không subscription Plane. Không LLM native trong app.</li>
+        <li>v1 agent = Claude Code và Codex local. Amp để sau.</li>
+        <li>Theo cơ chế Plane: @mention tạo Agent Run. Không extras Linear (delegate / assignee / 10s unresponsive / tên session-sheet).</li>
+        <li>Agent UI: card trên work item, click mở panel timeline thought/tool bền. Kết luận (response / elicitation / error) thành comment.</li>
+        <li>Cố ý lệch Plane ephemeral: không replace-as-you-go. Không đổ tool vào Activity log issue.</li>
+        <li>Mặc định mention = Q&amp;A. Code chỉ khi xin implement/fix. Leo thang trên cùng Agent Run, không card thứ hai.</li>
+        <li>Mention picker v1: @Claude và @Codex.</li>
+      </ol>
+    </div>
+    <div class="lock-g">
+      <h3>Máy · mạng · runner</h3>
+      <ol start="8">
+        <li>Plane + CLI trên một Mac Mini. Chuông một địa chỉ. Không định tuyến từng laptop.</li>
+        <li>Tailscale chỉ để người vào Plane. Agent không đi Tailscale.</li>
+        <li>Worker poll API Plane localhost. Không webhook công, không tunnel.</li>
+        <li>Song song được. Trần = RAM Mini. At-capacity = từ chối cứng, không queue-rồi-boot-docker.</li>
+        <li>Cùng work item = một session, không đẻ trùng.</li>
+        <li>Hai lớp: danh từ Plane không đổi khi đổi sandbox provider. <code>runner.run({ agent, sandbox })</code>.</li>
+        <li>v1 chỉ ship provider docker cho job ghi. Interface để chỗ noSandbox / podman / sau này.</li>
+        <li>Plane stale 5 phút khi worker down. Không heartbeat worker riêng.</li>
+      </ol>
+    </div>
+    <div class="lock-g">
+      <h3>Ba tầng · cây git</h3>
+      <ol start="16">
+        <li>Tầng 1 — Q&amp;A chữ issue: không sandbox, không git.</li>
+        <li>Tầng 2 — Q&amp;A đọc code: CLI OS sandbox (Seatbelt / workspace-write) chặn ghi; mirror GitHub; không docker; không nhánh.</li>
+        <li>Tầng 3 — implement: docker + worktree + <code>agent/&lt;issue-id&gt;</code> + draft PR.</li>
+        <li>Q&amp;A chưa worktree: clone nếu thiếu, <code>pull --ff-only</code>; không ff được thì fail, không trả lời từ cây lệch.</li>
+        <li>Cùng run đã implement: Q&amp;A đọc worktree job, gồm edit dở.</li>
+        <li>Mirror cạnh worker, path env var, SSH key Mini. Không git token trong Plane. Không UI cấu hình trên Plane.</li>
+        <li>Bind repo: project → một remote đứng. Comment override. 0 hoặc &gt;1 → elicitation. Không Mini cwd. Không last-used.</li>
+        <li>Không bao giờ dùng folder deploy Plane làm workspace agent.</li>
+        <li>Không pull/rebase origin giữa worktree đang chạy. Fetch latest chỉ lúc tạo worktree.</li>
+      </ol>
+    </div>
+    <div class="lock-g">
+      <h3>Hỏng · quyền · PR</h3>
+      <ol start="25">
+        <li>Ai comment được thì @mention được.</li>
+        <li>Stop: giết process/Docker, giữ worktree.</li>
+        <li>Draft PR về GitHub của repo đã map. Người merge. Agent không merge main.</li>
+        <li>CLI auth fail = Agent Run failed ngay (error + comment). Preflight trước in_progress. Không container treo.</li>
+        <li>Docker: trần concurrent + mem_limit + chừa RAM cho Plane.</li>
+      </ol>
+    </div>
+  </div>
+  <p class="endplate">Keepsake · brainstorm-plane-local-cli-agents-2026-09-06 · một file · không CDN · xem trên Tailscale</p>
+</section>
+
+</div>
+</div>
+
+<script>
+(function () {
+  var ids = ["mast","jtbd","transfer","constraint","ship60","fail","star","role","worst","spine","locked"];
+  var rack = document.querySelectorAll(".rack a");
+  var mnav = document.querySelectorAll(".mnav a");
+  function setCurrent() {
+    var y = window.scrollY + 96;
+    var cur = ids[0];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el && el.offsetTop <= y) cur = ids[i];
+    }
+    rack.forEach(function (a) {
+      a.setAttribute("aria-current", a.getAttribute("href") === "#" + cur ? "true" : "false");
+    });
+    mnav.forEach(function (a) {
+      a.setAttribute("aria-current", a.getAttribute("href") === "#" + cur ? "true" : "false");
+    });
+  }
+  window.addEventListener("scroll", setCurrent, { passive: true });
+  setCurrent();
+})();
+</script>
+</body>
+</html>

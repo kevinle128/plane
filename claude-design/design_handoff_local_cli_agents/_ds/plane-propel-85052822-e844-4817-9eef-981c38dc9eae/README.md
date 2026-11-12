@@ -1,0 +1,133 @@
+## How to build with PlanePropel
+
+**Setup.** No provider is required: components read their theme from the nearest `data-theme` attribute, so put `data-theme="light"` (or `"dark"`) on your root element. The canvas colour and body font come from the stylesheet (`bg-canvas`, `font-body`); give your root `className="bg-canvas text-primary font-body"`. Toasts need the host mounted once: render `<Toast theme="light" />` at the root, then call `setToast({ type: TOAST_TYPE.SUCCESS, title: "Saved", message: "…" })` from anywhere. Icons: Plane's own icons are named exports (`SearchIcon`, `PlusIcon`, `CheckIcon`, …); `<Icon name="…" />` renders from the registry. All of these come from `window.PlanePropel`.
+
+**Styling idiom: semantic Tailwind utilities, never raw palette classes.** The stylesheet is a compiled Tailwind v4 theme with Plane's semantic names. `bg-blue-500`, `text-gray-600`, `p-7` and other stock Tailwind names do NOT exist here and render as nothing. Use only these families (names are exact):
+
+| Family | Use these |
+|---|---|
+| Surfaces | `bg-canvas` (page), `bg-surface-1`, `bg-surface-2` (panels), `bg-layer-1` `bg-layer-2` `bg-layer-3` (layer-1 also `-hover` / `-active` / `-selected`; layer-3 `-hover` / `-selected`), `bg-inverse`, `bg-backdrop` |
+| Accent / status fills | `bg-accent-primary`, `bg-accent-subtle`, `bg-danger-primary`, `bg-danger-subtle`, `bg-success-primary`, `bg-success-subtle`, `bg-warning-primary`, `bg-warning-subtle`, `bg-info-subtle` |
+| Text colour | `text-primary`, `text-secondary`, `text-tertiary`, `text-placeholder`, `text-disabled`, `text-on-color` (on accent fills), `text-inverse`, `text-accent-primary`, `text-link-primary`, `text-danger-primary`, `text-success-primary`, `text-warning-primary`, `text-info-primary` |
+| Icon colour | `text-icon-secondary`, `text-icon-tertiary`, `text-icon-placeholder`, `text-icon-accent-primary`, `text-icon-danger-primary`, `text-icon-success-primary`, `text-icon-warning-primary` |
+| Type scale | roles: `text-h2-regular` `text-h3-regular` `text-h4-semibold` `text-h5-medium` `text-h6-semibold` `text-body-md-regular` `text-body-md-semibold` `text-body-sm-regular` `text-body-sm-medium` `text-body-sm-semibold` `text-body-xs-regular` `text-body-xs-medium` `text-caption-md-regular` `text-caption-sm-regular`; sizes (exact): `text-9 text-10 text-11 text-12 text-13 text-14 text-16 text-18 text-20 text-40`; weights `font-medium` `font-semibold` `font-bold`; families `font-body` `font-heading` `font-code` |
+| Borders | `border` + `border-subtle` (default hairline), `border-subtle-1`, `border-strong`, `border-accent-strong`, `border-danger-strong`, `border-disabled`; `border-dashed` |
+| Radius / shadow | `rounded-xs` `rounded-sm` `rounded-md` `rounded-lg` `rounded-xl` `rounded-full`; `shadow-raised-100` `shadow-raised-200` `shadow-raised-300` (cards), `shadow-overlay-100` `shadow-overlay-200` (popups) |
+| Spacing (exact sets - nothing in between exists) | padding `p-0 p-0.5 p-1 p-1.5 p-2 p-3 p-4 p-5 p-6 p-8`, `px-0 px-0.5 px-1 px-1.5 px-2 px-2.5 px-3 px-3.5 px-4 px-5 px-6 px-8`, `py-0 py-0.5 py-1 py-1.5 py-2 py-2.5 py-3 py-3.5 py-4 py-6 py-7`; gap `gap-0 gap-0.5 gap-1 gap-1.5 gap-2 gap-2.5 gap-3 gap-3.5 gap-4 gap-6 gap-8`; margin only `mt-0.5 mt-1 mt-2 mt-3 mt-4 mt-6`, `mb-1 mb-1.5 mb-2 mb-3 mb-4 mb-6`, `ml-2 ml-4 ml-auto`, `mr-1 mr-2`, `mx-0 mx-1 mx-2 mx-3 mx-4`, `my-0.5 my-1 my-2 my-auto` (no `m-*`, no `mx-auto`, no `p-7`, no `gap-5`) |
+| Layout | `flex inline-flex grid block hidden`, `flex-col flex-row flex-wrap flex-1 shrink-0 grow`, `items-center items-start items-end items-stretch`, `justify-between justify-center justify-start justify-end`, `grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-5 grid-cols-12`, `truncate overflow-hidden overflow-y-auto`; width `w-full w-fit w-auto w-screen` + `w-4 w-5 w-6 w-8 w-10 w-12 w-16 w-20 w-24 w-32 w-40 w-48 w-56 w-64 w-80 w-96`, `max-w-xs max-w-md max-w-2xl max-w-3xl max-w-4xl max-w-full`; height `h-full h-screen h-auto` + `h-4 h-5 h-6 h-7 h-8 h-9 h-10 h-12 h-16 h-20 h-24 h-32 h-48 h-64 h-80 h-96`; square `size-3 size-4 size-5 size-6 size-8 size-10 size-12 size-16` |
+| Labels | `bg-label-{indigo|emerald|orange|yellow|crimson|grey}-bg` with `text-label-{same}-text` for coloured tags |
+
+Because the stylesheet is tree-shaken, a utility that is not in the table silently does nothing - that includes any other spacing step, `mx-auto`, arbitrary values like `w-[300px]`, and every stock palette colour. For any other margin, width or colour use inline `style` with the design tokens - they are all defined and theme-aware: `style={{ background: "var(--bg-surface-2)", color: "var(--txt-secondary)", borderColor: "var(--border-color-subtle)" }}`. Token families: `--bg-*` (surfaces/layers/status), `--txt-*` (text colours), `--border-color-*`, `--radius-*`, `--font-body` / `--font-heading` / `--font-code`, `--control-height-{xs..2xl}`.
+
+**Where the truth lives.** `styles.css` `@import`s `_ds_bundle.css` (every utility class and every `--token` above is in there - grep it before inventing a name) and `fonts/fonts.css` (Inter Variable, IBM Plex Mono, Material Symbols Rounded). Per-component API and examples: `components/<group>/<Name>/<Name>.prompt.md` and `<Name>.d.ts`. Compound components (`Accordion.Item`, `Dialog.Panel`, `Command.Input`, `ContextMenu.Trigger`, `Tabs`) are documented there.
+
+**Idiomatic snippet** (library components for controls, semantic utilities for layout glue):
+
+```jsx
+const { Button, Badge, Avatar, PlusIcon } = window.PlanePropel;
+
+<section data-theme="light" className="bg-canvas text-primary font-body p-6">
+  <div className="bg-surface-1 border border-subtle rounded-lg shadow-raised-100 p-4 flex items-center justify-between gap-4">
+    <div className="flex items-center gap-3">
+      <Avatar name="Ada Lovelace" size="base" />
+      <div>
+        <div className="text-body-sm-semibold">Analytics engine</div>
+        <div className="text-caption-sm-regular text-secondary">Updated 2 hours ago</div>
+      </div>
+      <Badge variant="brand" size="sm">Active</Badge>
+    </div>
+    <Button variant="primary" size="base" prependIcon={<PlusIcon className="size-3" />}>Create work item</Button>
+  </div>
+</section>
+```
+
+# PlanePropel (@plane/propel@1.4.2)
+
+This design system is the published @plane/propel React library, bundled as a single
+browser global. All 36 components are the real upstream code.
+
+## Where things are
+
+- `_ds_bundle.js` — the whole-DS bundle at the project root; loads every component to `window.PlanePropel`. First line is a `/* @ds-bundle: … */` metadata header.
+- `styles.css` — the single stylesheet entry: it `@import`s the tokens, fonts, and component styles (`_ds_bundle.css`). Link this one file.
+- `components/<group>/<Name>/<Name>.prompt.md` (example JSX + variants), `<Name>.d.ts` (types), `<Name>.html` (variant grid).
+- `tokens/*.css` — CSS custom properties, names verbatim from upstream.
+- `fonts/` — `@font-face` files + `fonts.css` (when the package ships fonts).
+
+For a specific component, `read_file("components/<group>/<Name>/<Name>.prompt.md")`.
+
+## Loading
+
+Add these two lines to your page once (React must be on the page first):
+
+```html
+<link rel="stylesheet" href="styles.css">
+<script src="_ds_bundle.js"></script>
+```
+
+Components are then available at `window.PlanePropel.*`. Mount into a dedicated child node (e.g. `<div id="ds-root">`), not the host page's own React root, so the two trees don't collide:
+
+```jsx
+const { Accordion } = window.PlanePropel;
+ReactDOM.createRoot(document.getElementById('ds-root')).render(<Accordion />);
+```
+
+## Tokens
+
+727 CSS custom properties from @plane/propel. Names are
+preserved verbatim from upstream. They are declared inside `_ds_bundle.css` (this DS ships one compiled stylesheet rather than separate token files).
+
+- **color** (343): `--tw-border-style`, `--tw-shadow-color`, `--tw-inset-shadow-color`, …
+- **spacing** (22): `--tw-space-y-reverse`, `--tw-space-x-reverse`, `--tw-inset-shadow`, …
+- **typography** (13): `--tw-font-weight`, `--tw-tracking`, `--font-heading`, …
+- **radius** (11): `--radius-xs`, `--radius-sm`, `--radius-md`, …
+- **shadow** (7): `--tw-shadow`, `--tw-shadow-alpha`, `--tw-ring-shadow`, …
+- **other** (331): `--tw-translate-x`, `--tw-translate-y`, `--tw-translate-z`, …
+
+## Components
+
+### components
+- `Accordion` (compound: `Accordion.Root`, `Accordion.Item`, `Accordion.Trigger`, `Accordion.Content`)
+- `AnimatedCounter`
+- `Avatar`
+- `Badge`
+- `Banner`
+- `Button`
+- `Calendar`
+- `Card`
+- `CircularBarSpinner`
+- `Collapsible` (compound: `Collapsible.CollapsibleRoot`, `Collapsible.CollapsibleTrigger`, `Collapsible.CollapsibleContent`)
+- `Combobox` (compound: `Combobox.Button`, `Combobox.Options`, `Combobox.Option`)
+- `Command` (compound: `Command.Input`, `Command.List`, `Command.Empty`, `Command.Item`)
+- `ContextMenu` (compound: `ContextMenu.Trigger`, `ContextMenu.Portal`, `ContextMenu.Content`, `ContextMenu.Item`, `ContextMenu.Separator`, `ContextMenu.Submenu`, …)
+- `Dialog` (compound: `Dialog.Panel`, `Dialog.Title`)
+- `IconButton`
+- `Input`
+- `Menu` (compound: `Menu.MenuItem`, `Menu.SubMenu`)
+- `Pill`
+- `Popover` (compound: `Popover.Button`, `Popover.Panel`)
+- `ScrollArea`
+- `Skeleton` (compound: `Skeleton.Item`)
+- `Spinner`
+- `Switch`
+- `Table`
+- `TabNavigationList`
+- `Tabs` (compound: `Tabs.List`, `Tabs.Trigger`, `Tabs.Content`, `Tabs.Indicator`)
+- `Toast`
+- `Toolbar` (compound: `Toolbar.Group`, `Toolbar.Item`, `Toolbar.Separator`, `Toolbar.SubmitButton`)
+- `Tooltip`
+
+### emoji
+- `EmojiPicker`
+- `EmojiReaction`
+- `EmojiReactionPicker`
+
+### emptystate
+- `EmptyStateCompact`
+- `EmptyStateDetailed`
+
+### misc
+- `Icon`
+
+### portal
+- `ModalPortal`
