@@ -7,38 +7,52 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import { Button } from "@makeplane/propel/components/button";
-import { getDeviceCodeExpiry } from "@plane/blocks/agent-run";
+import { getDeviceCodeDeadline, getDeviceCodeExpiry, getDevicePollErrorAction } from "@plane/blocks/agent-run";
 import { Spinner } from "@plane/blocks/spinner";
 import { useTranslation } from "@plane/i18n";
-import type { TAgentGithubDeviceAuthorization, TAgentGithubDeviceAuthorizationStatus } from "@plane/types";
+import type {
+  TAgentGitError,
+  TAgentGithubDeviceAuthorization,
+  TAgentGithubDeviceAuthorizationStatus,
+} from "@plane/types";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
 import { agentGitErrorMessage } from "../provider-meta";
 
-export type TDeviceFlowOutcome = Exclude<TAgentGithubDeviceAuthorizationStatus, "pending">;
+/** Final state of the device flow. `failed` means a poll error that another poll cannot fix. */
+export type TDeviceFlowOutcome = Exclude<TAgentGithubDeviceAuthorizationStatus, "pending"> | "failed";
 
 type Props = {
   workspaceSlug: string;
   authorization: TAgentGithubDeviceAuthorization;
-  onSettled: (outcome: TDeviceFlowOutcome) => void;
-  onError: (message: string) => void;
+  /** Local time when the start response arrived; the countdown starts from it. */
+  receivedAt: number;
+  /** `authorization` is the last state from the server; `message` is set for the `failed` outcome. */
+  onSettled: (outcome: TDeviceFlowOutcome, authorization: TAgentGithubDeviceAuthorization, message?: string) => void;
 };
 
-/** The device code card: shows the code and polls GitHub at the interval it asked for. */
+/**
+ * The device code card: shows the code and polls GitHub at the interval it asked for. The poll status
+ * from the server decides when the flow ends; the countdown is for display only.
+ */
 export const GithubDeviceFlowCard = observer(function GithubDeviceFlowCard(props: Props) {
-  const { workspaceSlug, authorization: initial, onSettled, onError } = props;
+  const { workspaceSlug, authorization: initial, receivedAt, onSettled } = props;
   const { t } = useTranslation();
   const { pollGithubDeviceAuthorization, cancelGithubDeviceAuthorization } = useAgentGit();
   const [authorization, setAuthorization] = useState(initial);
+  const [deadline] = useState(() => getDeviceCodeDeadline(initial, receivedAt));
   const [now, setNow] = useState(() => Date.now());
   const [isBusy, setIsBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Changes after a poll fails with a temporary error, so the poll timer starts again.
+  const [retryCount, setRetryCount] = useState(0);
   const settledRef = useRef(false);
-  const expiry = getDeviceCodeExpiry(authorization.expires_at, now);
+  const expiry = getDeviceCodeExpiry(deadline, now);
 
   const settle = useCallback(
-    (outcome: TDeviceFlowOutcome) => {
+    (outcome: TDeviceFlowOutcome, last: TAgentGithubDeviceAuthorization, message?: string) => {
       if (settledRef.current) return;
       settledRef.current = true;
-      onSettled(outcome);
+      onSettled(outcome, last, message);
     },
     [onSettled]
   );
@@ -47,12 +61,19 @@ export const GithubDeviceFlowCard = observer(function GithubDeviceFlowCard(props
     if (settledRef.current) return;
     try {
       const next = await pollGithubDeviceAuthorization(workspaceSlug, authorization.id);
+      setError(null);
       setAuthorization(next);
-      if (next.status !== "pending") settle(next.status);
-    } catch (error) {
-      onError(agentGitErrorMessage(t, error));
+      if (next.status !== "pending") settle(next.status, next);
+    } catch (pollError) {
+      const message = agentGitErrorMessage(t, pollError);
+      if (getDevicePollErrorAction((pollError as TAgentGitError | undefined)?.status) === "stop") {
+        settle("failed", authorization, message);
+        return;
+      }
+      setError(message);
+      setRetryCount((count) => count + 1);
     }
-  }, [authorization.id, onError, pollGithubDeviceAuthorization, settle, t, workspaceSlug]);
+  }, [authorization, pollGithubDeviceAuthorization, settle, t, workspaceSlug]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -62,11 +83,7 @@ export const GithubDeviceFlowCard = observer(function GithubDeviceFlowCard(props
   useEffect(() => {
     const timer = window.setTimeout(() => void poll(), Math.max(authorization.interval, 1) * 1000);
     return () => window.clearTimeout(timer);
-  }, [authorization, poll]);
-
-  useEffect(() => {
-    if (expiry.expired) settle("expired");
-  }, [expiry.expired, settle]);
+  }, [authorization, poll, retryCount]);
 
   const handleEntered = async () => {
     setIsBusy(true);
@@ -77,10 +94,10 @@ export const GithubDeviceFlowCard = observer(function GithubDeviceFlowCard(props
   const handleCancel = async () => {
     setIsBusy(true);
     try {
-      await cancelGithubDeviceAuthorization(workspaceSlug, authorization.id);
-      settle("cancelled");
-    } catch (error) {
-      onError(agentGitErrorMessage(t, error));
+      const cancelled = await cancelGithubDeviceAuthorization(workspaceSlug, authorization.id);
+      settle("cancelled", cancelled);
+    } catch (cancelError) {
+      setError(agentGitErrorMessage(t, cancelError));
     } finally {
       setIsBusy(false);
     }
@@ -98,6 +115,11 @@ export const GithubDeviceFlowCard = observer(function GithubDeviceFlowCard(props
           {t("agent_git.github.device.expires_in", { time: expiry.label })}
         </span>
       </div>
+      {error && (
+        <p role="alert" className="text-caption-sm-regular text-danger-primary">
+          {error}
+        </p>
+      )}
       <p className="text-body-sm-regular text-secondary">
         {t("agent_git.github.device.instructions", { url: authorization.verification_uri })}
       </p>

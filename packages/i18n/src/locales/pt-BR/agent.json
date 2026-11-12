@@ -82,7 +82,20 @@
       "gitlab_group_not_found": "The group does not exist, or the token cannot see it.",
       "gitlab_role_too_low": "The token user's role in the group is {detail}. It needs Developer or higher.",
       "gitlab_unexpected_response": "GitLab returned an unexpected response ({detail}).",
-      "gitlab_disconnect_first": "Disconnect the current GitLab before you connect another GitLab URL."
+      "gitlab_disconnect_first": "Disconnect the current GitLab before you connect another GitLab URL.",
+      "github_token_invalid": "GitHub no longer accepts the Plane token. Connect GitHub again.",
+      "github_tls_failed": "The GitHub certificate is not trusted. Ask the instance operator to check the network proxy.",
+      "github_url_redirected": "GitHub redirected the request to {detail}. Plane does not follow redirects. Ask the instance operator to check the network proxy.",
+      "github_url_not_allowed_or_unresolved": "Plane cannot resolve the GitHub address, or the address is not allowed. Ask the instance operator to check the network.",
+      "invalid_kind": "The authorization type is not valid. Start again.",
+      "invalid_cursor": "The repository list changed while it loaded. Load it again.",
+      "account_remove_not_supported": "You cannot remove this account here. Disconnect the provider to stop using it.",
+      "account_attach_not_supported": "You cannot attach this account here.",
+      "device_code_unreadable": "Plane could not read the saved device code. The instance secret key may have changed. Start again.",
+      "incorrect_client_credentials": "GitHub did not accept the GitHub App client ID. Ask the instance admin to check the GitHub App settings.",
+      "unsupported_grant_type": "GitHub did not accept the device flow request. Ask the instance admin to make sure Device Flow is enabled on the GitHub App.",
+      "incorrect_device_code": "GitHub did not recognize the device code. Start again.",
+      "github_identity_failed": "GitHub authorized Plane, but Plane could not read your GitHub account. Start again."
     },
     "accounts": {
       "title": "Connections",
@@ -122,7 +135,9 @@
       "reconnect_generic": "Plane cannot use the saved {provider} connection. Connect again to continue.",
       "gitlab_disconnect_confirm_content": "Plane deletes the stored GitLab token and stops using it. Plane does not revoke the token in GitLab: revoke it in the group settings under Access tokens. Projects keep their repository binding for history, but new agent work fails until GitLab is connected again.",
       "gitlab_revoke_in_provider": "Revoke the Group Access Token in GitLab now: group Settings, Access tokens.",
-      "open_gitlab_token_settings": "Open GitLab access tokens"
+      "open_gitlab_token_settings": "Open GitLab access tokens",
+      "worker_error": "Worker cannot reach {host}: {reason}",
+      "load_error": "Plane could not load the Git connections."
     },
     "repository": {
       "title": "Repository",
@@ -205,7 +220,7 @@
       "warnings": {
         "expires_soon": "The token expires on {date}. Create a new token and connect again before then.",
         "not_bot": "This token belongs to a person, not a group bot. Pushes and merge requests appear as that person, and the connection stops when that person loses access to the group.",
-        "worker_error": "Worker cannot reach {host}: {reason}"
+        "expired": "The token expired on {date}. Create a new token and connect again."
       }
     }
   }

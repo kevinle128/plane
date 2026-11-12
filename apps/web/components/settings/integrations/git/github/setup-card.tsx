@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import { Button } from "@makeplane/propel/components/button";
 import { TickOutline } from "@makeplane/propel/icons";
+import { getDeniedReasonCode } from "@plane/blocks/agent-run";
 import { useTranslation } from "@plane/i18n";
 import type { TAgentGithubDeviceAuthorization } from "@plane/types";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
@@ -34,7 +35,7 @@ const OUTCOME_MESSAGES: Partial<Record<TDeviceFlowOutcome, string>> = {
 export const GithubSetupCard = observer(function GithubSetupCard({ workspaceSlug, canEdit }: Props) {
   const { t } = useTranslation();
   const { startGithubDeviceAuthorization } = useAgentGit();
-  const [authorization, setAuthorization] = useState<TAgentGithubDeviceAuthorization | null>(null);
+  const [flow, setFlow] = useState<{ authorization: TAgentGithubDeviceAuthorization; receivedAt: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
@@ -42,7 +43,8 @@ export const GithubSetupCard = observer(function GithubSetupCard({ workspaceSlug
     setIsStarting(true);
     setMessage(null);
     try {
-      setAuthorization(await startGithubDeviceAuthorization(workspaceSlug, "user"));
+      const authorization = await startGithubDeviceAuthorization(workspaceSlug, "user");
+      setFlow({ authorization, receivedAt: Date.now() });
     } catch (error) {
       setMessage(agentGitErrorMessage(t, error));
     } finally {
@@ -51,21 +53,31 @@ export const GithubSetupCard = observer(function GithubSetupCard({ workspaceSlug
   };
 
   const handleSettled = useCallback(
-    (outcome: TDeviceFlowOutcome) => {
-      setAuthorization(null);
+    (outcome: TDeviceFlowOutcome, last: TAgentGithubDeviceAuthorization, errorMessage?: string) => {
+      setFlow(null);
+      if (outcome === "failed") {
+        setMessage(errorMessage ?? t("agent_git.errors.generic"));
+        return;
+      }
+      // A denied authorization that the user did not refuse shows the reason, for example wrong App credentials.
+      const deniedReason = outcome === "denied" ? getDeniedReasonCode(last.last_error) : null;
+      if (deniedReason) {
+        setMessage(agentGitErrorMessage(t, { error: deniedReason }));
+        return;
+      }
       const key = OUTCOME_MESSAGES[outcome];
       setMessage(key ? t(key) : null);
     },
     [t]
   );
 
-  if (authorization) {
+  if (flow) {
     return (
       <GithubDeviceFlowCard
         workspaceSlug={workspaceSlug}
-        authorization={authorization}
+        authorization={flow.authorization}
+        receivedAt={flow.receivedAt}
         onSettled={handleSettled}
-        onError={setMessage}
       />
     );
   }

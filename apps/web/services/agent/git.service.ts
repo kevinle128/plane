@@ -10,6 +10,7 @@ import type {
   TAgentGitAccountRemoval,
   TAgentGitConnection,
   TAgentGitDisconnectResult,
+  TAgentGitError,
   TAgentGitPolicy,
   TAgentGitProvider,
   TAgentGitRepositoryPage,
@@ -20,7 +21,18 @@ import type {
 } from "@plane/types";
 import { APIService } from "@/services/api.service";
 
-/** Workspace Git provider endpoints (`api/workspaces/<slug>/agent-git/`). Errors reject with the API error body. */
+/**
+ * API error body with the HTTP status. A body that is not JSON (for example an HTML 502 page) gives an
+ * empty error code, so the caller shows the generic message.
+ */
+function toAgentGitError(error: unknown): TAgentGitError {
+  const response = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+  const data = response?.data;
+  const body = data && typeof data === "object" ? (data as Partial<TAgentGitError>) : {};
+  return { ...body, error: typeof body.error === "string" ? body.error : "", status: response?.status };
+}
+
+/** Workspace Git provider endpoints (`api/workspaces/<slug>/agent-git/`). Errors reject with the API error body and the HTTP status. */
 export class AgentGitService extends APIService {
   constructor() {
     super(API_BASE_URL);
@@ -34,7 +46,7 @@ export class AgentGitService extends APIService {
     return this.get(`${this.base(workspaceSlug)}/connections/`)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -45,7 +57,7 @@ export class AgentGitService extends APIService {
     return this.post(`${this.base(workspaceSlug)}/github/device-authorizations/`, { kind })
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -56,7 +68,7 @@ export class AgentGitService extends APIService {
     return this.post(`${this.base(workspaceSlug)}/github/device-authorizations/${authorizationId}/poll/`, {})
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -67,7 +79,7 @@ export class AgentGitService extends APIService {
     return this.post(`${this.base(workspaceSlug)}/github/device-authorizations/${authorizationId}/cancel/`, {})
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -75,7 +87,7 @@ export class AgentGitService extends APIService {
     return this.post(`${this.base(workspaceSlug)}/gitlab/connection/`, data)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -83,7 +95,7 @@ export class AgentGitService extends APIService {
     return this.delete(`${this.base(workspaceSlug)}/${provider}/connection/`)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -91,7 +103,7 @@ export class AgentGitService extends APIService {
     return this.get(`${this.base(workspaceSlug)}/${provider}/accounts/`)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -99,7 +111,7 @@ export class AgentGitService extends APIService {
     return this.post(`${this.base(workspaceSlug)}/github/accounts/sync/`, {})
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -111,7 +123,7 @@ export class AgentGitService extends APIService {
     return this.post(`${this.base(workspaceSlug)}/${provider}/accounts/${accountId}/attach/`, {})
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -123,7 +135,7 @@ export class AgentGitService extends APIService {
     return this.delete(`${this.base(workspaceSlug)}/${provider}/accounts/${accountId}/`)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -134,7 +146,7 @@ export class AgentGitService extends APIService {
     return this.get(`${this.base(workspaceSlug)}/repositories/`, { params: query })
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -142,7 +154,7 @@ export class AgentGitService extends APIService {
     return this.get(`${this.base(workspaceSlug)}/${provider}/policy/`)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 
@@ -154,7 +166,7 @@ export class AgentGitService extends APIService {
     return this.patch(`${this.base(workspaceSlug)}/${provider}/policy/`, data)
       .then((response) => response?.data)
       .catch((error) => {
-        throw error?.response?.data;
+        throw toAgentGitError(error);
       });
   }
 }

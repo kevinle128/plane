@@ -136,6 +136,8 @@ export type TAgentGithubDeviceAuthorization = {
   user_code: string;
   verification_uri: string;
   expires_at: string;
+  /** Server time when the authorization started. With `expires_at` it gives the code lifetime. */
+  created_at?: string;
   interval: number;
   last_error: string;
 };
@@ -145,6 +147,8 @@ export type TAgentGitError = {
   error: string;
   provider?: TAgentGitProvider | "";
   detail?: string;
+  /** HTTP status of the failed response. Not set when no response arrived (network error). */
+  status?: number;
 };
 
 /** Change-request policy of one provider in a workspace. */
