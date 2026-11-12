@@ -113,6 +113,21 @@ class AgentGithubDeviceAuthorizationCancelEndpoint(BaseAPIView):
         return Response(AgentGithubDeviceAuthorizationSerializer(authorization).data, status=status.HTTP_200_OK)
 
 
+class AgentGitConnectionEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, provider):
+        if require_provider(provider) != AgentGitProvider.GITHUB:
+            raise Http404
+        workspace = Workspace.objects.get(slug=slug)
+        try:
+            connection, revoke_in_provider = github_connection.disconnect(workspace)
+        except ProviderError as error:
+            return provider_error_response(error)
+        data = AgentGitConnectionSerializer(connection).data
+        data["revoke_in_provider"] = revoke_in_provider
+        return Response(data, status=status.HTTP_200_OK)
+
+
 class AgentGitAccountsEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug, provider):

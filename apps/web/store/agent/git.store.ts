@@ -9,6 +9,7 @@ import type {
   TAgentGitAccount,
   TAgentGitAccountRemoval,
   TAgentGitConnection,
+  TAgentGitDisconnectResult,
   TAgentGitProvider,
   TAgentGithubDeviceAuthorization,
   TAgentGithubDeviceAuthorizationKind,
@@ -29,6 +30,7 @@ export interface IAgentGitStore {
     provider: TAgentGitProvider,
     accountId: string
   ) => Promise<TAgentGitAccountRemoval>;
+  disconnect: (workspaceSlug: string, provider: TAgentGitProvider) => Promise<TAgentGitDisconnectResult>;
   getConnection: (workspaceSlug: string, provider: TAgentGitProvider) => TAgentGitConnection | undefined;
   isConnected: (workspaceSlug: string, provider: TAgentGitProvider) => boolean;
   fetchConnections: (workspaceSlug: string) => Promise<TAgentGitConnection[]>;
@@ -56,6 +58,7 @@ export class AgentGitStore implements IAgentGitStore {
       connectionsByWorkspace: observable,
       accountsByWorkspace: observable,
       fetchConnections: action,
+      disconnect: action,
       fetchAccounts: action,
       syncGithubAccounts: action,
       attachAccount: action,
@@ -92,6 +95,18 @@ export class AgentGitStore implements IAgentGitStore {
 
   cancelGithubDeviceAuthorization = (workspaceSlug: string, authorizationId: string) =>
     this.service.cancelGithubDeviceAuthorization(workspaceSlug, authorizationId);
+
+  disconnect = async (workspaceSlug: string, provider: TAgentGitProvider) => {
+    const result = await this.service.disconnect(workspaceSlug, provider);
+    runInAction(() => {
+      const { revoke_in_provider: _revoke, ...connection } = result;
+      this.connectionsByWorkspace[workspaceSlug] = {
+        ...this.connectionsByWorkspace[workspaceSlug],
+        [provider]: connection,
+      };
+    });
+    return result;
+  };
 
   getAccounts = (workspaceSlug: string, provider: TAgentGitProvider) =>
     this.accountsByWorkspace[workspaceSlug]?.[provider];

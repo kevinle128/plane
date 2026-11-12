@@ -4,17 +4,20 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Avatar } from "@makeplane/propel/components/avatar";
+import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
 import { useTranslation } from "@plane/i18n";
-import type { TAgentGitConnection, TAgentGitProvider } from "@plane/types";
+import type { TAgentGitConnection, TAgentGitDisconnectResult, TAgentGitProvider } from "@plane/types";
 import { getFileURL, renderFormattedDate } from "@plane/utils";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
 import { GitAccountsList } from "./accounts-list";
+import { GitDisconnectAction } from "./disconnect-action";
 import { GithubSetupCard } from "./github/setup-card";
 import { agentGitProviderLabel } from "./provider-meta";
 
@@ -29,7 +32,48 @@ const DESCRIPTION_KEYS: Record<TAgentGitProvider, string> = {
   gitlab: "agent_git.github.description",
 };
 
-function ConnectionMetaStrip({ connection }: { connection: TAgentGitConnection }) {
+const DISCONNECT_CONFIRM_KEYS: Record<TAgentGitProvider, string> = {
+  github: "agent_git.connection.github_disconnect_confirm_content",
+  gitlab: "agent_git.connection.github_disconnect_confirm_content",
+};
+
+const REVOKE_HINTS: Record<TAgentGitProvider, { messageKey: string; href: string }> = {
+  github: {
+    messageKey: "agent_git.connection.github_revoke_in_provider",
+    href: "https://github.com/settings/apps/authorizations",
+  },
+  gitlab: {
+    messageKey: "agent_git.connection.github_revoke_in_provider",
+    href: "https://github.com/settings/apps/authorizations",
+  },
+};
+
+function DisconnectResultNotice({ result }: { result: TAgentGitDisconnectResult }) {
+  const { t } = useTranslation();
+  const hint = REVOKE_HINTS[result.provider];
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-layer-1 px-3 py-2 text-caption-sm-regular text-secondary"
+    >
+      <span className="flex-1">
+        {t("agent_git.connection.disconnected", { provider: agentGitProviderLabel(result.provider) })}{" "}
+        {result.revoke_in_provider && t(hint.messageKey)}
+      </span>
+      {result.revoke_in_provider && (
+        <AnchorButton
+          variant="secondary"
+          size="sm"
+          href={hint.href}
+          external
+          label={t("agent_git.connection.open_github_authorizations")}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConnectionMetaStrip({ connection, action }: { connection: TAgentGitConnection; action?: React.ReactNode }) {
   const { t } = useTranslation();
   const connectedBy = connection.connected_by_detail;
   return (
@@ -66,6 +110,7 @@ function ConnectionMetaStrip({ connection }: { connection: TAgentGitConnection }
             : t("agent_git.github.meta.no_scopes")}
         </span>
       </div>
+      {action && <div className="ml-auto">{action}</div>}
     </div>
   );
 }
@@ -75,6 +120,7 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
   const { workspaceSlug, provider, canEdit } = props;
   const { t } = useTranslation();
   const { fetchConnections, getConnection } = useAgentGit();
+  const [disconnectResult, setDisconnectResult] = useState<TAgentGitDisconnectResult | null>(null);
   const { isLoading } = useSWR(`AGENT_GIT_CONNECTIONS_${workspaceSlug}`, () => fetchConnections(workspaceSlug));
   const connection = getConnection(workspaceSlug, provider);
   const isConnected = connection?.status === "connected";
@@ -83,6 +129,15 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
     connection?.last_error === "connected_admin_lost"
       ? "agent_git.github.reconnect.connected_admin_lost"
       : "agent_git.github.reconnect.generic";
+
+  const disconnectAction = (
+    <GitDisconnectAction
+      workspaceSlug={workspaceSlug}
+      provider={provider}
+      confirmContentKey={DISCONNECT_CONFIRM_KEYS[provider]}
+      onDisconnected={setDisconnectResult}
+    />
+  );
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -94,14 +149,19 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
         {t("agent_git.integrations.back")}
       </Link>
       <SettingsHeading title={agentGitProviderLabel(provider)} description={t(DESCRIPTION_KEYS[provider])} />
+      {disconnectResult && <DisconnectResultNotice result={disconnectResult} />}
       {needsReconnect && (
-        <p role="alert" className="rounded-md bg-warning-subtle px-3 py-2 text-body-sm-regular text-warning-primary">
-          {t(reconnectKey)}
-        </p>
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-2 rounded-md bg-warning-subtle px-3 py-2 text-body-sm-regular text-warning-primary"
+        >
+          <span className="flex-1">{t(reconnectKey)}</span>
+          {canEdit && disconnectAction}
+        </div>
       )}
       {!isLoading && isConnected && connection && (
         <>
-          <ConnectionMetaStrip connection={connection} />
+          <ConnectionMetaStrip connection={connection} action={canEdit ? disconnectAction : undefined} />
           <GitAccountsList workspaceSlug={workspaceSlug} connection={connection} canEdit={canEdit} />
         </>
       )}

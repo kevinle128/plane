@@ -422,3 +422,68 @@ def usable_token(connection_id):
     if error:
         raise error
     return token
+
+
+# Disconnect
+
+
+def _revoke_token(token):
+    """Revoke this workspace's token only.
+
+    ``DELETE /applications/{client_id}/token`` revokes one token. The grant
+    endpoint is not used: it deletes every token of the GitHub user for the
+    App, which would also disconnect other workspaces of that user.
+    """
+    credentials = app_credentials()
+    if not credentials.client_id or not credentials.client_secret:
+        raise ProviderError("github_app_not_configured", PROVIDER, http_status=400)
+    try:
+        response = http.request(
+            "DELETE",
+            f"{GITHUB_API_URL}/applications/{credentials.client_id}/token",
+            provider=PROVIDER,
+            headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+            json_body={"access_token": token},
+            auth=(credentials.client_id, credentials.client_secret),
+        )
+    except ProviderError as error:
+        raise ProviderError("github_revoke_failed", PROVIDER, error.code, http_status=502)
+    # GitHub documents 204 and 422; an unknown or already revoked token can also give 404.
+    if response.status_code in (200, 204, 404, 422):
+        return
+    raise ProviderError("github_revoke_failed", PROVIDER, f"HTTP {response.status_code}", http_status=502)
+
+
+def disconnect(workspace):
+    """Revoke and forget the workspace GitHub token. Returns ``(connection, revoke_in_provider)``.
+
+    ``revoke_in_provider`` is true when Plane did not revoke the token itself
+    (for example the connecting admin left), so the admin should revoke it in
+    GitHub. A GitHub failure raises and keeps the connection unchanged.
+    """
+    connection = git_connection.get_connection(workspace.id, PROVIDER)
+    if connection is None:
+        raise ProviderError("provider_disconnected", PROVIDER, http_status=404)
+    if connection.status == AgentGitConnectionStatus.DISCONNECTED:
+        return connection, False
+
+    token = None
+    if connection.status == AgentGitConnectionStatus.CONNECTED:
+        try:
+            token = usable_token(connection.id)
+        except ProviderError as error:
+            if error.code != "provider_reconnect_required":
+                raise
+    if token:
+        _revoke_token(token)
+
+    with transaction.atomic():
+        locked = AgentGitConnection.objects.select_for_update().get(pk=connection.pk)
+        git_connection.clear_tokens(locked)
+        locked.status = AgentGitConnectionStatus.DISCONNECTED
+        locked.last_error = ""
+        locked.save(
+            update_fields=["access_token", "refresh_token", "token_expires_at", "status", "last_error", "updated_at"]
+        )
+    logger.info("github connection %s disconnected (revoked by Plane: %s)", connection.id, bool(token))
+    return locked, not token

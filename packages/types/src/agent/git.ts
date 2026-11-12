@@ -43,6 +43,11 @@ export type TAgentGitConnection = {
   updated_at: string;
 };
 
+/** Result of a disconnect. `revoke_in_provider` asks the admin to revoke the token at the provider. */
+export type TAgentGitDisconnectResult = TAgentGitConnection & {
+  revoke_in_provider: boolean;
+};
+
 export type TAgentGitAccountState = "candidate" | "attached" | "detached";
 
 /** A GitHub installation or a GitLab group. */

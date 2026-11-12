@@ -9,6 +9,7 @@ import type {
   TAgentGitAccount,
   TAgentGitAccountRemoval,
   TAgentGitConnection,
+  TAgentGitDisconnectResult,
   TAgentGitProvider,
   TAgentGitRepositoryPage,
   TAgentGitRepositoryQuery,
@@ -62,6 +63,14 @@ export class AgentGitService extends APIService {
     authorizationId: string
   ): Promise<TAgentGithubDeviceAuthorization> {
     return this.post(`${this.base(workspaceSlug)}/github/device-authorizations/${authorizationId}/cancel/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async disconnect(workspaceSlug: string, provider: TAgentGitProvider): Promise<TAgentGitDisconnectResult> {
+    return this.delete(`${this.base(workspaceSlug)}/${provider}/connection/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

@@ -58,7 +58,10 @@
       "token_encryption_failed": "Plane could not store the token securely. Nothing was connected.",
       "github_unexpected_response": "GitHub returned an unexpected response. Try again.",
       "github_url_unreachable": "Plane cannot reach GitHub. Check the network and try again.",
-      "account_remove_failed": "Plane could not remove the installation. It is still connected. Try again."
+      "account_remove_failed": "Plane could not remove the installation. It is still connected. Try again.",
+      "github_revoke_failed": "GitHub did not confirm that the token is revoked. GitHub is still connected. Try again.",
+      "provider_disconnected": "This provider is not connected in this workspace.",
+      "provider_reconnect_required": "This provider needs to be connected again."
     },
     "accounts": {
       "title": "Connections",
@@ -85,6 +88,15 @@
       "removed": "{name} was removed from Plane.",
       "removed_hint": "To uninstall the GitHub App, open the installation settings in GitHub.",
       "open_settings": "Open GitHub settings"
+    },
+    "connection": {
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting",
+      "disconnect_confirm_title": "Disconnect {provider}?",
+      "github_disconnect_confirm_content": "Plane revokes this workspace's GitHub token and stops using it. Projects keep their repository binding for history, but new agent work and pending pull requests fail until GitHub is connected again.",
+      "disconnected": "{provider} is disconnected.",
+      "github_revoke_in_provider": "Plane did not revoke the old token because it could not use it. Revoke it in GitHub under Settings, Applications, Authorized GitHub Apps.",
+      "open_github_authorizations": "Open GitHub settings"
     }
   }
 }

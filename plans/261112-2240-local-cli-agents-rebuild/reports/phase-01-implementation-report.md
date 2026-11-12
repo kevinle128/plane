@@ -27,6 +27,12 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Green: `test_agent_github_installations.py` 19 passed; `pytest plane/tests/contract/app -k agent` 56 passed. Web typecheck 10/10, i18n in sync.
 - The two binding checks of this story (binding kept with `available=false`; detach, then sync keeps the binding unavailable) need the binding model from 1.5. They are in `test_agent_repository_binding.py` with the 1.5 commit.
 
+### 1.4 Disconnect the workspace GitHub account
+
+- Test first: `test_agent_github_disconnect.py` -> 9 failed, 2 passed (the two passing cases, "no connection gives 404" and "GitLab row unchanged", pass trivially while the route is missing; they guard behavior after the route exists).
+- Green: disconnect 11 passed; `pytest plane/tests/contract/app -k agent` 67 passed. Web typecheck 10/10, oxlint clean, i18n in sync.
+- AC 2 for new Launches and pending change-request delivery needs Runs; it stays open for Phases 3 and 7 as the plan states. The "bindings kept" check is in the 1.5 binding tests.
+
 ## Deviations from the plan
 
 1. Migrations: the plan names four migrations. The models are split by story: `0126_agent_git_connection` (connection, device authorization) in 1.1; accounts and repositories in 1.2; binding in 1.5; policy in 1.6.
