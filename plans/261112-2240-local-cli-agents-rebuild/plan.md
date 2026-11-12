@@ -25,7 +25,7 @@ Rebuild the Git provider connection (GitHub and self-hosted GitLab), four local 
 
 - Existing code: bot users, Fernet helpers, instance config, entity search, mention extension point, activity feed, resizable sidebar pattern, `@plane/blocks` vitest. Legacy GitHub sync models and the unrouted Integrations page are not reused as-is.
 - Requested scope: 43 stories in [epics.md](../2026-09-28-plane-local-cli-agents-epics/epics.md) plus GitLab parity ([gitlab-scope-decisions.md](./gitlab-scope-decisions.md)). Nothing deferred.
-- Extension trace (provider boundary): GitHub and GitLab are two real cases, so one small provider interface (`GitProviderClient`, six methods) is justified. There is no registry, plugin loader or provider config layer. Details and proof: [architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace).
+- Extension trace (provider boundary): GitHub and GitLab are two real cases, so one small provider interface (`GitProviderClient`, five methods) is justified. There is no registry, plugin loader or provider config layer. Details and proof: [architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace).
 - Complexity: more than 3 phases because one PR per prior phase would carry 9-26 stories; seven phases keep each PR reviewable.
 
 ## Prior phase to new phase
@@ -91,7 +91,8 @@ The user accepted all recommended answers on 2026-11-12.
 1. Personal GitLab token. The accepted scope says Group Access Token. The only test token now is a personal token of a human user (`bot=false`, scope `api`, no expiry). The plan warns and accepts it (pushes and merge requests then appear as that person, and Q10 has no GitLab equivalent: Plane notices that the person lost access only when GitLab returns 401 or 403). Keep warn, or reject non-bot tokens?
 2. Live write check. The Phase 7 live check (push, draft merge request, merge-request note) needs a Group Access Token with role Developer and scopes `api` and `write_repository` on a test group of git.oceanlabs.dev. Can the user create one and put it in the secret store? Without it, Phase 7 G6/G7 close on recorded responses only, and the live check stays open.
 3. Subgroups. Do the projects on git.oceanlabs.dev sit directly in the token's group or in subgroups? The plan lists group projects with `include_subgroups=true` by default; confirm or choose top level only.
-4. Scope of the `api` token for Git push. GitLab docs list `write_repository` for Git-over-HTTPS push ("not using the API"); the plan requires `api` and `write_repository`. The current test token has `api` only, so the connect check reports `gitlab_scope_missing` for it. This is correct per the docs; confirm that the real token will carry both scopes.
+4. Scope of the `api` token for Git push. GitLab docs list `write_repository` for Git-over-HTTPS push ("not using the API"); the plan requires `api` and `write_repository`. The current test token has `api` only, so the connect check reports `gitlab_scope_missing` for it. This is correct per the docs; confirm that the real token will carry both scopes. Evidence added by the GitLab red-team pass (2026-11-12, no decision made): GitLab source (master) gives an `api` token the `push_code` ability for Git over HTTPS (`lib/gitlab/auth.rb:308-329, 350-352, 475-486`), so `write_repository` is likely not technically needed for push; requiring it is still harmless. The docs scope table (`access_token_scopes.md:41,44`) does not state this.
+5. Connect error detail versus internal-name probing (GitLab red-team pass, 2026-11-12). G1 AC4/AC5 return `gitlab_dns_failed` for a name that does not resolve and `gitlab_url_blocked` for a name that resolves to a private address. Any workspace admin can then test whether an internal host name exists (for example `db.internal`). The webhook form avoids this on purpose: both cases give one message, "Invalid or disallowed webhook URL." (`apps/api/plane/app/serializers/webhook.py:37`). Scope item 4 asks for a clear connection-failed reason. Options: (a) keep two codes (clear reason, small name oracle); (b) one code `gitlab_url_not_allowed_or_unresolved` for both, other codes unchanged; (c) two codes for instance admins only. The plan keeps (a) until the user decides.
 
 ## Red Team Review
 
@@ -123,4 +124,29 @@ The user accepted all recommended answers on 2026-11-12.
 - Decision deltas checked: 11 (sync keeps detach, concurrency test DB mode, installation removal semantics, revoke endpoint, refresh locking, binding input source, `base_ref` rule, Q3 accessor, makemigrations command location, pytest `-k` split, deferred 1.4/1.8 ACs)
 - Reconciled stale references: 8 (Phase 1 1.3 and 1.4 rows, Tests Before 1-3 reference, two `app/(all)` paths without the `apps/web/` prefix, makemigrations lines in Phases 2, 3, 4, 5, 7 and architecture-contracts §7, Phase 7 PR token source)
 - Unresolved contradictions: 0. F13 and F14 were decided by the user on 2026-11-12 (Q9, Q10).
-- GitLab scope (2026-11-12, after this review): Phase 1 now uses the provider-neutral model and ships GitHub and GitLab; Phases 3, 4, 5 and 7 use the provider boundary in [architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace). Every red-team fix F1-F12 and F15 is kept on the neutral model; F3, F4, F6 and F8 stay GitHub-only. The red-team gate has not run on the GitLab additions. Rerun it on Phase 1 before implementation; the new attack surface is listed in Phase 1 Risks (admin-supplied base URL, custom CA, token handout to the Worker).
+- GitLab scope (2026-11-12, after this review): Phase 1 now uses the provider-neutral model and ships GitHub and GitLab; Phases 3, 4, 5 and 7 use the provider boundary in [architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace). Every red-team fix F1-F12 and F15 is kept on the neutral model; F3, F4, F6 and F8 stay GitHub-only. The red-team gate ran on the GitLab additions on 2026-11-12 (session below).
+
+### Session — 2026-11-12 (GitLab additions)
+**Findings:** 12 (10 accepted and applied, 1 surface-to-user, 1 rejected). Report: [addendum in reports/red-team-261112-local-cli-agents-rebuild.md](./reports/red-team-261112-local-cli-agents-rebuild.md#addendum-gitlab-red-team-pass-2026-11-12). Edits carry the marker `<!-- red-team 2026-11-12 gitlab -->`.
+**Severity breakdown:** 0 Critical, 4 High, 6 Medium, 2 Low
+**Method note:** one reviewer, four lenses, scope = diff `acd8965582` vs `d6f6b43d25`. No user decision (Q1-Q10, GitLab scope items 1-6) was changed; open questions 1-4 were not decided (evidence added to 4).
+
+| # | Finding | Severity | Disposition | Applied To |
+|---|---------|----------|-------------|------------|
+| GL1 | `/version` refuses `write_repository`-only tokens (403), so `gitlab_scope_missing` cannot occur; check `self` first | High | Accept | Phase 1 Key decisions, Files (fixtures), G1 tests |
+| GL2 | Worker token in `X-Api-Key` would store `git-credential` responses (GitLab token) through `APITokenLogMiddleware` | High | Accept | Phase 2 Key decisions, architecture-contracts §4 |
+| GL3 | Container rewrites the Worktree `.git` file; Worker git on the Host runs attacker config with the token in reach | High | Accept | Phase 7 Key decisions, G6 tests, architecture-contracts §11 |
+| GL4 | Worker git transport: system credential helper stores the token, redirects followed, no SSRF guard on the Mini | High | Accept | Phase 3 Key decisions, 2.7 tests, architecture-contracts §11 |
+| GL5 | GitLab reconnect with another group leaves the old group `attached` | Medium | Accept | Phase 1 Key decisions, G1 tests |
+| GL6 | Hostile GitLab server: no body cap, timeout multiplied by resolved IPs, no request-host guard | Medium | Accept | Phase 1 Key decisions, G1 tests |
+| GL7 | Phase 3 `-k` never selects `test_agent_git_credential_fetch.py` | Medium | Accept | Phase 3 Verification |
+| GL8 | Live GitLab smoke passes as a skip (exit 0); Phase 7 command runs outside the test container | Medium | Accept | Phase 1 Files, Verification, Success criteria; Phase 7 Verification |
+| GL9 | `ps` capture of git argv is a racy phantom test | Medium | Accept | Phase 3 2.7 tests, Phase 7 G6 tests |
+| GL10 | `gitlab_dns_failed` vs `gitlab_url_blocked` is an internal-name oracle | Medium | Surface to user (scope item 4) | plan.md open question 5 |
+| GL11 | `get_repository` has no caller; 401/403 status rule inconsistent; `protected_branches` paginated | Low | Accept | architecture-contracts §11, plan.md, Phase 1 Key decisions and Risks, Phase 7 |
+| GL12 | Custom CA bundle widens trust for other hosts | Low | Reject (verified safe) | none |
+
+### Whole-Plan Consistency Sweep (GitLab pass)
+- Files reread: plan.md, phase-01, phase-02 (Worker token line), phase-03, phase-07, architecture-contracts.md, gitlab-scope-decisions.md
+- Reconciled: "six methods" to five (plan.md, architecture-contracts §11 table and extension trace), Phase 7 "five Phase 7 methods" to four, Phase 1 G1 test order matches the new check order, 401/403 rule matches between Phase 1 Key decisions and Risks
+- Unresolved contradictions: 0. Open: questions 1-5.

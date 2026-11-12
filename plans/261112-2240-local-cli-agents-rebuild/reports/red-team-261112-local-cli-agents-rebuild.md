@@ -179,3 +179,108 @@ Severity: Critical blocks success; High is significant risk; Medium is notable. 
 
 - F13 and F14 were decided by the user on 2026-11-12: plan.md User decisions Q9 (admin selects attached installations; sync never attaches) and Q10 (connecting admin leaves or is demoted: GitHub connection becomes `reconnect_required`). Both are applied with tests in phase-01. GitLab: Q10 does not apply to a Group Access Token.
 - The GitLab scope is now in the phase files (provider-neutral model in Phase 1, provider boundary in architecture-contracts §11). The `phase-01:NN` line citations above refer to the file before that change. This red-team gate has not run on the GitLab additions yet.
+
+## Addendum: GitLab red-team pass (2026-11-12)
+
+- Date: 2026-11-12 (Asia/Saigon). Scope: `git diff d6f6b43d25 acd8965582 -- plans/261112-2240-local-cli-agents-rebuild` (Phase 1 G1-G5 and the neutral model, Phase 3 Worker git transport, Phase 7 G6-G7 and Worker token handling, architecture-contracts §11, gitlab-scope-decisions.md).
+- Lenses: Assumptions, Failure, Scope, Security. One reviewer, applied in sequence. Findings F1-F15 above are not repeated.
+- Rules kept: no user decision changed (Q1-Q10, GitLab scope items 1-6). Open questions 1-4 not decided; evidence added to 4. One new trade-off surfaced as open question 5.
+- Edits carry `<!-- red-team 2026-11-12 gitlab -->`. Line numbers below are for the files before this pass unless stated.
+- Sources read: worktree code (`apps/api/plane/...`); GitLab source at `gitlab.com/gitlab-org/gitlab` master (`lib/api/api.rb`, `lib/api/metadata.rb`, `lib/api/personal_access_tokens/self_information.rb`, `lib/gitlab/auth.rb`, `lib/api/protected_branches.rb`, `doc/security/tokens/access_token_scopes.md`); git docs at `github.com/git/git` master (`Documentation/config/http.adoc`, `Documentation/gitcredentials.adoc`). Fetched 2026-11-12.
+
+### GL1. `/version` refuses tokens without `api`/`read_api`, so G1 AC2 cannot happen as planned (High, Assumptions)
+
+- Location: phase-01:63 (check order), G1 AC2, G1 tests (phase-01:215).
+- Evidence: the API base allows only `api` and `read_api` (`lib/api/api.rb:57-58`); `/version` adds only `read_user`, `ai_features`, `ai_workflows` (`lib/api/metadata.rb:8`). `/personal_access_tokens/self` allows every scope (`self_information.rb:13-16`). The plan calls `/version` first and maps only 401, 404 and non-JSON.
+- Failure: an admin pastes a `write_repository`-only token. `/version` returns 403 `insufficient_scope`, which has no mapping, so the user sees a generic error or a 500, not `gitlab_scope_missing`. The contract test still passes, because its "missing scope" fixture is hand-written for the `self` response, which the real flow never reaches.
+- Action: fixed-in-plan. Order is now `self` first (401 = invalid, scope and expiry checks), then `/version`; a 404 on `self` falls back to `/version` to tell "too old" from "not GitLab"; unknown statuses map to `gitlab_unexpected_response`. Fixtures add a recorded `/version` 403 and a pre-15.5 `self` 404. Decision item 4 (minimum version check) is kept.
+
+### GL2. A Worker token in `X-Api-Key` stores the GitLab token in Celery and `APIActivityLog` (High, Security)
+
+- Location: phase-02:34 (Worker token, no header named); phase-03 and phase-07 `git-credential` endpoint; architecture-contracts §4.
+- Evidence: `APITokenLogMiddleware` is active for every request (`plane/settings/common.py:134`). For any request that has `X-Api-Key`, it sends the request body and the response body to `process_logs.delay` (`plane/middleware/logger.py:130-153`). The `git-credential` response body is the GitLab token (architecture-contracts:221).
+- Failure: the implementer copies the existing external-API pattern and sends the Worker token as `X-Api-Key`. Each clone and push writes the raw group token to the broker and to the `APIActivityLog` table. The plan's "no token in a log line" tests check `caplog` only and miss this.
+- Action: fixed-in-plan. Phase 2 and §4 fix the header to `Authorization: Bearer` and add a test that a Worker request causes no `process_logs.delay` call.
+
+### GL3. The Code container can redirect the Worktree's git metadata and run commands on the Host (High, Security)
+
+- Location: phase-07:49 (Worktree is the writable bind mount), phase-07:51,53 (Worker runs commit and push on the Host with the token), architecture-contracts §11.
+- Evidence: a git Worktree root contains a `.git` file with a `gitdir:` pointer; the container may write anywhere in the Worktree (phase-07:49). The plan has no rule about how the Worker finds the git directory (search for `gitdir`, `hooksPath`, `fsmonitor` in the plan: no result).
+- Failure: an agent command in the container rewrites the `.git` file to a directory in the Worktree with a `config` that sets `credential.helper=!curl ...` or `core.fsmonitor=<cmd>`. The member then approves "commit" or "push". The Worker runs git on the Mini, git loads that config, and the attacker command runs on the Host with the GitLab token on the helper pipe or with the Mini-held GitHub credentials. This defeats "the container has no credentials" and the AD-8 boundary.
+- Action: fixed-in-plan. Worker git on a Worktree uses explicit `--git-dir`/`--work-tree` from Run state, `core.hooksPath=/dev/null`, `core.fsmonitor=false`; the `.git` file is compared with the written value before commit and push (`worktree_tampered`); the clone and the worktree metadata are never mounted. Test added to G6.
+
+### GL4. Worker git transport leaks the token to the system helper and has no SSRF guard (High, Security)
+
+- Location: architecture-contracts:221-223 (credential helper on a pipe), phase-03:28,44.
+- Evidence: an empty `credential.helper` value is needed to reset helpers from lower-priority config (`gitcredentials.adoc:199-201`); the plan adds a helper but does not reset the list. `http.followRedirects` defaults to `initial`, and git then uses the redirected URL as the base for later requests (`http.adoc:370-378`). The Plane API guard (`pinned_fetch`, operator allowlist) runs only in the API; the Worker clones with plain git. `AgentWorker` has no workspace field (architecture-contracts:56), so one Worker serves every workspace.
+- Failure A: on the Mini, a system or global helper (for example `osxkeychain`) receives `store` after a successful clone and writes the GitLab token into the keychain. Linux CI has no such helper, so all Worker tests pass. Failure B: a workspace admin connects a public GitLab-like server whose clone URL passes the host check but answers with a redirect to `http://127.0.0.1:<port>` or a LAN host; the Mini follows it. Failure C: the same server changes DNS between the API check and the Worker clone (the Worker resolves again). `[UNVERIFIED]` whether git asks helpers for the redirect host; the fixes apply either way.
+- Action: fixed-in-plan. Phase 3 and §11: `-c credential.helper=` before the pipe helper; the helper answers only for `https` and the clone-spec host; `http.followRedirects=false`; the Worker applies the blocked-address rule with a Worker-config allowlist and pins with `http.curloptResolve` (`http.adoc:141-147`); `GIT_TERMINAL_PROMPT=0`. Tests: recording helper injected through `GIT_CONFIG_SYSTEM`, redirect to a second server, loopback clone host.
+
+### GL5. GitLab reconnect with another group leaves the old group attached (Medium, Failure)
+
+- Location: phase-01:67 (different base URL needs Disconnect), phase-01:70 (one token = one group), G4 AC3 (covers base URL change only).
+- Evidence: availability = account `attached` + connection `connected` + same host (phase-01:41). Nothing detaches the old group account when the same connection reconnects.
+- Failure: admin disconnects, reconnects the same base URL with a token for group B. Group A's account is still `attached`, so group A bindings show as available. Their Runs fail at clone with `git_not_found`, or, if the new token can also read group A, run through a token the admin meant for group B.
+- Action: fixed-in-plan. Connect sets all other accounts of the connection to `detached` in the same transaction; G1 test added.
+
+### GL6. Hostile GitLab server limits are missing in `http.py` (Medium, Failure/Security)
+
+- Location: phase-01:38, 63, 68.
+- Evidence: `pinned_fetch` reads the full body unless the caller streams (`url_security.py:127-157`); `_fetch_validated_hop` retries every resolved address with the full timeout (`url_security.py:183-192`); the webhook serializer blocks the Plane request host and `WEBHOOK_DISALLOWED_DOMAINS` (`plane/app/serializers/webhook.py:49-55`), and the plan does not reuse that rule. Any user who can create a workspace is its admin.
+- Failure: a server with 8 A records that never answers keeps a gunicorn worker for 8 x 6 checks x timeout; a server that returns a multi-GB `/version` body exhausts API memory; a base URL on Plane's own public host makes the API call itself with the pasted token.
+- Action: fixed-in-plan. 1 MiB body cap with `stream=True`, 5 s connect and 10 s read per call, 30 s total budget, request-host and disallowed-domain rule, redirect message shows scheme and host only. G1 tests added.
+
+### GL7. Phase 3 verification never runs the fetch-credential contract tests (Medium, Failure)
+
+- Location: phase-03:89 (`-k "agent_run or agent_worker or agent_conclusion or entity_search"`), phase-03:48 (`test_agent_git_credential_fetch.py`).
+- Evidence: no `-k` term matches `agent_git_credential`. Same class as F10, new instance introduced by the GitLab additions.
+- Failure: lease, old-generation and `credential_mode=host` refusals of the token endpoint are never run in the Phase 3 PR check; the command is green.
+- Action: fixed-in-plan. `agent_git_credential` added to the `-k` expression.
+
+### GL8. Live GitLab smoke checks pass as skips (Medium, Failure)
+
+- Location: phase-01:141 (`skipif` on `PLANE_TEST_GITLAB_TOKEN`), phase-01:232, phase-01:243 (success criterion), phase-07:121.
+- Evidence: `docker compose run -e VAR` forwards nothing when `VAR` is unset; the test then skips and pytest exits 0. `pytest.ini` has no `-rs`. The Phase 7 command runs pytest on the host, unlike every other API command (`docker-compose-test.yml` `api-tests`).
+- Failure: the operator runs the documented command without the secret loaded, sees exit 0, and records "smoke check passes" against git.oceanlabs.dev with zero tests run.
+- Action: fixed-in-plan. `PLANE_TEST_GITLAB_REQUIRED=1` turns the skip into a failure, `-rs` prints skips, the Phase 7 command uses the test container, and the success criterion says a skip does not count.
+
+### GL9. `ps` capture of git argv is a phantom test (Medium, Scope/Failure)
+
+- Location: phase-07:102 ("`ps` capture of the git process"); same claim in phase-03 2.7.
+- Evidence: phase-07:102 and phase-03:82 name a `ps` sample as the argv check; no step holds the git process open or records its argv and environment in a deterministic way.
+- Failure: a fetch on a local remote ends in milliseconds; a `ps` sample usually sees no git process and the assertion "token not in argv" passes without data.
+- Action: fixed-in-plan. A git shim first on the test `PATH` records argv and environment, then runs real git.
+
+### GL10. Separate DNS-failure and blocked-address codes are an internal-name oracle (Medium, Security) - surface to user
+
+- Location: G1 AC4 (`gitlab_dns_failed`), AC5 (`gitlab_url_blocked`).
+- Evidence: the webhook path gives one message for both cases, "Invalid or disallowed webhook URL." (`plane/app/serializers/webhook.py:37`); `resolve_and_validate` raises different messages for the two cases (`plane/utils/ip_address.py:136-155`).
+- Failure: any workspace admin learns whether `db.internal` or `vault.corp` exists in the instance's DNS by comparing the two codes.
+- Action: surface-to-user. GitLab scope item 4 asks for a clear connection-failed reason, so merging the codes changes a user-accepted outcome. Options are in plan.md open question 5; the plan keeps two codes until the user decides.
+
+### GL11. Minor: unused provider method, 401/403 rule, protected-branch pages (Low, Scope/Assumptions)
+
+- `get_repository(external_id)` (architecture-contracts:204) has no caller in any phase step or story. Removed; the interface has five methods. The rest of §11 is justified: each remaining method has a Phase 1 or Phase 7 caller and two real providers.
+- phase-01:74 says any 401 sets `reconnect_required`; phase-01:259 says 401/403. A 403 on one merge request (bot role lower on one project) would then stop all GitLab work. Fixed: only 401 changes status; 403 fails that operation.
+- `GET /projects/:id/protected_branches` is paginated (`lib/api/protected_branches.rb:31,46`). Reading only page 1 misses rules after the first 20; the server-side refusal (`git_push_rejected`) is the backstop, but the user would approve a push that cannot succeed. Fixed: read all pages; test with 25 rules.
+- Action: fixed-in-plan.
+
+### GL12. Custom CA bundle widens trust for other hosts (Low, Security) - rejected
+
+- Checked: `_request_to_ip` mounts a new `PinnedIPAdapter` on a throwaway `requests.Session` for each request (`url_security.py:121-124`), so a per-call `verify=<path>` cannot reach another host's request. On the Worker, `http.<url>.sslCAInfo` applies only to URLs that match the key (`http.adoc:380-382`). The admin's bundle can only affect that admin's own connection. Rejected: no failure path. The plan's planned unit test (second host keeps system trust) stays.
+
+### Open-question evidence (no decision)
+
+- Q4 (`api` vs `write_repository` for push): GitLab Git-over-HTTP token auth (`lib/gitlab/auth.rb:126`, `:308-329`) uses `abilities_for_scopes`, which maps `api` to `full_authentication_abilities` (`:350-352`) that include `push_code` (`:475-486`). So `api` alone likely permits push; the docs table (`access_token_scopes.md:41,44`) is silent. Recorded in plan.md and phase-01.
+- `[UNVERIFIED]` group token on `/personal_access_tokens/self`: the endpoint refuses only tokens whose `token_type` is not `PersonalAccessToken` (`self_information.rb:19-23`); a group token is a `PersonalAccessToken` of the bot user. Supports the plan's expectation; the live check still decides. Mark kept.
+
+### Evidence status (this pass)
+
+- Proven by reading: `url_security.py` (verify hard-coded at `:133`, throwaway session, per-IP retry), `logger.py` middleware, `settings/common.py` middleware and allowlist parse, `webhook.py` message and request-host guard, `ip_address.py` messages, `pytest.ini` markers, existence of `plane/tests/smoke/` and `bg_tasks/test_url_security.py`.
+- Proven by GitLab and git source or docs: GL1, GL4 (git config behaviour), GL11 pagination, Q4 evidence.
+- Not proven: git credential fill on the redirect target (GL4, marked); `osxkeychain` present in the Mini's system config (fix applies regardless). No test, docker or typecheck run (plan review only).
+
+### Unresolved (this pass)
+
+- Open question 5 (GL10) needs the user.
+- Not edited, Low: phase-01 writes the API-side CA bundle to a file named by its SHA-256 with no atomic-write rule. Two API workers that write the same name at once can give a partial file to a reader. Write to a temporary file, then rename. Apply at implementation time.

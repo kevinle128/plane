@@ -70,7 +70,7 @@ One migration per story that changes models. Name it `<next>_<domain>`, for exam
 ## 4. API surfaces
 
 - Member API (session auth, `plane/app/urls/agent.py`, views in `plane/app/views/agent/`): settings, Git providers (`agent-git/`), repository catalog, Runs, events, messages, questions, permissions. Use `allow_permission` (`plane/app/permissions/base.py:19`). Comment-permission checks reuse the guest rule from `comment.py:103-118`.
-- Worker API (`plane/agent/worker_api/`, mounted at `api/agent-worker/v1/` in `plane/urls.py:18-25`): own `APIView` base with explicit `authentication_classes`, `permission_classes` and `throttle_classes = []` (not `BaseAPIView`, `plane/app/views/base.py:279-284`). The authentication class returns an authenticated principal as `request.user`, so the default `AnonRateThrottle` (`plane/settings/common.py:141`) never applies. Every mutation carries `run_id`, `lease_generation` and an `idempotency_key`. Plane rejects an older generation with HTTP 409.
+- Worker API (`plane/agent/worker_api/`, mounted at `api/agent-worker/v1/` in `plane/urls.py:18-25`): own `APIView` base with explicit `authentication_classes`, `permission_classes` and `throttle_classes = []` (not `BaseAPIView`, `plane/app/views/base.py:279-284`). The authentication class returns an authenticated principal as `request.user`, so the default `AnonRateThrottle` (`plane/settings/common.py:141`) never applies. Every mutation carries `run_id`, `lease_generation` and an `idempotency_key`. Plane rejects an older generation with HTTP 409. <!-- red-team 2026-11-12 gitlab --> The Worker token uses `Authorization: Bearer`, never `X-Api-Key`: `APITokenLogMiddleware` (`plane/middleware/logger.py:130-153`) stores request and response bodies of `X-Api-Key` requests, and `git-credential` responses carry a GitLab token (Phase 2 key decisions).
 - Domain services (`plane/agent/services/`): run creation, context snapshot, lease, event append, queue, branch name, Git connections. Provider HTTP lives only in `plane/agent/git_providers/` (§11). Views stay thin.
 - Error codes for a missing or broken provider are neutral with a `provider` field: `provider_disconnected`, `provider_reconnect_required`, `repository_unavailable`. Provider-specific causes keep their own codes (for example `gitlab_tls_failed`).
 
@@ -196,13 +196,12 @@ GitHub and GitLab are two real cases (user scope 2026-11-12), so the plan has on
 | `github.py`, `gitlab.py` | One client class each |
 | `__init__.py` | `client_for(connection)`: one `if` per provider; unknown provider raises |
 
-`GitProviderClient` has six methods. Each is used by both providers:
+`GitProviderClient` has five methods. Each is used by both providers. <!-- red-team 2026-11-12 gitlab --> `get_repository(external_id)` was removed: no phase step or story calls it (the catalog row supplies repository facts, and 3.8 checks the remote on disk).
 
 | Method | Phase | GitHub | GitLab |
 | --- | --- | --- | --- |
 | `list_repositories(account, cursor)` | 1 | installation repositories | `GET /groups/:id/projects?include_subgroups=true` |
-| `get_repository(external_id)` | 7 | `GET /repos/{owner}/{repo}` | `GET /projects/:id` |
-| `is_protected_ref(repository, ref)` | 7 | `GET /repos/{owner}/{repo}/rules/branches/{branch}` (GitHub docs, "Get rules for a branch": "The branch does not need to exist"); protected when an active rule of type `creation`, `update` or `pull_request` applies. Classic branch-protection patterns are `[UNVERIFIED]` in this endpoint (the docs mention only rulesets); for them GitHub rejects the push server-side and the Worker reports `git_push_rejected` | `GET /projects/:id/protected_branches`, match name and wildcard patterns (works for a branch that does not exist yet) |
+| `is_protected_ref(repository, ref)` | 7 | `GET /repos/{owner}/{repo}/rules/branches/{branch}` (GitHub docs, "Get rules for a branch": "The branch does not need to exist"); protected when an active rule of type `creation`, `update` or `pull_request` applies. Classic branch-protection patterns are `[UNVERIFIED]` in this endpoint (the docs mention only rulesets); for them GitHub rejects the push server-side and the Worker reports `git_push_rejected` | `GET /projects/:id/protected_branches`, read every page (the endpoint is paginated, GitLab `lib/api/protected_branches.rb:31,46`), match name and wildcard patterns (works for a branch that does not exist yet) <!-- red-team 2026-11-12 gitlab --> |
 | `create_change_request(repository, source, target, title, body, draft)` | 7 | `POST /repos/{owner}/{repo}/pulls` with `draft` | `POST /projects/:id/merge_requests`; draft by `Draft: ` title prefix (the create API has no `draft` attribute); reads `draft` back from the response |
 | `find_comment(repository, number, marker)` | 7 | list issue comments | `GET /projects/:id/merge_requests/:iid/notes` |
 | `post_comment(repository, number, body)` | 7 | `POST /repos/{owner}/{repo}/issues/{number}/comments` | `POST /projects/:id/merge_requests/:iid/notes` |
@@ -218,9 +217,11 @@ Plane gives the Worker a neutral clone spec with each claim: `provider`, `clone_
 | `credential_mode` | Provider | Behaviour |
 | --- | --- | --- |
 | `host` | GitHub | Git uses the Mini-held credentials (operator setup, unchanged from the GitHub-only plan) |
-| `plane_token` | GitLab | The Worker asks Plane for the token with `POST api/agent-worker/v1/runs/<id>/git-credential/` (Worker token, lease and purpose `fetch` or `push`; `push` needs a consumed push grant). Plane returns the token and the username. The Worker keeps it in memory for one git command and gives it to git through a credential helper that reads from an inherited pipe. The token is never in argv, environment, the remote URL, `.git/config`, a file, a Run event or a log. The Harness process and the Code container never receive it |
+| `plane_token` | GitLab | The Worker asks Plane for the token with `POST api/agent-worker/v1/runs/<id>/git-credential/` (Worker token, lease and purpose `fetch` or `push`; `push` needs a consumed push grant). Plane returns the token and the username. The Worker keeps it in memory for one git command and gives it to git through a credential helper that reads from an inherited pipe. The token is never in argv, environment, the remote URL, `.git/config`, a file, a Run event or a log. The Harness process and the Code container never receive it. <!-- red-team 2026-11-12 gitlab --> Git runs with `-c credential.helper=` before the pipe helper (no system helper such as `osxkeychain` sees or stores the token), and the pipe helper answers only for `https` and the clone-spec host. Transport rules that apply to both modes are below |
 
 CA bundle: the Worker writes it to `<run_root>/<run_id>/git-ca.pem` (mode 0600) and passes `-c http.<base_url>/.sslCAInfo=<file>`, so the bundle applies to that URL only. Git transport failures map to fixed codes: `git_dns_failed`, `git_unreachable`, `git_tls_failed`, `git_auth_failed`, `git_not_found`, `git_push_rejected`.
+
+<!-- red-team 2026-11-12 gitlab --> Transport rules for both credential modes (details in Phase 3 key decisions and Phase 7 key decisions): `-c http.followRedirects=false`; the Worker resolves the clone host, applies the Plane blocked-address rule with a Worker-config allowlist, and pins the address with `-c http.curloptResolve`; `GIT_TERMINAL_PROMPT=0`; on a Worktree, explicit `--git-dir` and `--work-tree` from Run state with `core.hooksPath=/dev/null` and `core.fsmonitor=false`, never discovery through the container-writable `.git` file. Reason: the Plane API SSRF guard does not run on the Mini, and one Worker serves every workspace.
 
 ### Minimum GitLab version: 15.5
 
@@ -239,7 +240,7 @@ The highest requirement is 15.5, from the token self endpoint that the connect c
 
 ### Extension trace
 
-- Stable contract: the neutral models (§3), the six-method `GitProviderClient`, the neutral error codes, the Worker clone spec with `credential_mode`, and the Run snapshot fields. Phases 3-7 depend only on these.
+- Stable contract: the neutral models (§3), the five-method `GitProviderClient`, the neutral error codes, the Worker clone spec with `credential_mode`, and the Run snapshot fields. Phases 3-7 depend only on these.
 - What changes per provider: the connect and disconnect service, the client class, the policy labels (`provider-terms.ts`), the icon, and possibly a new `credential_mode`.
-- Next credible variant: a further self-hosted forge (for example Gitea). It would need one connect service, one client class with the same six methods, one `client_for` branch and one label set. It is not in scope and the plan adds nothing for it.
+- Next credible variant: a further self-hosted forge (for example Gitea). It would need one connect service, one client class with the same five methods, one `client_for` branch and one label set. It is not in scope and the plan adds nothing for it.
 - Proof: `plane/tests/unit/test_agent_git_provider_contract.py` runs the same assertions on the GitHub and the GitLab fake (neutral shapes, error codes, draft flag read back, comment marker search). Phase 7 adds its methods to the same suite. A third provider would have to pass the same suite.
