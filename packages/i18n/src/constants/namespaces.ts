@@ -6,6 +6,7 @@
 
 export const NAMESPACES = [
   "accessibility",
+  "agent",
   "auth",
   "automation",
   "common",

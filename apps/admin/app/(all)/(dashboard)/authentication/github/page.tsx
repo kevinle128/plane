@@ -25,6 +25,7 @@ import { useInstance } from "@/hooks/store";
 import type { Route } from "./+types/page";
 // local
 import { InstanceGithubConfigForm } from "./form";
+import { InstanceGithubAppConfigForm } from "@/components/authentication/github-app-config";
 
 const InstanceGithubAuthenticationPage = observer(function InstanceGithubAuthenticationPage(
   _props: Route.ComponentProps
@@ -61,14 +62,13 @@ const InstanceGithubAuthenticationPage = observer(function InstanceGithubAuthent
       },
     });
 
-    await updateConfigPromise
-      .then(() => {
-        setIsSubmitting(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setIsSubmitting(false);
-      });
+    try {
+      await updateConfigPromise;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isGithubEnabled = enableGithubConfig === "1";
@@ -104,7 +104,10 @@ const InstanceGithubAuthenticationPage = observer(function InstanceGithubAuthent
       }
     >
       {formattedConfig ? (
-        <InstanceGithubConfigForm config={formattedConfig} />
+        <div className="flex flex-col gap-8">
+          <InstanceGithubConfigForm config={formattedConfig} />
+          <InstanceGithubAppConfigForm config={formattedConfig} />
+        </div>
       ) : (
         <Skeleton className="space-y-8">
           <Skeleton.Item height="50px" width="25%" />

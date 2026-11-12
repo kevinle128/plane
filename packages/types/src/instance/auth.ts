@@ -44,6 +44,12 @@ export type TInstanceGithubAuthenticationConfigurationKeys =
   | "GITHUB_ORGANIZATION_ID"
   | "ENABLE_GITHUB_SYNC";
 
+/** GitHub App used by local CLI agents; separate from the GitHub login keys. */
+export type TInstanceGithubAppConfigurationKeys =
+  | "GITHUB_APP_CLIENT_ID"
+  | "GITHUB_APP_CLIENT_SECRET"
+  | "GITHUB_APP_SLUG";
+
 export type TInstanceGitlabAuthenticationConfigurationKeys =
   | "GITLAB_HOST"
   | "GITLAB_CLIENT_ID"
@@ -59,6 +65,7 @@ export type TInstanceGiteaAuthenticationConfigurationKeys =
 export type TInstanceAuthenticationConfigurationKeys =
   | TInstanceGoogleAuthenticationConfigurationKeys
   | TInstanceGithubAuthenticationConfigurationKeys
+  | TInstanceGithubAppConfigurationKeys
   | TInstanceGitlabAuthenticationConfigurationKeys
   | TInstanceGiteaAuthenticationConfigurationKeys;
 

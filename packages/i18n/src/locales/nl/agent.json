@@ -1,0 +1,63 @@
+{
+  "agent_git": {
+    "integrations": {
+      "description": "Connect the services that local agents use to read repositories and open draft changes.",
+      "essentials": "Essentials",
+      "github_blurb": "Bind projects to repositories and let agents open draft pull requests.",
+      "connect": "Connect",
+      "back": "Integrations",
+      "read_only": "Only workspace admins can change these settings."
+    },
+    "status": {
+      "connected": "Connected",
+      "not_connected": "Not connected",
+      "reconnect_required": "Reconnect required",
+      "connecting": "Connecting"
+    },
+    "github": {
+      "description": "Bind projects to repositories, clone them on the Mini, and let agents open draft pull requests.",
+      "setup": {
+        "title": "Install the GitHub integration",
+        "description": "Plane uses a GitHub App that your workspace admin authorizes. Plane never stores your password.",
+        "check_repositories": "List the repositories the app has been granted",
+        "check_bind": "Bind one repository to each project",
+        "check_pull_requests": "Let agents open draft pull requests for review",
+        "authenticate": "Authenticate with GitHub",
+        "later": "I'll do this later"
+      },
+      "device": {
+        "region_label": "GitHub device authorization",
+        "waiting": "Waiting for GitHub",
+        "expires_in": "Expires in {time}",
+        "instructions": "Open {url} in your browser and enter this code to authorize Plane.",
+        "open_url": "Open GitHub",
+        "code_label": "Device code",
+        "entered": "I entered the code",
+        "cancel": "Cancel"
+      },
+      "result": {
+        "expired": "The code expired before GitHub confirmed it. Start again to get a new code.",
+        "denied": "GitHub did not authorize Plane. Start again if this was a mistake.",
+        "cancelled": "Authorization cancelled. Nothing was connected."
+      },
+      "meta": {
+        "enabled_by": "Enabled by",
+        "account": "Account",
+        "scopes": "Scopes",
+        "no_scopes": "App permissions"
+      },
+      "reconnect": {
+        "connected_admin_lost": "The admin who connected GitHub is no longer a workspace admin. Plane stopped using that token. Another admin must reconnect.",
+        "generic": "Plane cannot use the saved GitHub connection. Reconnect to continue."
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "github_app_not_configured": "The GitHub App is not configured on this Plane instance. Ask the instance admin to add its client ID.",
+      "device_flow_disabled": "Device flow is not enabled on the GitHub App. Enable it in the GitHub App settings.",
+      "token_encryption_failed": "Plane could not store the token securely. Nothing was connected.",
+      "github_unexpected_response": "GitHub returned an unexpected response. Try again.",
+      "github_url_unreachable": "Plane cannot reach GitHub. Check the network and try again."
+    }
+  }
+}

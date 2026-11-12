@@ -90,3 +90,12 @@ from .device import Device, DeviceSession
 from .sticky import Sticky
 
 from .description import Description, DescriptionVersion
+
+from .agent_git import (
+    AgentGitConnection,
+    AgentGitConnectionStatus,
+    AgentGitProvider,
+    AgentGithubDeviceAuthorization,
+    AgentGithubDeviceAuthorizationKind,
+    AgentGithubDeviceAuthorizationStatus,
+)

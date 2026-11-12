@@ -8,6 +8,13 @@ from pytest_django.fixtures import django_db_setup
 
 # conftest_external is not a conftest.py, so pytest only sees its fixtures when imported here
 from plane.tests.conftest_external import mock_celery, mock_redis  # noqa: F401
+from plane.tests.agent_git_fixtures import (  # noqa: F401
+    agent_caplog,
+    fake_http,
+    github_app_env,
+    guest_client,
+    member_client,
+)
 
 from plane.db.models import User, Workspace, WorkspaceMember
 from plane.db.models.api import APIToken
