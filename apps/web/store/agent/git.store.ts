@@ -13,6 +13,7 @@ import type {
   TAgentGitPolicy,
   TAgentGitProvider,
   TAgentGitRepository,
+  TAgentGitlabConnectInput,
   TAgentGithubDeviceAuthorization,
   TAgentGithubDeviceAuthorizationKind,
 } from "@plane/types";
@@ -35,6 +36,7 @@ export interface IAgentGitStore {
     accountId: string
   ) => Promise<TAgentGitAccountRemoval>;
   disconnect: (workspaceSlug: string, provider: TAgentGitProvider) => Promise<TAgentGitDisconnectResult>;
+  connectGitlab: (workspaceSlug: string, data: TAgentGitlabConnectInput) => Promise<TAgentGitConnection>;
   /** Every catalog row the caller can bind, keyed by workspace slug. */
   repositoriesByWorkspace: Record<string, TAgentGitRepository[]>;
   fetchRepositories: (workspaceSlug: string) => Promise<TAgentGitRepository[]>;
@@ -82,6 +84,7 @@ export class AgentGitStore implements IAgentGitStore {
       fetchRepositories: action,
       fetchConnections: action,
       disconnect: action,
+      connectGitlab: action,
       fetchAccounts: action,
       syncGithubAccounts: action,
       attachAccount: action,
@@ -118,6 +121,18 @@ export class AgentGitStore implements IAgentGitStore {
 
   cancelGithubDeviceAuthorization = (workspaceSlug: string, authorizationId: string) =>
     this.service.cancelGithubDeviceAuthorization(workspaceSlug, authorizationId);
+
+  connectGitlab = async (workspaceSlug: string, data: TAgentGitlabConnectInput) => {
+    const connection = await this.service.connectGitlab(workspaceSlug, data);
+    runInAction(() => {
+      this.connectionsByWorkspace[workspaceSlug] = {
+        ...this.connectionsByWorkspace[workspaceSlug],
+        gitlab: connection,
+      };
+    });
+    await this.fetchAccounts(workspaceSlug, "gitlab");
+    return connection;
+  };
 
   disconnect = async (workspaceSlug: string, provider: TAgentGitProvider) => {
     const result = await this.service.disconnect(workspaceSlug, provider);

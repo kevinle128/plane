@@ -152,3 +152,11 @@ export type TAgentGitPolicy = {
   mirror_conclusions: boolean;
   branch_format: "issue" | "project_issue";
 };
+
+/** Body of the GitLab connect request. The token is sent once and never returned. */
+export type TAgentGitlabConnectInput = {
+  base_url: string;
+  group_path: string;
+  token: string;
+  ca_bundle?: string;
+};

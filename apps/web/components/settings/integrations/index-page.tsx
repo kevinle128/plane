@@ -17,6 +17,7 @@ type Props = { workspaceSlug: string };
 
 const ESSENTIAL_PROVIDERS: { provider: TAgentGitProvider; blurbKey: string }[] = [
   { provider: "github", blurbKey: "agent_git.integrations.github_blurb" },
+  { provider: "gitlab", blurbKey: "agent_git.integrations.gitlab_blurb" },
 ];
 
 export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ workspaceSlug }: Props) {

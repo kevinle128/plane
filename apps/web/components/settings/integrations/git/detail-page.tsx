@@ -11,6 +11,7 @@ import useSWR from "swr";
 import { Avatar } from "@makeplane/propel/components/avatar";
 import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
+import { getTokenExpiryState } from "@plane/blocks/agent-run";
 import { useTranslation } from "@plane/i18n";
 import type { TAgentGitConnection, TAgentGitDisconnectResult, TAgentGitProvider } from "@plane/types";
 import { getFileURL, renderFormattedDate } from "@plane/utils";
@@ -20,6 +21,7 @@ import { GitAccountsList } from "./accounts-list";
 import { GitChangeRequestPolicy } from "./change-request-policy";
 import { GitDisconnectAction } from "./disconnect-action";
 import { GithubSetupCard } from "./github/setup-card";
+import { GitlabSetupCard } from "./gitlab/setup-card";
 import { agentGitProviderLabel } from "./provider-meta";
 
 type Props = {
@@ -30,7 +32,7 @@ type Props = {
 
 const DESCRIPTION_KEYS: Record<TAgentGitProvider, string> = {
   github: "agent_git.github.description",
-  gitlab: "agent_git.github.description",
+  gitlab: "agent_git.gitlab.description",
 };
 
 const DISCONNECT_CONFIRM_KEYS: Record<TAgentGitProvider, string> = {
@@ -74,45 +76,96 @@ function DisconnectResultNotice({ result }: { result: TAgentGitDisconnectResult 
   );
 }
 
+function MetaItem({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="tracking-wider text-11 font-semibold text-tertiary uppercase">{label}</span>
+      <span className="flex min-w-0 items-center gap-2 text-body-sm-regular text-primary">{children}</span>
+    </div>
+  );
+}
+
 function ConnectionMetaStrip({ connection, action }: { connection: TAgentGitConnection; action?: React.ReactNode }) {
   const { t } = useTranslation();
   const connectedBy = connection.connected_by_detail;
   return (
     <div className="flex flex-wrap items-center gap-6 rounded-lg border border-subtle bg-surface-1 px-4 py-3">
       {connectedBy && (
-        <div className="flex flex-col gap-1">
-          <span className="tracking-wider text-11 font-semibold text-tertiary uppercase">
-            {t("agent_git.github.meta.enabled_by")}
-          </span>
-          <span className="flex items-center gap-2 text-body-sm-regular text-primary">
-            <Avatar size="sm" src={getFileURL(connectedBy.avatar_url ?? "")} alt={connectedBy.display_name} />
-            {connectedBy.display_name}
-            {connection.connected_at && (
-              <span className="text-caption-sm-regular text-tertiary">
-                {renderFormattedDate(connection.connected_at)}
-              </span>
-            )}
-          </span>
-        </div>
+        <MetaItem label={t("agent_git.github.meta.enabled_by")}>
+          <Avatar size="sm" src={getFileURL(connectedBy.avatar_url ?? "")} alt={connectedBy.display_name} />
+          {connectedBy.display_name}
+          {connection.connected_at && (
+            <span className="text-caption-sm-regular text-tertiary">
+              {renderFormattedDate(connection.connected_at)}
+            </span>
+          )}
+        </MetaItem>
       )}
-      <div className="flex flex-col gap-1">
-        <span className="tracking-wider text-11 font-semibold text-tertiary uppercase">
-          {t("agent_git.github.meta.account")}
-        </span>
-        <span className="font-code text-body-sm-regular text-primary">{connection.account_login}</span>
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="tracking-wider text-11 font-semibold text-tertiary uppercase">
-          {t("agent_git.github.meta.scopes")}
-        </span>
-        <span className="font-code text-caption-sm-regular text-secondary">
-          {connection.token_scopes.length > 0
-            ? connection.token_scopes.join(" · ")
-            : t("agent_git.github.meta.no_scopes")}
-        </span>
-      </div>
+      {connection.provider === "gitlab" ? (
+        <>
+          <MetaItem label={t("agent_git.gitlab.meta.base_url")}>
+            <span className="truncate font-code">{connection.base_url}</span>
+          </MetaItem>
+          <MetaItem label={t("agent_git.gitlab.meta.version")}>
+            <span className="font-code">{connection.server_version}</span>
+          </MetaItem>
+          <MetaItem label={t("agent_git.gitlab.meta.token")}>
+            <span className="font-code">{connection.token_name}</span>
+          </MetaItem>
+          <MetaItem label={t("agent_git.gitlab.meta.token_user")}>
+            <span className="font-code">{connection.account_login}</span>
+          </MetaItem>
+          <MetaItem label={t("agent_git.gitlab.meta.expires")}>
+            {connection.token_expires_at
+              ? renderFormattedDate(connection.token_expires_at)
+              : t("agent_git.gitlab.meta.never")}
+          </MetaItem>
+        </>
+      ) : (
+        <>
+          <MetaItem label={t("agent_git.github.meta.account")}>
+            <span className="font-code">{connection.account_login}</span>
+          </MetaItem>
+          <MetaItem label={t("agent_git.github.meta.scopes")}>
+            <span className="font-code text-caption-sm-regular text-secondary">
+              {connection.token_scopes.length > 0
+                ? connection.token_scopes.join(" · ")
+                : t("agent_git.github.meta.no_scopes")}
+            </span>
+          </MetaItem>
+        </>
+      )}
       {action && <div className="ml-auto">{action}</div>}
     </div>
+  );
+}
+
+function ConnectionWarnings({ connection }: { connection: TAgentGitConnection }) {
+  const { t } = useTranslation();
+  const expiry = getTokenExpiryState(connection.token_expires_at);
+  const warnings: string[] = [];
+  if (connection.warnings.includes("gitlab_token_not_bot")) warnings.push(t("agent_git.gitlab.warnings.not_bot"));
+  if (expiry.expiresSoon && connection.token_expires_at)
+    warnings.push(
+      t("agent_git.gitlab.warnings.expires_soon", { date: renderFormattedDate(connection.token_expires_at) ?? "" })
+    );
+  if (connection.worker_last_error)
+    warnings.push(
+      t("agent_git.gitlab.warnings.worker_error", { host: connection.host, reason: connection.worker_last_error })
+    );
+  if (warnings.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-2">
+      {warnings.map((warning) => (
+        <li
+          key={warning}
+          role="note"
+          className="rounded-md bg-warning-subtle px-3 py-2 text-body-sm-regular text-warning-primary"
+        >
+          {warning}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -126,10 +179,10 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
   const connection = getConnection(workspaceSlug, provider);
   const isConnected = connection?.status === "connected";
   const needsReconnect = connection?.status === "reconnect_required";
-  const reconnectKey =
+  const reconnectMessage =
     connection?.last_error === "connected_admin_lost"
-      ? "agent_git.github.reconnect.connected_admin_lost"
-      : "agent_git.github.reconnect.generic";
+      ? t("agent_git.github.reconnect.connected_admin_lost")
+      : t("agent_git.connection.reconnect_generic", { provider: agentGitProviderLabel(provider) });
 
   const disconnectAction = (
     <GitDisconnectAction
@@ -156,19 +209,26 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
           role="alert"
           className="flex flex-wrap items-center gap-2 rounded-md bg-warning-subtle px-3 py-2 text-body-sm-regular text-warning-primary"
         >
-          <span className="flex-1">{t(reconnectKey)}</span>
-          {canEdit && disconnectAction}
+          <span className="flex-1">{reconnectMessage}</span>
+          {canEdit && provider === "github" && disconnectAction}
         </div>
       )}
       {!isLoading && isConnected && connection && (
         <>
-          <ConnectionMetaStrip connection={connection} action={canEdit ? disconnectAction : undefined} />
+          <ConnectionMetaStrip
+            connection={connection}
+            action={canEdit && provider === "github" ? disconnectAction : undefined}
+          />
+          <ConnectionWarnings connection={connection} />
           <GitAccountsList workspaceSlug={workspaceSlug} connection={connection} canEdit={canEdit} />
           <GitChangeRequestPolicy workspaceSlug={workspaceSlug} provider={provider} canEdit={canEdit} />
         </>
       )}
       {!isLoading && !isConnected && provider === "github" && (
         <GithubSetupCard workspaceSlug={workspaceSlug} canEdit={canEdit} />
+      )}
+      {!isLoading && !isConnected && provider === "gitlab" && (
+        <GitlabSetupCard workspaceSlug={workspaceSlug} canEdit={canEdit} />
       )}
     </div>
   );

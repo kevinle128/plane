@@ -26,10 +26,11 @@ type TTranslate = (key: string, params?: Record<string, unknown>) => string;
 
 /** Translated message for an agent Git API error body. Unknown codes fall back to a generic message. */
 export function agentGitErrorMessage(t: TTranslate, error: unknown): string {
-  const code = (error as TAgentGitError | undefined)?.error;
+  const body = error as TAgentGitError | undefined;
+  const code = body?.error;
   if (code) {
     const key = `agent_git.errors.${code}`;
-    const message = t(key);
+    const message = t(key, { detail: body?.detail ?? "" });
     if (message && message !== key) return message;
   }
   return t("agent_git.errors.generic");

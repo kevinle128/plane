@@ -22,7 +22,7 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.agent.git_providers.base import ProviderError
-from plane.agent.services import git_connection, github_connection
+from plane.agent.services import git_connection, github_connection, gitlab_connection
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers.agent_git import (
     AgentGitAccountSerializer,
@@ -117,6 +117,32 @@ class AgentGithubDeviceAuthorizationCancelEndpoint(BaseAPIView):
 
 
 class AgentGitConnectionEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def post(self, request, slug, provider):
+        """Connect a self-hosted GitLab with a Group Access Token (GitHub uses the device flow)."""
+        if require_provider(provider) != AgentGitProvider.GITLAB:
+            raise Http404
+        fields = {name: request.data.get(name) for name in ("base_url", "group_path", "token")}
+        ca_bundle = request.data.get("ca_bundle") or None
+        if not all(isinstance(value, str) and value.strip() for value in fields.values()) or not (
+            ca_bundle is None or isinstance(ca_bundle, str)
+        ):
+            return Response({"error": "invalid_request", "provider": provider}, status=status.HTTP_400_BAD_REQUEST)
+        workspace = Workspace.objects.get(slug=slug)
+        try:
+            connection = gitlab_connection.connect(
+                workspace,
+                request.user,
+                base_url=fields["base_url"],
+                group_path=fields["group_path"],
+                token=fields["token"].strip(),
+                ca_bundle=ca_bundle,
+                request_host=request.get_host(),
+            )
+        except ProviderError as error:
+            return provider_error_response(error)
+        return Response(AgentGitConnectionSerializer(connection).data, status=status.HTTP_201_CREATED)
+
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def delete(self, request, slug, provider):
         if require_provider(provider) != AgentGitProvider.GITHUB:

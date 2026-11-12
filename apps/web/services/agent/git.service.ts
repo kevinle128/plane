@@ -13,6 +13,7 @@ import type {
   TAgentGitPolicy,
   TAgentGitProvider,
   TAgentGitRepositoryPage,
+  TAgentGitlabConnectInput,
   TAgentGitRepositoryQuery,
   TAgentGithubDeviceAuthorization,
   TAgentGithubDeviceAuthorizationKind,
@@ -64,6 +65,14 @@ export class AgentGitService extends APIService {
     authorizationId: string
   ): Promise<TAgentGithubDeviceAuthorization> {
     return this.post(`${this.base(workspaceSlug)}/github/device-authorizations/${authorizationId}/cancel/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async connectGitlab(workspaceSlug: string, data: TAgentGitlabConnectInput): Promise<TAgentGitConnection> {
+    return this.post(`${this.base(workspaceSlug)}/gitlab/connection/`, data)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

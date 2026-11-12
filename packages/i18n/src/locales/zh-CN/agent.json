@@ -6,7 +6,8 @@
       "github_blurb": "Bind projects to repositories and let agents open draft pull requests.",
       "connect": "Connect",
       "back": "Integrations",
-      "read_only": "Only workspace admins can change these settings."
+      "read_only": "Only workspace admins can change these settings.",
+      "gitlab_blurb": "Bind projects to a self-hosted GitLab and let agents open draft merge requests."
     },
     "status": {
       "connected": "Connected",
@@ -66,7 +67,22 @@
       "repository_unavailable": "This repository is no longer available. Choose another one.",
       "repository_not_found": "This repository is no longer in the catalog. Choose another one.",
       "invalid_base_ref": "The base branch name is not valid.",
-      "invalid_repository": "The repository choice is not valid. Choose it again."
+      "invalid_repository": "The repository choice is not valid. Choose it again.",
+      "invalid_request": "Fill in every required field.",
+      "gitlab_url_invalid": "Enter an https URL without a user name, query or fragment, for example https://gitlab.example.com.",
+      "gitlab_url_not_allowed_or_unresolved": "Plane cannot resolve this address, or the address is not allowed. For a GitLab on a private network, ask the instance operator to allow it.",
+      "gitlab_url_unreachable": "Plane cannot reach GitLab ({detail}). Check the URL and the network.",
+      "gitlab_url_redirected": "GitLab redirected the request to {detail}. Enter the final GitLab URL.",
+      "gitlab_not_gitlab": "This URL does not answer like the GitLab API.",
+      "gitlab_version_unsupported": "This GitLab version is not supported: {detail}.",
+      "gitlab_tls_failed": "The GitLab certificate is not trusted. Add the CA bundle that signs it.",
+      "gitlab_ca_invalid": "The CA bundle is not a valid list of PEM certificates (256 KB at most).",
+      "gitlab_token_invalid": "The token is expired, revoked or not active.",
+      "gitlab_scope_missing": "The token is missing the scope {detail}. It needs api and write_repository.",
+      "gitlab_group_not_found": "The group does not exist, or the token cannot see it.",
+      "gitlab_role_too_low": "The token user's role in the group is {detail}. It needs Developer or higher.",
+      "gitlab_unexpected_response": "GitLab returned an unexpected response ({detail}).",
+      "gitlab_disconnect_first": "Disconnect the current GitLab before you connect another GitLab URL."
     },
     "accounts": {
       "title": "Connections",
@@ -92,7 +108,8 @@
       "remove_confirm_content": "New projects can no longer use repositories from {name}. Projects already bound to one of them keep the binding for audit, but new Runs cannot use it. The GitHub App stays installed until you uninstall it in GitHub.",
       "removed": "{name} was removed from Plane.",
       "removed_hint": "To uninstall the GitHub App, open the installation settings in GitHub.",
-      "open_settings": "Open GitHub settings"
+      "open_settings": "Open GitHub settings",
+      "group": "Group"
     },
     "connection": {
       "disconnect": "Disconnect",
@@ -101,7 +118,8 @@
       "github_disconnect_confirm_content": "Plane revokes this workspace's GitHub token and stops using it. Projects keep their repository binding for history, but new agent work and pending pull requests fail until GitHub is connected again.",
       "disconnected": "{provider} is disconnected.",
       "github_revoke_in_provider": "Plane did not revoke the old token because it could not use it. Revoke it in GitHub under Settings, Applications, Authorized GitHub Apps.",
-      "open_github_authorizations": "Open GitHub settings"
+      "open_github_authorizations": "Open GitHub settings",
+      "reconnect_generic": "Plane cannot use the saved {provider} connection. Connect again to continue."
     },
     "repository": {
       "title": "Repository",
@@ -150,6 +168,36 @@
       "branch_format_hint": "Each run gets its own branch. The run ID at the end keeps names unique, and a run keeps its branch when this format changes.",
       "saved": "Setting saved.",
       "save_failed": "The setting was not saved. Try again."
+    },
+    "gitlab": {
+      "description": "Connect a self-hosted GitLab group, bind projects to its repositories, and let agents open draft merge requests.",
+      "setup": {
+        "title": "Connect a self-hosted GitLab",
+        "description": "Paste a Group Access Token of the group that holds your repositories. Plane checks the token and the server before it saves anything.",
+        "base_url_label": "GitLab URL",
+        "base_url_hint": "The https address of your GitLab, for example https://gitlab.example.com. A path is allowed for installs under a sub-path.",
+        "group_label": "Group path",
+        "group_hint": "The full path of the group, for example platform or platform/tools.",
+        "token_label": "Group Access Token",
+        "token_hint": "Role Developer or higher, scopes api and write_repository. Plane stores it encrypted and never shows it again.",
+        "ca_label": "CA bundle (optional)",
+        "ca_hint": "PEM certificates that sign your GitLab certificate. Plane trusts them for this GitLab only.",
+        "connect": "Connect GitLab",
+        "connecting": "Connecting"
+      },
+      "meta": {
+        "base_url": "GitLab URL",
+        "version": "Version",
+        "token": "Token",
+        "token_user": "Token user",
+        "expires": "Expires",
+        "never": "Never"
+      },
+      "warnings": {
+        "expires_soon": "The token expires on {date}. Create a new token and connect again before then.",
+        "not_bot": "This token belongs to a person, not a group bot. Pushes and merge requests appear as that person, and the connection stops when that person loses access to the group.",
+        "worker_error": "Worker cannot reach {host}: {reason}"
+      }
     }
   }
 }

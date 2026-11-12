@@ -290,6 +290,10 @@ export const coreRoutes: RouteConfigEntry[] = [
             ":workspaceSlug/settings/integrations/github",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/integrations/github/page.tsx"
           ),
+          route(
+            ":workspaceSlug/settings/integrations/gitlab",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/integrations/gitlab/page.tsx"
+          ),
         ]),
 
         // --------------------------------------------------------------------

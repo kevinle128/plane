@@ -36,8 +36,11 @@ function AccountRow(props: {
   const { account, canEdit, isBusy, onAttach, onRemove } = props;
   const { t } = useTranslation();
   const isAttached = account.state === "attached";
-  const typeLabel =
-    account.account_type === "Organization" ? t("agent_git.accounts.organization") : t("agent_git.accounts.user");
+  const typeLabels: Record<string, string> = {
+    Organization: t("agent_git.accounts.organization"),
+    Group: t("agent_git.accounts.group"),
+  };
+  const typeLabel = typeLabels[account.account_type] ?? t("agent_git.accounts.user");
   const selectionLabel =
     account.repository_selection === "selected"
       ? t("agent_git.accounts.selected_repositories")

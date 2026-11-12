@@ -393,3 +393,173 @@ class TestReviewFixes:
         session.close.assert_not_called()  # deferred
         out.close()
         session.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Per-call trust for a custom CA bundle (Git provider connections)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+class TestPinnedFetchVerify:
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_default_still_verifies_against_system_trust(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = ["93.184.216.34"]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "https://example.com/x")
+
+        assert session.request.call_args.kwargs["verify"] is True
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_ca_bundle_path_reaches_the_request(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = ["93.184.216.34"]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "https://git.example.com/api/v4/version", verify="/tmp/plane-ca/abc.pem")
+
+        assert session.request.call_args.kwargs["verify"] == "/tmp/plane-ca/abc.pem"
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_a_second_host_in_the_same_process_keeps_system_trust(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = ["93.184.216.34"]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "https://git.example.com/api/v4/version", verify="/tmp/plane-ca/abc.pem")
+        pinned_fetch("GET", "https://other.example.com/hook")
+
+        verifies = [call.kwargs["verify"] for call in session.request.call_args_list]
+        assert verifies == ["/tmp/plane-ca/abc.pem", True]
+
+
+def _streamed(status_code=200, headers=None, chunks=(b"{}",)):
+    response = MagicMock()
+    response.status_code = status_code
+    response.headers = headers or {"Content-Type": "application/json"}
+    response.iter_content.return_value = iter(chunks)
+    return response
+
+
+@pytest.mark.unit
+class TestAgentGitHttpSeam:
+    """Transport failures of the Git provider seam map to fixed reason codes."""
+
+    def _request(self, **kwargs):
+        from plane.agent.git_providers import http
+
+        return http.request("GET", "https://git.example.com/api/v4/version", provider="gitlab", **kwargs)
+
+    @pytest.mark.parametrize(
+        "error, code, detail",
+        [
+            (ValueError("Hostname could not be resolved"), "gitlab_url_not_allowed_or_unresolved", ""),
+            (
+                ValueError("Access to private/internal networks is not allowed"),
+                "gitlab_url_not_allowed_or_unresolved",
+                "",
+            ),
+            (requests.exceptions.ConnectTimeout("timed out"), "gitlab_url_unreachable", "timeout"),
+            (requests.exceptions.ReadTimeout("timed out"), "gitlab_url_unreachable", "timeout"),
+            (requests.exceptions.ConnectionError("refused"), "gitlab_url_unreachable", "connection"),
+            (requests.exceptions.SSLError("certificate verify failed"), "gitlab_tls_failed", ""),
+        ],
+        ids=["dns", "private-ip", "connect-timeout", "read-timeout", "refused", "tls"],
+    )
+    def test_transport_failures_map_to_codes(self, error, code, detail):
+        from plane.agent.git_providers.base import ProviderError
+
+        with patch("plane.agent.git_providers.http.pinned_fetch", side_effect=error):
+            with pytest.raises(ProviderError) as raised:
+                self._request()
+
+        assert (raised.value.code, raised.value.detail) == (code, detail)
+
+    def test_redirect_is_refused_and_shows_only_scheme_and_host(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        response = _streamed(302, {"Location": "http://10.0.0.5/admin?private_token=leak"})
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response):
+            with pytest.raises(ProviderError) as raised:
+                self._request()
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_redirected", "http://10.0.0.5")
+        response.close.assert_called_once()
+
+    def test_body_over_one_mebibyte_is_refused(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        chunk = b"x" * (64 * 1024)
+        response = _streamed(chunks=[chunk] * 17)
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response):
+            with pytest.raises(ProviderError) as raised:
+                self._request()
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_unexpected_response", "response_too_large")
+        response.close.assert_called_once()
+
+    def test_body_at_the_limit_is_read(self):
+        chunk = b"x" * (64 * 1024)
+        response = _streamed(chunks=[chunk] * 16)
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response):
+            result = self._request()
+
+        assert len(result.content) == 1024 * 1024
+
+    def test_spent_budget_makes_no_request(self):
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        with patch("plane.agent.git_providers.http.pinned_fetch") as fetch:
+            with pytest.raises(ProviderError) as raised:
+                self._request(deadline=http.new_deadline(-1))
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        fetch.assert_not_called()
+
+    def test_budget_spent_during_a_call_fails_the_call(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        response = _streamed()
+        times = iter([100.0, 131.0, 131.0])
+        with (
+            patch("plane.agent.git_providers.http.pinned_fetch", return_value=response),
+            patch("plane.agent.git_providers.http.time.monotonic", side_effect=lambda: next(times)),
+        ):
+            with pytest.raises(ProviderError) as raised:
+                self._request(deadline=130.0)
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+
+    def test_timeouts_never_exceed_the_remaining_budget(self):
+        response = _streamed()
+        with (
+            patch("plane.agent.git_providers.http.pinned_fetch", return_value=response) as fetch,
+            patch("plane.agent.git_providers.http.time.monotonic", return_value=100.0),
+        ):
+            self._request(deadline=103.0)
+
+        assert fetch.call_args.kwargs["timeout"] == (3.0, 3.0)
+
+    def test_ca_bundle_is_passed_as_a_private_file_and_default_is_system_trust(self, settings):
+        import os
+        import stat
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["git.internal"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["10.0.0.0/8"]
+        pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+        with patch("plane.agent.git_providers.http.pinned_fetch", side_effect=lambda *a, **k: _streamed()) as fetch:
+            self._request(ca_bundle=pem)
+            self._request()
+
+        with_bundle, without_bundle = fetch.call_args_list
+        path = with_bundle.kwargs["verify"]
+        assert open(path).read() == pem
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+        assert stat.S_IMODE(os.stat(os.path.dirname(path)).st_mode) == 0o700
+        assert without_bundle.kwargs["verify"] is True
+        assert with_bundle.kwargs["allowed_hosts"] == ["git.internal"]
+        assert with_bundle.kwargs["allowed_ips"] == ["10.0.0.0/8"]

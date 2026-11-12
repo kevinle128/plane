@@ -57,6 +57,14 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Green: `pytest plane/tests/unit/test_agent_branch_name.py plane/tests/contract/app -k 'agent or project_app'` 175 passed; `makemigrations --check` clean; web and constants typecheck 11/11; i18n in sync.
 - AC 4 (a Run keeps its branch after a format change) needs a Run and stays open for Phase 7 (3.1), as the plan states.
 
+### G1 Connect a self-hosted GitLab with a Group Access Token
+
+- Tests Before 3 and 4 on unchanged code: `test_url_security.py` + `test_ssrf_advisories.py` + `test_work_item_link_task.py` + new `test_outbound_allowlists.py` (webhook parse) -> 101 passed, including the new "default still verifies against system trust" case.
+- Test first: 6 failures in the seam, `verify` and allowlist cases (no `verify` parameter, no deadline re-check, no CA file, no `AGENT_GIT_ALLOWED_*`); `test_agent_git_provider_contract.py` and `test_agent_gitlab_connect.py` -> collection errors (`plane.agent.git_providers.gitlab` missing). Blocks `token-expiry.test.ts` -> module missing.
+- Green: the same three `pinned_fetch` caller suites plus the new cases 118 passed; provider contract 14 passed; GitLab connect 55 passed; `pytest plane/tests/contract/app plane/tests/unit plane/tests/smoke/test_agent_gitlab_live.py -k 'agent or project_app or url_security or ssrf or work_item_link or allowlists'` 362 passed, 4 skipped (smoke, no token); `makemigrations --check` clean; `ruff check plane` clean; blocks agent-run 18 passed; web typecheck 10/10 and 11/11; i18n in sync.
+- Live smoke check: NOT RUN. The personal GitLab token is in a file that the privacy hook blocks; the task says not to work around it. Without a token the module skips (exit 0); with `PLANE_TEST_GITLAB_REQUIRED=1` it fails at collection, as designed.
+- Refactor: `url_security.pinned_fetch`, `_fetch_validated_hop` and `_request_to_ip` take `verify` (default `True`); `settings/common.py` has one parse helper pair used by the webhook and the new `AGENT_GIT_ALLOWED_*` settings. Only the changed lines were formatted, because both files are not ruff-formatted on `preview`.
+
 ## Deviations from the plan
 
 1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.
@@ -64,5 +72,9 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 3. The admin GitHub page had a lint warning (`promise/always-return`) that the pre-commit hook rejects for any touched file. It was rewritten as an equivalent `try/catch/finally`.
 4. Locales: the `translate` skill is not installed in this runtime. Every non-English `agent.json` carries the English text for the new keys, so `check:sync` passes; the strings still need translation.
 5. "The Celery task arguments contain no token" check (1.1 list) moves to 1.2, where the catalog task is created (`test_attach_enqueues_catalog_with_ids_only_and_lists_repositories`).
-6. `base_ref` validation lives in `plane/agent/services/branch_name.py` (`is_valid_ref_name`), next to the branch-name helper that 1.8 adds.
-7. Removed (detached) installations are hidden on the GitHub detail page (1.3 AC "disappears"). The mockup has no control to attach a removed installation again; the API allows it (`POST github/accounts/<id>/attach/`). This is a product gap for the user to decide.
+6. Removed (detached) installations are hidden on the GitHub detail page (1.3 AC "disappears"). The mockup has no control to attach a removed installation again; the API allows it (`POST github/accounts/<id>/attach/`). This is a product gap for the user to decide.
+7. `base_ref` validation lives in `plane/agent/services/branch_name.py` (`is_valid_ref_name`), next to the branch-name helper of 1.8.
+8. GitLab fixtures in `plane/tests/fixtures/gitlab/` are shaped from the GitLab API docs, not recorded (no readable token in this session; see the README there). `version_insufficient_scope.json` especially needs a recording with a `write_repository`-only token.
+9. The seam mapping cases (DNS, private IP, timeout, refused, TLS, redirect, body cap, budget, CA file) are in `test_url_security.py` as the plan says, in a new `TestAgentGitHttpSeam` class.
+10. The catalog enqueue after a GitLab connect is part of G2 (the catalog story), so its test is in `test_agent_git_catalog.py`.
+11. A GitLab connect check that is not in the G1 table was needed: an invalid base URL form (http, user info, query, fragment) returns `gitlab_url_invalid`; another base URL while connected returns `gitlab_disconnect_first` (409), following "A different base URL needs Disconnect first".

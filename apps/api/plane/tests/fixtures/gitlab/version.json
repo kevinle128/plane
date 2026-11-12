@@ -1,0 +1,11 @@
+{
+  "version": "18.10.3-ee",
+  "revision": "0123456789a",
+  "kas": {
+    "enabled": true,
+    "externalUrl": "wss://git.example.com/-/kubernetes-agent/",
+    "externalK8sProxyUrl": "https://git.example.com/-/kubernetes-agent/k8s-proxy/",
+    "version": "18.10.3"
+  },
+  "enterprise": true
+}

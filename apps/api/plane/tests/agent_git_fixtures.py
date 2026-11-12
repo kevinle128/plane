@@ -254,3 +254,57 @@ def project_payload(name, identifier, repository=None):
 
 def projects_url(slug):
     return f"/api/workspaces/{slug}/projects/"
+
+
+GITLAB_TOKEN = "glpat-SECRET-TOKEN-VALUE-0001"
+GITLAB_HOST = "git.example.com"
+GITLAB_BASE_URL = f"https://{GITLAB_HOST}"
+
+
+def gitlab_fixture(name):
+    from plane.tests.agent_git_fakes import load_fixture
+
+    return load_fixture("gitlab", name)
+
+
+def gitlab_path(path, base_path=""):
+    return f"{GITLAB_HOST}{base_path}/api/v4/{path}"
+
+
+def add_gitlab_connect_routes(
+    fake,
+    *,
+    token="token_self_active.json",
+    version="version.json",
+    user="user_bot.json",
+    group="group.json",
+    group_path="platform",
+    member="member_developer.json",
+    base_path="",
+):
+    """Script a successful GitLab connect; pass a response instead of a fixture name to change one step."""
+
+    def response(value):
+        return value if not isinstance(value, str) else json_response(200, gitlab_fixture(value))
+
+    user_response = response(user)
+    user_id = (user_response.json() or {}).get("id", 77)
+    group_response = response(group)
+    group_id = (group_response.json() or {}).get("id", 19)
+    encoded_group = group_path.replace("/", "%2F")
+    fake.add("GET", gitlab_path("personal_access_tokens/self", base_path), response(token))
+    fake.add("GET", gitlab_path("version", base_path), response(version))
+    fake.add("GET", gitlab_path("user", base_path), user_response)
+    fake.add("GET", gitlab_path(f"groups/{encoded_group}", base_path), group_response)
+    fake.add("GET", gitlab_path(f"groups/{group_id}/members/all/{user_id}", base_path), response(member))
+    return fake
+
+
+def gitlab_connect_payload(**overrides):
+    payload = {"base_url": GITLAB_BASE_URL, "group_path": "platform", "token": GITLAB_TOKEN}
+    payload.update(overrides)
+    return payload
+
+
+def gitlab_connection_url(slug):
+    return f"/api/workspaces/{slug}/agent-git/gitlab/connection/"

@@ -100,12 +100,15 @@ def _split_target(url):
     return scheme, hostname, port, path, auth
 
 
-def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout, auth=None, **kwargs):
+def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout, auth=None, verify=True, **kwargs):
     """Issue a single request whose socket is pinned to ``ip``.
 
     With ``stream=True`` the session is kept open until the caller closes the
     response (closing the response also closes the session), so a streamed body
     can be read with a real size cap; otherwise the session is closed eagerly.
+
+    ``verify`` is passed to ``requests`` unchanged: ``True`` for system trust,
+    or a path to a CA bundle that applies to this one request only.
     """
     ip_obj = ipaddress.ip_address(ip)
     host_for_url = f"[{ip}]" if ip_obj.version == 6 else ip
@@ -130,7 +133,7 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
             headers=request_headers,
             timeout=timeout,
             allow_redirects=False,
-            verify=True,
+            verify=verify,
             proxies=_NO_PROXIES,
             auth=auth,
             **kwargs,
@@ -157,7 +160,7 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
     return response
 
 
-def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, timeout, **kwargs):
+def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, timeout, verify=True, **kwargs):
     """
     Resolve ``url``'s host, validate it, then issue a single (non-redirecting)
     request pinned to a resolved IP. Returns ``(response, normalized_host)``.
@@ -184,7 +187,7 @@ def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, ti
         try:
             response = _request_to_ip(
                 method, scheme, hostname, ip, port, path,
-                headers=headers, timeout=timeout, auth=auth, **kwargs,
+                headers=headers, timeout=timeout, auth=auth, verify=verify, **kwargs,
             )
             return response, normalized_host
         except requests.RequestException as exc:
@@ -203,6 +206,7 @@ def pinned_fetch(
     allowed_hosts=None,
     headers=None,
     timeout=30,
+    verify=True,
     **kwargs,
 ):
     """
@@ -217,7 +221,7 @@ def pinned_fetch(
     response, _ = _fetch_validated_hop(
         method, url,
         allowed_ips=allowed_ips, allowed_hosts=allowed_hosts,
-        headers=headers, timeout=timeout, **kwargs,
+        headers=headers, timeout=timeout, verify=verify, **kwargs,
     )
     return response
 
