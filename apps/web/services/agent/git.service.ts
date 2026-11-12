@@ -7,6 +7,7 @@
 import { API_BASE_URL } from "@plane/constants";
 import type {
   TAgentGitAccount,
+  TAgentGitAccountRemoval,
   TAgentGitConnection,
   TAgentGitProvider,
   TAgentGitRepositoryPage,
@@ -89,6 +90,18 @@ export class AgentGitService extends APIService {
     accountId: string
   ): Promise<TAgentGitAccount> {
     return this.post(`${this.base(workspaceSlug)}/${provider}/accounts/${accountId}/attach/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async removeAccount(
+    workspaceSlug: string,
+    provider: TAgentGitProvider,
+    accountId: string
+  ): Promise<TAgentGitAccountRemoval> {
+    return this.delete(`${this.base(workspaceSlug)}/${provider}/accounts/${accountId}/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

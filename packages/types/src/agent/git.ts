@@ -61,6 +61,12 @@ export type TAgentGitAccount = {
   catalog_error: string;
 };
 
+/** Result of removing a GitHub installation from Plane. */
+export type TAgentGitAccountRemoval = TAgentGitAccount & {
+  /** GitHub page where an admin can uninstall the App installation. */
+  settings_url: string;
+};
+
 /** A repository in the workspace catalog. */
 export type TAgentGitRepository = {
   id: string;

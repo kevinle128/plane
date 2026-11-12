@@ -6,6 +6,7 @@ from django.urls import path
 
 from plane.app.views.agent.git import (
     AgentGitAccountAttachEndpoint,
+    AgentGitAccountDetailEndpoint,
     AgentGitAccountsEndpoint,
     AgentGitConnectionsEndpoint,
     AgentGitRepositoriesEndpoint,
@@ -40,6 +41,11 @@ urlpatterns = [
         name="agent-git-github-accounts-sync",
     ),
     path(f"{AGENT_GIT}/<str:provider>/accounts/", AgentGitAccountsEndpoint.as_view(), name="agent-git-accounts"),
+    path(
+        f"{AGENT_GIT}/<str:provider>/accounts/<uuid:pk>/",
+        AgentGitAccountDetailEndpoint.as_view(),
+        name="agent-git-account-detail",
+    ),
     path(
         f"{AGENT_GIT}/<str:provider>/accounts/<uuid:pk>/attach/",
         AgentGitAccountAttachEndpoint.as_view(),

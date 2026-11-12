@@ -7,6 +7,7 @@
 import { action, makeObservable, observable, runInAction } from "mobx";
 import type {
   TAgentGitAccount,
+  TAgentGitAccountRemoval,
   TAgentGitConnection,
   TAgentGitProvider,
   TAgentGithubDeviceAuthorization,
@@ -23,6 +24,11 @@ export interface IAgentGitStore {
   fetchAccounts: (workspaceSlug: string, provider: TAgentGitProvider) => Promise<TAgentGitAccount[]>;
   syncGithubAccounts: (workspaceSlug: string) => Promise<TAgentGitAccount[]>;
   attachAccount: (workspaceSlug: string, provider: TAgentGitProvider, accountId: string) => Promise<TAgentGitAccount>;
+  removeAccount: (
+    workspaceSlug: string,
+    provider: TAgentGitProvider,
+    accountId: string
+  ) => Promise<TAgentGitAccountRemoval>;
   getConnection: (workspaceSlug: string, provider: TAgentGitProvider) => TAgentGitConnection | undefined;
   isConnected: (workspaceSlug: string, provider: TAgentGitProvider) => boolean;
   fetchConnections: (workspaceSlug: string) => Promise<TAgentGitConnection[]>;
@@ -53,6 +59,7 @@ export class AgentGitStore implements IAgentGitStore {
       fetchAccounts: action,
       syncGithubAccounts: action,
       attachAccount: action,
+      removeAccount: action,
       pollGithubDeviceAuthorization: action,
     });
     this.service = new AgentGitService();
@@ -107,14 +114,24 @@ export class AgentGitStore implements IAgentGitStore {
     return accounts;
   };
 
-  attachAccount = async (workspaceSlug: string, provider: TAgentGitProvider, accountId: string) => {
-    const account = await this.service.attachAccount(workspaceSlug, provider, accountId);
+  private replaceAccount(workspaceSlug: string, provider: TAgentGitProvider, account: TAgentGitAccount) {
     const current = this.getAccounts(workspaceSlug, provider) ?? [];
     this.setAccounts(
       workspaceSlug,
       provider,
       current.map((item) => (item.id === account.id ? account : item))
     );
+  }
+
+  attachAccount = async (workspaceSlug: string, provider: TAgentGitProvider, accountId: string) => {
+    const account = await this.service.attachAccount(workspaceSlug, provider, accountId);
+    this.replaceAccount(workspaceSlug, provider, account);
     return account;
+  };
+
+  removeAccount = async (workspaceSlug: string, provider: TAgentGitProvider, accountId: string) => {
+    const removal = await this.service.removeAccount(workspaceSlug, provider, accountId);
+    this.replaceAccount(workspaceSlug, provider, removal);
+    return removal;
   };
 }

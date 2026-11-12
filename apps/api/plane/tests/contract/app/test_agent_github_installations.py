@@ -230,3 +230,104 @@ class TestInstallationAttach:
     @pytest.mark.django_db
     def test_unknown_provider_in_path_returns_404(self, session_client, workspace):
         assert session_client.get(accounts_url(workspace.slug, provider="bitbucket")).status_code == 404
+
+
+@pytest.mark.contract
+class TestInstallationRemoval:
+    def _two_attached(self, session_client, workspace, fake_http):
+        connection = connected_with(
+            session_client,
+            workspace,
+            fake_http,
+            github_installation(111, "plane-mini"),
+            github_installation(222, "kevinle128", account_type="User"),
+        )
+        AgentGitAccount.objects.filter(connection=connection).update(state="attached")
+        return connection
+
+    @pytest.mark.django_db
+    def test_remove_detaches_only_the_target_installation(self, session_client, workspace, fake_http, github_app_env):
+        connection = self._two_attached(session_client, workspace, fake_http)
+        target = AgentGitAccount.objects.get(connection=connection, external_id="111")
+        fake_http.add(
+            "GET",
+            github_installation_repositories_path(111),
+            github_repositories_page(github_repository(501, "plane-mini/api")),
+        )
+        fake_http.add(
+            "GET",
+            github_installation_repositories_path(222),
+            github_repositories_page(github_repository(601, "kevinle128/notes")),
+        )
+        refresh_catalog(connection.id)
+
+        response = session_client.delete(accounts_url(workspace.slug, account_id=target.id))
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        assert response.data["state"] == "detached"
+        assert response.data["removed_at"]
+        assert response.data["settings_url"] == "https://github.com/organizations/plane-mini/settings/installations/111"
+        states = dict(AgentGitAccount.objects.filter(connection=connection).values_list("external_id", "state"))
+        assert states == {"111": "detached", "222": "attached"}
+        listed = session_client.get(repositories_url(workspace.slug))
+        assert [row["full_name"] for row in listed.data["results"]] == ["kevinle128/notes"]
+        assert fake_http.count("DELETE") == 0
+
+    @pytest.mark.django_db
+    def test_user_installation_points_to_personal_settings(self, session_client, workspace, fake_http, github_app_env):
+        connection = self._two_attached(session_client, workspace, fake_http)
+        target = AgentGitAccount.objects.get(connection=connection, external_id="222")
+
+        response = session_client.delete(accounts_url(workspace.slug, account_id=target.id))
+
+        assert response.data["settings_url"] == "https://github.com/settings/installations/222"
+
+    @pytest.mark.django_db
+    def test_detached_installation_stays_detached_after_sync(
+        self, session_client, workspace, fake_http, github_app_env
+    ):
+        connection = self._two_attached(session_client, workspace, fake_http)
+        target = AgentGitAccount.objects.get(connection=connection, external_id="111")
+        session_client.delete(accounts_url(workspace.slug, account_id=target.id))
+        fake_http.add(
+            "GET",
+            "api.github.com/user/installations",
+            github_installations_response(
+                github_installation(111, "plane-mini"), github_installation(222, "kevinle128")
+            ),
+        )
+
+        synced = session_client.post(accounts_url(workspace.slug, action="sync"), {}, format="json")
+
+        assert synced.status_code == status.HTTP_200_OK
+        target.refresh_from_db()
+        assert target.state == "detached"
+
+    @pytest.mark.django_db
+    def test_failed_removal_keeps_the_installation_and_returns_an_actionable_error(
+        self, session_client, workspace, fake_http, github_app_env, mocker
+    ):
+        from django.db import DatabaseError
+
+        connection = self._two_attached(session_client, workspace, fake_http)
+        target = AgentGitAccount.objects.get(connection=connection, external_id="111")
+        mocker.patch.object(AgentGitAccount, "save", side_effect=DatabaseError("forced failure"))
+
+        response = session_client.delete(accounts_url(workspace.slug, account_id=target.id))
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert response.data["error"] == "account_remove_failed"
+        mocker.stopall()
+        target.refresh_from_db()
+        assert target.state == "attached"
+
+    @pytest.mark.django_db
+    def test_member_cannot_remove(self, session_client, member_client, workspace, fake_http, github_app_env):
+        connection = self._two_attached(session_client, workspace, fake_http)
+        target = AgentGitAccount.objects.get(connection=connection, external_id="111")
+
+        response = member_client.delete(accounts_url(workspace.slug, account_id=target.id))
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        target.refresh_from_db()
+        assert target.state == "attached"

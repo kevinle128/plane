@@ -9,9 +9,10 @@ import { observer } from "mobx-react";
 import useSWR from "swr";
 import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { Button } from "@makeplane/propel/components/button";
+import { ConfirmDialog } from "@plane/blocks/dialog";
 import { setToast } from "@plane/blocks/toast";
 import { useTranslation } from "@plane/i18n";
-import type { TAgentGitAccount, TAgentGitConnection } from "@plane/types";
+import type { TAgentGitAccount, TAgentGitAccountRemoval, TAgentGitConnection } from "@plane/types";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
 import { agentGitErrorMessage } from "./provider-meta";
 
@@ -30,8 +31,9 @@ function AccountRow(props: {
   canEdit: boolean;
   isBusy: boolean;
   onAttach: (account: TAgentGitAccount) => void;
+  onRemove: (account: TAgentGitAccount) => void;
 }) {
-  const { account, canEdit, isBusy, onAttach } = props;
+  const { account, canEdit, isBusy, onAttach, onRemove } = props;
   const { t } = useTranslation();
   const isAttached = account.state === "attached";
   const typeLabel =
@@ -63,6 +65,17 @@ function AccountRow(props: {
       ) : (
         <span className="text-caption-sm-medium text-tertiary">{t("agent_git.accounts.candidate")}</span>
       )}
+      {canEdit && isAttached && account.provider === "github" && (
+        <Button
+          variant="tertiary"
+          size="sm"
+          stretch="auto"
+          label={t("agent_git.accounts.remove")}
+          aria-label={`${t("agent_git.accounts.remove")} ${account.login}`}
+          disabled={isBusy}
+          onClick={() => onRemove(account)}
+        />
+      )}
       {canEdit && !isAttached && (
         <Button
           variant="secondary"
@@ -81,8 +94,11 @@ function AccountRow(props: {
 /** Installations of the GitHub connection: attach candidates, connect an organisation, refresh. */
 export const GitAccountsList = observer(function GitAccountsList({ workspaceSlug, connection, canEdit }: Props) {
   const { t } = useTranslation();
-  const { fetchAccounts, getAccounts, syncGithubAccounts, attachAccount } = useAgentGit();
+  const { fetchAccounts, getAccounts, syncGithubAccounts, attachAccount, removeAccount } = useAgentGit();
   const [isBusy, setIsBusy] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<TAgentGitAccount | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [lastRemoval, setLastRemoval] = useState<TAgentGitAccountRemoval | null>(null);
   useSWR(`AGENT_GIT_ACCOUNTS_${workspaceSlug}_${connection.provider}`, () =>
     fetchAccounts(workspaceSlug, connection.provider)
   );
@@ -110,8 +126,33 @@ export const GitAccountsList = observer(function GitAccountsList({ workspaceSlug
       t("agent_git.accounts.attached_toast", { name: account.login })
     );
 
+  const handleRemove = async () => {
+    if (!removeTarget) return;
+    setIsRemoving(true);
+    try {
+      const removal = await removeAccount(workspaceSlug, connection.provider, removeTarget.id);
+      setLastRemoval(removal);
+      setRemoveTarget(null);
+    } catch (error) {
+      // The installation stays visible: the store changes only after a successful response.
+      setToast({ type: "error", title: agentGitErrorMessage(t, error) });
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   return (
     <section className="flex flex-col gap-3" aria-labelledby="agent-git-accounts-title">
+      <ConfirmDialog
+        isOpen={removeTarget !== null}
+        variant="danger"
+        title={t("agent_git.accounts.remove_confirm_title", { name: removeTarget?.login ?? "" })}
+        content={t("agent_git.accounts.remove_confirm_content", { name: removeTarget?.login ?? "" })}
+        handleClose={() => setRemoveTarget(null)}
+        handleSubmit={handleRemove}
+        isSubmitting={isRemoving}
+        primaryButtonText={{ default: t("agent_git.accounts.remove"), loading: t("agent_git.accounts.removing") }}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <h4 id="agent-git-accounts-title" className="flex-1 text-body-sm-semibold text-primary">
           {t("agent_git.accounts.title")}
@@ -141,12 +182,36 @@ export const GitAccountsList = observer(function GitAccountsList({ workspaceSlug
       {canEdit && connection.provider === "github" && (
         <p className="text-caption-sm-regular text-tertiary">{t("agent_git.accounts.connect_organization_hint")}</p>
       )}
+      {lastRemoval && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-subtle bg-layer-1 px-3 py-2 text-caption-sm-regular text-secondary"
+        >
+          <span className="flex-1">
+            {t("agent_git.accounts.removed", { name: lastRemoval.login })} {t("agent_git.accounts.removed_hint")}
+          </span>
+          <AnchorButton
+            variant="secondary"
+            size="sm"
+            href={lastRemoval.settings_url}
+            external
+            label={t("agent_git.accounts.open_settings")}
+          />
+        </div>
+      )}
       <ul className="rounded-lg border border-subtle bg-surface-1">
         {accounts.length === 0 && (
           <li className="px-4 py-3 text-caption-sm-regular text-tertiary">{t("agent_git.accounts.empty")}</li>
         )}
         {accounts.map((account) => (
-          <AccountRow key={account.id} account={account} canEdit={canEdit} isBusy={isBusy} onAttach={handleAttach} />
+          <AccountRow
+            key={account.id}
+            account={account}
+            canEdit={canEdit}
+            isBusy={isBusy}
+            onAttach={handleAttach}
+            onRemove={setRemoveTarget}
+          />
         ))}
         {connection.provider === "github" && (
           <li className="flex flex-wrap items-center gap-3 px-4 py-3">

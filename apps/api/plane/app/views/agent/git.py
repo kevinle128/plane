@@ -12,7 +12,7 @@ rules live in ``plane.agent.services``.
 import logging
 
 # Django imports
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.http import Http404
 from django.utils import timezone
 
@@ -153,6 +153,38 @@ class AgentGitAccountAttachEndpoint(BaseAPIView):
             account.save(update_fields=["state", "attached_by", "attached_at", "removed_at", "updated_at"])
             enqueue_catalog_refresh(account.connection_id)
         return Response(AgentGitAccountSerializer(account).data, status=status.HTTP_200_OK)
+
+
+class AgentGitAccountDetailEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def delete(self, request, slug, provider, pk):
+        """Remove one GitHub installation from Plane (a Plane-side detach).
+
+        Uninstalling at GitHub needs the App private key, which Plane does not
+        hold, so the response links to the GitHub installation settings.
+        """
+        require_provider(provider)
+        if provider != AgentGitProvider.GITHUB:
+            return Response(
+                {"error": "account_remove_not_supported", "provider": provider, "detail": "disconnect"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        account = AgentGitAccount.objects.get(pk=pk, workspace__slug=slug, provider=provider)
+        try:
+            with transaction.atomic():
+                account = AgentGitAccount.objects.select_for_update().get(pk=account.pk)
+                account.state = AgentGitAccountState.DETACHED
+                account.removed_at = timezone.now()
+                account.save(update_fields=["state", "removed_at", "updated_at"])
+        except DatabaseError:
+            logger.exception("removing account %s failed", pk)
+            return Response(
+                {"error": "account_remove_failed", "provider": provider},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        data = AgentGitAccountSerializer(account).data
+        data["settings_url"] = github_connection.installation_settings_url(account)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class AgentGitRepositoriesEndpoint(BaseAPIView):

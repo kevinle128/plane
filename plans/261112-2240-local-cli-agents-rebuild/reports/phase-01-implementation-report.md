@@ -21,6 +21,12 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - First green run: 1 failure. The attach test asserted the enqueue, but `transaction.on_commit` does not fire inside the per-test transaction; the test now uses `django_capture_on_commit_callbacks(execute=True)`.
 - Green: `pytest plane/tests/contract/app -k agent` -> 51 passed. `makemigrations --check` clean (`0127_agent_git_accounts`). `ruff check plane` clean. Web typecheck 10/10 tasks, oxlint/oxfmt clean, i18n in sync.
 
+### 1.3 Remove one GitHub installation
+
+- Test first: 5 new removal tests failed with 404 (no `DELETE <provider>/accounts/<id>/` route).
+- Green: `test_agent_github_installations.py` 19 passed; `pytest plane/tests/contract/app -k agent` 56 passed. Web typecheck 10/10, i18n in sync.
+- The two binding checks of this story (binding kept with `available=false`; detach, then sync keeps the binding unavailable) need the binding model from 1.5. They are in `test_agent_repository_binding.py` with the 1.5 commit.
+
 ## Deviations from the plan
 
 1. Migrations: the plan names four migrations. The models are split by story: `0126_agent_git_connection` (connection, device authorization) in 1.1; accounts and repositories in 1.2; binding in 1.5; policy in 1.6.

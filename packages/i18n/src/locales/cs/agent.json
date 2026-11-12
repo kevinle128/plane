@@ -57,7 +57,8 @@
       "device_flow_disabled": "Device flow is not enabled on the GitHub App. Enable it in the GitHub App settings.",
       "token_encryption_failed": "Plane could not store the token securely. Nothing was connected.",
       "github_unexpected_response": "GitHub returned an unexpected response. Try again.",
-      "github_url_unreachable": "Plane cannot reach GitHub. Check the network and try again."
+      "github_url_unreachable": "Plane cannot reach GitHub. Check the network and try again.",
+      "account_remove_failed": "Plane could not remove the installation. It is still connected. Try again."
     },
     "accounts": {
       "title": "Connections",
@@ -76,7 +77,14 @@
       "personal_hint": "Connected · used to authorize the GitHub App for this workspace",
       "empty": "No installations yet. Install the GitHub App on an account or organisation.",
       "synced": "Installations refreshed.",
-      "attached_toast": "{name} is attached. Its repositories appear shortly."
+      "attached_toast": "{name} is attached. Its repositories appear shortly.",
+      "remove": "Remove",
+      "removing": "Removing",
+      "remove_confirm_title": "Remove {name} from Plane?",
+      "remove_confirm_content": "New projects can no longer use repositories from {name}. Projects already bound to one of them keep the binding for audit, but new Runs cannot use it. The GitHub App stays installed until you uninstall it in GitHub.",
+      "removed": "{name} was removed from Plane.",
+      "removed_hint": "To uninstall the GitHub App, open the installation settings in GitHub.",
+      "open_settings": "Open GitHub settings"
     }
   }
 }

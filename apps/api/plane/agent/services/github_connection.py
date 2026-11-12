@@ -324,6 +324,13 @@ def sync_installations(connection, token):
     return list(AgentGitAccount.objects.filter(connection=connection))
 
 
+def installation_settings_url(account):
+    """GitHub page where an admin can uninstall or reconfigure the App installation."""
+    if account.account_type == "Organization":
+        return f"{GITHUB_BASE_URL}/organizations/{account.login}/settings/installations/{account.external_id}"
+    return f"{GITHUB_BASE_URL}/settings/installations/{account.external_id}"
+
+
 def _sync_after_connect(connection, token):
     """Sync installations after connect; a failure leaves the connection and the admin can sync again."""
     try:
