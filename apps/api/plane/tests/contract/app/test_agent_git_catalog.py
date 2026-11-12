@@ -5,7 +5,8 @@
 import pytest
 
 from plane.agent.git_providers.base import ProviderError
-from plane.bgtasks.agent_git_catalog_task import refresh_catalog
+from plane.bgtasks import agent_git_catalog_task
+from plane.bgtasks.agent_git_catalog_task import refresh_agent_git_catalog, refresh_catalog
 from plane.db.models import AgentGitAccount, AgentGitConnection, AgentGitRepository
 from plane.tests.agent_git_fakes import json_response
 from plane.tests.agent_git_fixtures import (
@@ -371,10 +372,10 @@ class TestCatalogUntrustedShapes:
 
         real = GithubClient.list_repositories
 
-        def broken_for_first(client, account, cursor=None):
+        def broken_for_first(client, account, cursor=None, deadline=None):
             if account.pk == first.pk:
                 raise RuntimeError("unexpected failure")
-            return real(client, account, cursor)
+            return real(client, account, cursor, deadline=deadline)
 
         mocker.patch.object(GithubClient, "list_repositories", broken_for_first)
 
@@ -403,3 +404,83 @@ class TestCatalogUntrustedShapes:
         refresh_catalog(connection.id)
 
         assert AgentGitAccount.objects.get(connection=connection).catalog_error == "github_unexpected_response"
+
+
+def second_github_account(connection, workspace):
+    return AgentGitAccount.objects.create(
+        connection=connection,
+        workspace=workspace,
+        provider="github",
+        external_id="222",
+        login="beta",
+        account_type="Organization",
+        state="attached",
+    )
+
+
+@pytest.mark.contract
+class TestCatalogTimeLimits:
+    def test_task_has_soft_and_hard_time_limits_above_the_shared_budget(self):
+        budget = agent_git_catalog_task.CATALOG_BUDGET_SECONDS
+        soft = refresh_agent_git_catalog.soft_time_limit
+        hard = refresh_agent_git_catalog.time_limit
+
+        assert soft is not None and hard is not None
+        assert budget < soft < hard
+        # One account must not hold a worker for the old 200 pages x 30 s.
+        assert hard <= 15 * 60
+
+    @pytest.mark.django_db
+    def test_all_pages_of_all_accounts_share_one_task_deadline(
+        self, session_client, workspace, fake_http, github_app_env
+    ):
+        import time
+
+        connection = attached_github(session_client, workspace, fake_http)
+        second_github_account(connection, workspace)
+        fake_http.add(
+            "GET",
+            REPOS_PATH,
+            github_repositories_page(github_repository(501, "plane-mini/api"), next_page=2),
+            github_repositories_page(github_repository(502, "plane-mini/web")),
+        )
+        second_path = github_installation_repositories_path(222)
+        fake_http.add("GET", second_path, github_repositories_page(github_repository(601, "beta/api")))
+
+        started = time.monotonic()
+        refresh_catalog(connection.id)
+
+        catalog_paths = {REPOS_PATH, second_path}
+        catalog_calls = [call for call in fake_http.calls if catalog_paths & {call["path"], call["host_path"]}]
+        deadlines = {call["deadline"] for call in catalog_calls}
+        assert len(catalog_calls) == 3
+        assert len(deadlines) == 1
+        (deadline,) = deadlines
+        assert deadline is not None
+        assert deadline <= started + agent_git_catalog_task.CATALOG_BUDGET_SECONDS + 1
+
+    @pytest.mark.django_db
+    def test_soft_time_limit_records_the_timeout_and_stops_the_task(
+        self, session_client, workspace, fake_http, github_app_env, mocker
+    ):
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        from plane.agent.git_providers.github import GithubClient
+
+        connection = attached_github(session_client, workspace, fake_http)
+        fake_http.add("GET", REPOS_PATH, github_repositories_page(github_repository(501, "plane-mini/api")))
+        refresh_catalog(connection.id)
+        second = second_github_account(connection, workspace)
+        first = AgentGitAccount.objects.get(connection=connection, external_id="111")
+        second_path = github_installation_repositories_path(222)
+        fake_http.add("GET", second_path, github_repositories_page(github_repository(601, "beta/api")))
+        mocker.patch.object(GithubClient, "list_repositories", side_effect=SoftTimeLimitExceeded())
+
+        refresh_catalog(connection.id)
+
+        assert GithubClient.list_repositories.call_count == 1
+        read_account = GithubClient.list_repositories.call_args.args[0]
+        errors = dict(AgentGitAccount.objects.filter(pk__in=[first.pk, second.pk]).values_list("pk", "catalog_error"))
+        assert errors[read_account.pk] == "github_url_unreachable"
+        assert [error for pk, error in errors.items() if pk != read_account.pk] == [""]
+        assert names(workspace) == ["plane-mini/api"]

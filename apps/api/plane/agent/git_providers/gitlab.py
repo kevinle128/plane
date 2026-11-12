@@ -59,7 +59,7 @@ class GitlabClient:
             deadline=deadline,
         )
 
-    def list_repositories(self, account, cursor=None):
+    def list_repositories(self, account, cursor=None, deadline=None):
         response = self.get(
             f"groups/{account.external_id}/projects",
             params={
@@ -69,6 +69,7 @@ class GitlabClient:
                 "per_page": PAGE_SIZE,
                 "page": int(cursor or 1),
             },
+            deadline=deadline,
         )
         raise_for_status(response)
         items = response.json()

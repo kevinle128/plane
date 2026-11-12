@@ -67,4 +67,6 @@ class RepositoryPage:
 class GitProviderClient(Protocol):
     """The operations later code may call on any provider."""
 
-    def list_repositories(self, account, cursor: Optional[str] = None) -> RepositoryPage: ...
+    def list_repositories(
+        self, account, cursor: Optional[str] = None, deadline: Optional[float] = None
+    ) -> RepositoryPage: ...

@@ -55,7 +55,7 @@ class GithubClient:
         self.connection = connection
         self._token = token
 
-    def list_repositories(self, account, cursor=None):
+    def list_repositories(self, account, cursor=None, deadline=None):
         page = int(cursor or 1)
         response = http.request(
             "GET",
@@ -63,6 +63,7 @@ class GithubClient:
             provider=PROVIDER,
             headers=api_headers(self._token),
             params={"per_page": PAGE_SIZE, "page": page},
+            deadline=deadline,
         )
         raise_for_status(response)
         items = response.json_object().get("repositories")

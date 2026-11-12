@@ -8,6 +8,10 @@ The task takes a connection ID only, never a token, so no token reaches the
 broker or task logs. Each attached account is read page by page, and its
 snapshot is replaced only after the last page succeeded; a failure keeps
 the previous snapshot unchanged.
+
+All pages of all accounts share one deadline of ``CATALOG_BUDGET_SECONDS``,
+so a slow or hostile provider cannot hold a worker for ``MAX_PAGES`` full
+call budgets. Celery soft and hard time limits are a second limit.
 """
 
 # Python imports
@@ -15,13 +19,14 @@ import logging
 
 # Third party imports
 from celery import shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 
 # Django imports
 from django.db import transaction
 from django.utils import timezone
 
 # Module imports
-from plane.agent.git_providers import client_for
+from plane.agent.git_providers import client_for, http
 from plane.agent.git_providers.base import ProviderError
 from plane.agent.services import git_connection
 from plane.db.models import AgentGitAccount, AgentGitAccountState, AgentGitConnection, AgentGitRepository
@@ -29,6 +34,12 @@ from plane.db.models import AgentGitAccount, AgentGitAccountState, AgentGitConne
 logger = logging.getLogger("plane.bgtasks.agent_git_catalog_task")
 
 MAX_PAGES = 200
+# One deadline for all provider calls of one task run.
+CATALOG_BUDGET_SECONDS = 5 * 60
+# Celery stops the task when the shared deadline did not, for example in a
+# database call. The soft limit lets the task record the error first.
+SOFT_TIME_LIMIT_SECONDS = CATALOG_BUDGET_SECONDS + 60
+HARD_TIME_LIMIT_SECONDS = SOFT_TIME_LIMIT_SECONDS + 30
 TOKEN_INVALID_CODES = {"github_token_invalid", "gitlab_token_invalid"}
 
 
@@ -36,11 +47,15 @@ def _unexpected(account, detail=""):
     return ProviderError(f"{account.provider}_unexpected_response", account.provider, detail, http_status=502)
 
 
-def _fetch_all(client, account):
+def _timeout(account):
+    return ProviderError(f"{account.provider}_url_unreachable", account.provider, "timeout", http_status=502)
+
+
+def _fetch_all(client, account, deadline):
     repositories = []
     cursor = None
     for _ in range(MAX_PAGES):
-        page = client.list_repositories(account, cursor)
+        page = client.list_repositories(account, cursor, deadline=deadline)
         repositories.extend(page.repositories)
         if not page.next_cursor:
             return repositories
@@ -102,10 +117,17 @@ def refresh_catalog(connection_id):
     except ProviderError as error:
         logger.warning("catalog refresh for connection %s stopped: %s", connection_id, error.code)
         return
+    deadline = http.new_deadline(CATALOG_BUDGET_SECONDS)
     for account in accounts:
         try:
-            repositories = _fetch_all(client, account)
+            repositories = _fetch_all(client, account, deadline)
             _swap_snapshot(account.id, repositories)
+        except SoftTimeLimitExceeded:
+            # Celery raises this as an Exception; it must not reach the branch
+            # below, which goes on with the next account.
+            logger.warning("catalog refresh for connection %s stopped at the time limit", connection_id)
+            _record_failure(connection, account, _timeout(account))
+            return
         except ProviderError as error:
             logger.warning("catalog refresh for account %s failed: %s", account.id, error.code)
             if not _record_failure(connection, account, error):
@@ -120,6 +142,6 @@ def refresh_catalog(connection_id):
         logger.info("catalog of account %s refreshed with %s repositories", account.id, len(repositories))
 
 
-@shared_task
+@shared_task(soft_time_limit=SOFT_TIME_LIMIT_SECONDS, time_limit=HARD_TIME_LIMIT_SECONDS)
 def refresh_agent_git_catalog(connection_id):
     refresh_catalog(connection_id)

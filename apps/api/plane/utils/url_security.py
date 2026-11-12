@@ -22,10 +22,19 @@ Redirects are never auto-followed (``requests`` would re-resolve each hop and
 reopen the rebinding window, and a ``Location`` can point at a new internal
 host). ``pinned_fetch_following_redirects`` follows them manually, re-resolving,
 re-validating and re-pinning every hop.
+
+A caller can opt in to an absolute deadline for one call with
+:class:`SocketDeadline`: pass its ``attach`` method as ``on_socket``, and every
+socket the call opens is shut down when the deadline passes. That ends the call
+in any phase (connect, TLS handshake, status line, headers, chunk-size lines,
+body, trailers), which a per-read timeout cannot do, because a server that
+sends one byte inside each read timeout resets it again and again.
 """
 
 # Python imports
 import ipaddress
+import socket
+import threading
 from urllib.parse import unquote, urljoin, urlsplit
 
 # Third party imports
@@ -43,7 +52,119 @@ _REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 _NO_PROXIES = {"http": None, "https": None}
 
 
-class PinnedIPAdapter(HTTPAdapter):
+class SocketDeadline:
+    """Shut down every socket attached to it when ``seconds`` have passed.
+
+    Use it as a context manager around one call and its body read; leaving the
+    block stops the timer. ``attach`` keeps a duplicate of each socket, so the
+    timer never acts on a file descriptor that urllib3 closed and the system
+    gave to another socket. ``shutdown`` on the duplicate ends the shared TCP
+    connection, so a blocked read on the original socket (plain or TLS)
+    returns at once. All state changes run under one lock, so the timer
+    thread and the calling thread can race safely.
+    """
+
+    THREAD_NAME = "plane-socket-deadline"
+
+    def __init__(self, seconds):
+        self._lock = threading.Lock()
+        self._sockets = []
+        self._expired = False
+        self._closed = False
+        self._timer = threading.Timer(max(seconds, 0), self._expire)
+        self._timer.name = self.THREAD_NAME
+        self._timer.daemon = True
+        self._timer.start()
+
+    @property
+    def expired(self):
+        """``True`` once the deadline passed and the sockets were shut down."""
+        return self._expired
+
+    def attach(self, sock):
+        """Shut ``sock`` down at the deadline, or at once when it already passed."""
+        with self._lock:
+            if self._expired or self._closed:
+                _shutdown(sock)
+                return
+            try:
+                self._sockets.append(sock.dup())
+            except OSError:
+                # Without a duplicate the deadline cannot hold, so the call must not go on.
+                sock.close()
+                raise
+
+    def _expire(self):
+        with self._lock:
+            if self._closed:
+                return
+            self._expired = True
+            for duplicate in self._sockets:
+                _shutdown(duplicate)
+
+    def cancel(self):
+        """Stop the timer and release the duplicates. Safe to call more than once."""
+        self._timer.cancel()
+        with self._lock:
+            self._closed = True
+            sockets, self._sockets = self._sockets, []
+        for duplicate in sockets:
+            duplicate.close()
+        if threading.current_thread() is not self._timer:
+            # The cancelled timer wakes at once; joining it means no thread outlives the call.
+            self._timer.join()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.cancel()
+        return False
+
+
+def _shutdown(sock):
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        # The peer or urllib3 already closed the connection.
+        pass
+
+
+def _connection_class_with_hook(base, on_socket):
+    """Return a subclass of the urllib3 connection class ``base`` that reports each new socket.
+
+    ``_new_conn`` returns the TCP socket before TLS wraps it, so the hook also
+    covers the TLS handshake.
+    """
+
+    class _HookedConnection(base):
+        def _new_conn(self):
+            sock = super()._new_conn()
+            on_socket(sock)
+            return sock
+
+    _HookedConnection.socket_hook = on_socket
+    return _HookedConnection
+
+
+class _SocketHookAdapter(HTTPAdapter):
+    """A ``requests`` adapter that calls ``on_socket`` for each socket its pools open."""
+
+    def __init__(self, *args, on_socket=None, **kwargs):
+        self._on_socket = on_socket
+        super().__init__(*args, **kwargs)
+
+    def _hook_pool(self, pool):
+        if self._on_socket is not None and getattr(pool.ConnectionCls, "socket_hook", None) is not self._on_socket:
+            pool.ConnectionCls = _connection_class_with_hook(pool.ConnectionCls, self._on_socket)
+        return pool
+
+    def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        pool = super().get_connection_with_tls_context(request, verify, proxies=proxies, cert=cert)
+        return self._hook_pool(pool)
+
+
+class PinnedIPAdapter(_SocketHookAdapter):
     """
     A ``requests`` transport adapter that connects to whatever IP literal is in
     the request URL while presenting ``server_hostname`` for TLS SNI and
@@ -60,9 +181,9 @@ class PinnedIPAdapter(HTTPAdapter):
     (prefork / threads / gevent).
     """
 
-    def __init__(self, server_hostname, *args, **kwargs):
+    def __init__(self, server_hostname, *args, on_socket=None, **kwargs):
         self._server_hostname = server_hostname
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, on_socket=on_socket, **kwargs)
 
     def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
         # requests >= 2.32 calls this (it replaced get_connection() as part of
@@ -73,7 +194,7 @@ class PinnedIPAdapter(HTTPAdapter):
         # server_hostname is a recognised urllib3 SSL pool-key field, so pools
         # for different hostnames don't collide.
         pool_kwargs["server_hostname"] = self._server_hostname
-        return self.poolmanager.connection_from_host(**host_params, pool_kwargs=pool_kwargs)
+        return self._hook_pool(self.poolmanager.connection_from_host(**host_params, pool_kwargs=pool_kwargs))
 
 
 def _split_target(url):
@@ -100,7 +221,9 @@ def _split_target(url):
     return scheme, hostname, port, path, auth
 
 
-def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout, auth=None, verify=True, **kwargs):
+def _request_to_ip(
+    method, scheme, hostname, ip, port, path, *, headers, timeout, auth=None, verify=True, on_socket=None, **kwargs
+):
     """Issue a single request whose socket is pinned to ``ip``.
 
     With ``stream=True`` the session is kept open until the caller closes the
@@ -109,6 +232,9 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
 
     ``verify`` is passed to ``requests`` unchanged: ``True`` for system trust,
     or a path to a CA bundle that applies to this one request only.
+
+    ``on_socket``, when given, is called with each socket the request opens
+    (see :class:`SocketDeadline`).
     """
     ip_obj = ipaddress.ip_address(ip)
     host_for_url = f"[{ip}]" if ip_obj.version == 6 else ip
@@ -124,7 +250,9 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
     session = requests.Session()
     session.trust_env = False  # ignore ambient proxy / netrc / env (see _NO_PROXIES)
     if scheme == "https":
-        session.mount("https://", PinnedIPAdapter(server_hostname=hostname))
+        session.mount("https://", PinnedIPAdapter(server_hostname=hostname, on_socket=on_socket))
+    elif on_socket is not None:
+        session.mount("http://", _SocketHookAdapter(on_socket=on_socket))
 
     try:
         response = session.request(
@@ -160,7 +288,9 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
     return response
 
 
-def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, timeout, verify=True, **kwargs):
+def _fetch_validated_hop(
+    method, url, *, allowed_ips, allowed_hosts, headers, timeout, verify=True, on_socket=None, **kwargs
+):
     """
     Resolve ``url``'s host, validate it, then issue a single (non-redirecting)
     request pinned to a resolved IP. Returns ``(response, normalized_host)``.
@@ -187,7 +317,7 @@ def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, ti
         try:
             response = _request_to_ip(
                 method, scheme, hostname, ip, port, path,
-                headers=headers, timeout=timeout, auth=auth, verify=verify, **kwargs,
+                headers=headers, timeout=timeout, auth=auth, verify=verify, on_socket=on_socket, **kwargs,
             )
             return response, normalized_host
         except requests.RequestException as exc:
@@ -207,12 +337,16 @@ def pinned_fetch(
     headers=None,
     timeout=30,
     verify=True,
+    on_socket=None,
     **kwargs,
 ):
     """
     SSRF-safe single request. Resolves + validates the target host and pins the
     connection to a validated IP (defeating DNS rebinding). Does NOT follow
     redirects.
+
+    ``on_socket`` is opt-in and is called with each socket the request opens;
+    pass :meth:`SocketDeadline.attach` to give the call an absolute deadline.
 
     Raises:
         ValueError: if the URL is invalid or resolves to a blocked address.
@@ -221,7 +355,7 @@ def pinned_fetch(
     response, _ = _fetch_validated_hop(
         method, url,
         allowed_ips=allowed_ips, allowed_hosts=allowed_hosts,
-        headers=headers, timeout=timeout, verify=verify, **kwargs,
+        headers=headers, timeout=timeout, verify=verify, on_socket=on_socket, **kwargs,
     )
     return response
 

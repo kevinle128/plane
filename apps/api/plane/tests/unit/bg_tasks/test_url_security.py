@@ -445,15 +445,63 @@ def _streamed(status_code=200, headers=None, chunks=(b"{}",)):
     return response
 
 
-class _DrippingServer:
-    """A local HTTP server that sends the headers, then one body byte per ``interval`` seconds."""
+def _self_signed_certificate(directory):
+    """Write a certificate and key for ``127.0.0.1`` and return ``(cert_path, key_path, pem)``."""
+    import datetime
+    import os
 
-    def __init__(self, interval, body_length):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(hours=1))
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), True)
+        .sign(key, hashes.SHA256())
+    )
+    pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
+    cert_path = os.path.join(directory, "cert.pem")
+    key_path = os.path.join(directory, "key.pem")
+    with open(cert_path, "w") as handle:
+        handle.write(pem)
+    with open(key_path, "wb") as handle:
+        handle.write(
+            key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+            )
+        )
+    return cert_path, key_path, pem
+
+
+class _DrippingServer:
+    """A local HTTP server that sends ``head`` at once, then ``drip`` one byte per ``interval`` seconds.
+
+    ``drip`` can be endless. The server stops after ``max_seconds`` and closes
+    the connection, so a client that does not end the call itself fails the
+    test instead of hanging it. With ``tls`` set to ``(cert_path, key_path)``
+    the connection uses TLS.
+    """
+
+    def __init__(self, interval, head=b"", drip=b"", max_seconds=5.0, tls=None):
         import socket
         import threading
 
         self.interval = interval
-        self.body_length = body_length
+        self.head = head
+        self.drip = drip
+        self.max_seconds = max_seconds
+        self._tls = tls
         self._stop = threading.Event()
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.bind(("127.0.0.1", 0))
@@ -462,21 +510,31 @@ class _DrippingServer:
         self._thread = threading.Thread(target=self._serve, daemon=True)
 
     def _serve(self):
+        import ssl
+        import time
+
         try:
             connection, _ = self._socket.accept()
         except OSError:
             return
+        if self._tls:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(*self._tls)
+            try:
+                connection = context.wrap_socket(connection, server_side=True)
+            except (OSError, ssl.SSLError):
+                connection.close()
+                return
+        stop_at = time.monotonic() + self.max_seconds
         with connection:
             try:
                 connection.recv(65536)
-                connection.sendall(
-                    b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                    + f"Content-Length: {self.body_length}\r\n\r\n".encode()
-                )
-                for _ in range(self.body_length):
-                    if self._stop.wait(self.interval):
+                if self.head:
+                    connection.sendall(self.head)
+                for byte in self.drip:
+                    if self._stop.wait(self.interval) or time.monotonic() > stop_at:
                         return
-                    connection.sendall(b" ")
+                    connection.sendall(bytes([byte]))
             except OSError:
                 return
 
@@ -488,6 +546,30 @@ class _DrippingServer:
         self._stop.set()
         self._socket.close()
         self._thread.join(timeout=5)
+
+
+_CHUNKED_HEAD = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
+_SLOW_SERVER_CASES = ["fixed-length-body", "chunk-size-line", "trailer-lines", "status-line-and-headers"]
+
+
+def _slow_server(case):
+    """Return ``(head, drip)`` for a server that never finishes the response in time.
+
+    Every single byte arrives well inside the read timeout, so only a deadline
+    for the whole call can end it.
+    """
+    import itertools
+
+    endless_header = itertools.cycle(b"X-Pad: 1\r\n")
+    return {
+        "fixed-length-body": (
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 40\r\n\r\n",
+            b" " * 40,
+        ),
+        "chunk-size-line": (_CHUNKED_HEAD, itertools.cycle(b"0")),
+        "trailer-lines": (_CHUNKED_HEAD + b"2\r\n[]\r\n0\r\n", endless_header),
+        "status-line-and-headers": (b"", itertools.chain(b"HTTP/1.1 200 OK\r\n", endless_header)),
+    }[case]
 
 
 @pytest.mark.unit
@@ -580,8 +662,9 @@ class TestAgentGitHttpSeam:
 
         assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
 
+    @pytest.mark.parametrize("case", _SLOW_SERVER_CASES)
     @pytest.mark.parametrize("use_shared_deadline", [True, False], ids=["shared-deadline", "own-call-budget"])
-    def test_slowly_dripping_body_stops_at_the_budget(self, settings, monkeypatch, use_shared_deadline):
+    def test_slow_server_is_stopped_at_the_budget(self, settings, monkeypatch, case, use_shared_deadline):
         import time
 
         from plane.agent.git_providers import http
@@ -591,8 +674,8 @@ class TestAgentGitHttpSeam:
         settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
         budget = 1.0
         monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
-        # Each byte arrives well inside the read timeout, and the whole body needs about 4 s.
-        with _DrippingServer(interval=0.1, body_length=40) as server:
+        head, drip = _slow_server(case)
+        with _DrippingServer(interval=0.1, head=head, drip=drip) as server:
             started = time.monotonic()
             with pytest.raises(ProviderError) as raised:
                 http.request(
@@ -605,6 +688,42 @@ class TestAgentGitHttpSeam:
 
         assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
         assert elapsed < budget + 0.5
+
+    @pytest.mark.parametrize("case", ["trailer-lines", "status-line-and-headers"])
+    def test_slow_tls_server_is_stopped_at_the_budget(self, settings, monkeypatch, tmp_path, case):
+        import time
+
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["127.0.0.1"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        budget = 1.0
+        monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
+        cert_path, key_path, pem = _self_signed_certificate(str(tmp_path))
+        head, drip = _slow_server(case)
+        with _DrippingServer(interval=0.1, head=head, drip=drip, tls=(cert_path, key_path)) as server:
+            started = time.monotonic()
+            with pytest.raises(ProviderError) as raised:
+                http.request("GET", f"https://127.0.0.1:{server.port}/api/v4/version", provider="gitlab", ca_bundle=pem)
+            elapsed = time.monotonic() - started
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        assert elapsed < budget + 0.5
+
+    def test_complete_chunked_response_with_trailers_is_read_and_leaves_no_timer(self, settings):
+        import threading
+
+        from plane.agent.git_providers import http
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["127.0.0.1"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        head = _CHUNKED_HEAD + b"2\r\n[]\r\n0\r\nX-Trailer: 1\r\n\r\n"
+        with _DrippingServer(interval=0.1, head=head) as server:
+            result = http.request("GET", f"http://127.0.0.1:{server.port}/api/v4/version", provider="gitlab")
+
+        assert (result.status_code, result.json()) == (200, [])
+        assert not [thread for thread in threading.enumerate() if thread.name == "plane-socket-deadline"]
 
     def test_identity_encoding_is_requested_and_an_encoded_body_is_refused(self):
         from plane.agent.git_providers.base import ProviderError
@@ -653,3 +772,64 @@ class TestAgentGitHttpSeam:
         assert without_bundle.kwargs["verify"] is True
         assert with_bundle.kwargs["allowed_hosts"] == ["git.internal"]
         assert with_bundle.kwargs["allowed_ips"] == ["10.0.0.0/8"]
+
+
+@pytest.mark.unit
+class TestSocketDeadline:
+    def test_expiry_shuts_down_an_attached_socket(self):
+        import socket
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        left, right = socket.socketpair()
+        with left, right, SocketDeadline(0.2) as deadline:
+            deadline.attach(left)
+            left.settimeout(5)
+            started = time.monotonic()
+            assert left.recv(1) == b""
+            assert time.monotonic() - started < 2
+            assert deadline.expired
+
+    def test_socket_attached_after_expiry_is_shut_down_at_once(self):
+        import socket
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        left, right = socket.socketpair()
+        with left, right, SocketDeadline(0) as deadline:
+            time.sleep(0.1)
+            deadline.attach(left)
+            left.settimeout(5)
+            assert left.recv(1) == b""
+
+    def test_cancel_before_expiry_keeps_the_socket_open_and_stops_the_timer(self):
+        import socket
+        import threading
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        left, right = socket.socketpair()
+        with left, right:
+            with SocketDeadline(0.2) as deadline:
+                deadline.attach(left)
+            time.sleep(0.4)
+            right.sendall(b"x")
+            left.settimeout(5)
+            assert left.recv(1) == b"x"
+            assert not deadline.expired
+        assert not [thread for thread in threading.enumerate() if thread.name == "plane-socket-deadline"]
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.ip_address.socket.getaddrinfo")
+    def test_without_a_socket_hook_the_plain_http_adapter_is_kept(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = [_addr("93.184.216.34")]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "http://example.com/hook")
+
+        session.mount.assert_not_called()
+        assert "on_socket" not in session.request.call_args.kwargs

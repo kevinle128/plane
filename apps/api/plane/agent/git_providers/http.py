@@ -7,9 +7,13 @@
 Every GitHub and GitLab request goes through :func:`request`. It uses
 ``pinned_fetch`` (resolve once, validate, pin the IP, no redirects, no proxy)
 with the operator allowlists ``AGENT_GIT_ALLOWED_HOSTS`` and
-``AGENT_GIT_ALLOWED_IPS``, caps the response body, enforces per-call
-timeouts and a total deadline that also bounds the body read, and maps
-transport failures to fixed reason codes of the form ``<provider>_<reason>``. A connection CA
+``AGENT_GIT_ALLOWED_IPS``, caps the response body, enforces per-read
+timeouts and an absolute deadline per call, and maps transport failures to
+fixed reason codes of the form ``<provider>_<reason>``. The deadline is a
+:class:`SocketDeadline` armed before the connection opens: when it passes,
+the socket is shut down, so a server that sends the status line, headers,
+chunk-size lines, body or trailers one byte at a time cannot hold the call
+past its budget. A connection CA
 bundle is written to a private file and passed as ``verify`` for that
 request only; every other request keeps system trust. Tests replace
 :func:`request` and nothing else.
@@ -37,7 +41,7 @@ from django.conf import settings
 
 # Module imports
 from plane.agent.git_providers.base import ProviderError
-from plane.utils.url_security import pinned_fetch
+from plane.utils.url_security import SocketDeadline, pinned_fetch
 
 logger = logging.getLogger("plane.agent.git_providers.http")
 
@@ -125,11 +129,6 @@ def _remaining(provider, deadline):
     return remaining
 
 
-def _timeouts(provider, deadline):
-    remaining = _remaining(provider, deadline)
-    return (min(CONNECT_TIMEOUT_SECONDS, remaining), min(READ_TIMEOUT_SECONDS, remaining))
-
-
 def _redacted_target(url):
     parts = urlsplit(url)
     return f"{parts.scheme}://{parts.hostname}{parts.path}"
@@ -163,11 +162,34 @@ def _read_capped(response, provider, max_bytes, deadline):
         _limit_socket_wait(raw, min(READ_TIMEOUT_SECONDS, _remaining(provider, deadline)))
         chunk = raw.read1(_CHUNK_BYTES, decode_content=False)
         if not chunk:
+            # A connection that the deadline shut down while trailers were
+            # read also ends with an empty read, so check the deadline again.
+            _remaining(provider, deadline)
             return b"".join(chunks)
         total += len(chunk)
         if total > max_bytes:
             raise ProviderError(f"{provider}_unexpected_response", provider, "response_too_large", http_status=502)
         chunks.append(chunk)
+
+
+def _fetch_error(error, provider, method, url, deadline_expired):
+    """Map an error of ``pinned_fetch`` to a :class:`ProviderError`.
+
+    After the deadline shut the socket down, the error can be any transport
+    error (even a TLS error), so the deadline decides first.
+    """
+    target = _redacted_target(url)
+    if deadline_expired or isinstance(error, requests.exceptions.Timeout):
+        logger.warning("provider timeout: %s %s", method, target)
+        return _timeout_error(provider)
+    if isinstance(error, ValueError):
+        logger.warning("provider request blocked: %s %s", method, target)
+        return ProviderError(f"{provider}_url_not_allowed_or_unresolved", provider, http_status=400)
+    if isinstance(error, requests.exceptions.SSLError):
+        logger.warning("provider TLS failure: %s %s", method, target)
+        return ProviderError(f"{provider}_tls_failed", provider, http_status=502)
+    logger.warning("provider connection failure: %s %s", method, target)
+    return ProviderError(f"{provider}_url_unreachable", provider, "connection", http_status=502)
 
 
 def request(
@@ -194,7 +216,8 @@ def request(
     """
     if deadline is None:
         deadline = new_deadline(CALL_BUDGET_SECONDS)
-    timeout = _timeouts(provider, deadline)
+    remaining = _remaining(provider, deadline)
+    timeout = (min(CONNECT_TIMEOUT_SECONDS, remaining), min(READ_TIMEOUT_SECONDS, remaining))
     target = f"{url}?{urlencode(params)}" if params else url
     headers = {**(headers or {}), "Accept-Encoding": "identity"}
     extra = {}
@@ -205,48 +228,43 @@ def request(
     if auth is not None:
         extra["auth"] = auth
 
-    try:
-        response = pinned_fetch(
-            method,
-            target,
-            headers=headers,
-            timeout=timeout,
-            stream=True,
-            verify=ca_bundle_path(ca_bundle) if ca_bundle else True,
-            allowed_hosts=settings.AGENT_GIT_ALLOWED_HOSTS,
-            allowed_ips=settings.AGENT_GIT_ALLOWED_IPS,
-            **extra,
-        )
-    except ValueError:
-        logger.warning("provider request blocked: %s %s", method, _redacted_target(url))
-        raise ProviderError(f"{provider}_url_not_allowed_or_unresolved", provider, http_status=400)
-    except requests.exceptions.SSLError:
-        logger.warning("provider TLS failure: %s %s", method, _redacted_target(url))
-        raise ProviderError(f"{provider}_tls_failed", provider, http_status=502)
-    except requests.exceptions.Timeout:
-        logger.warning("provider timeout: %s %s", method, _redacted_target(url))
-        raise ProviderError(f"{provider}_url_unreachable", provider, "timeout", http_status=502)
-    except requests.exceptions.RequestException:
-        logger.warning("provider connection failure: %s %s", method, _redacted_target(url))
-        raise ProviderError(f"{provider}_url_unreachable", provider, "connection", http_status=502)
+    with SocketDeadline(remaining) as socket_deadline:
+        try:
+            response = pinned_fetch(
+                method,
+                target,
+                headers=headers,
+                timeout=timeout,
+                stream=True,
+                verify=ca_bundle_path(ca_bundle) if ca_bundle else True,
+                allowed_hosts=settings.AGENT_GIT_ALLOWED_HOSTS,
+                allowed_ips=settings.AGENT_GIT_ALLOWED_IPS,
+                on_socket=socket_deadline.attach,
+                **extra,
+            )
+        except (ValueError, requests.exceptions.RequestException) as error:
+            raise _fetch_error(error, provider, method, url, socket_deadline.expired)
 
-    try:
-        if 300 <= response.status_code < 400:
-            origin = _redirect_origin(url, response.headers.get("Location"))
-            logger.warning("provider redirect refused: %s %s -> %s", method, _redacted_target(url), origin)
-            raise ProviderError(f"{provider}_url_redirected", provider, origin, http_status=502)
-        if (response.headers.get("Content-Encoding") or "identity").strip().lower() != "identity":
-            raise ProviderError(f"{provider}_unexpected_response", provider, "content_encoding", http_status=502)
-        # pinned_fetch tries each resolved address with the full timeout, so the
-        # budget is checked again before and during the body read.
-        content = _read_capped(response, provider, max_bytes, deadline)
-    except (requests.exceptions.Timeout, urllib3.exceptions.TimeoutError, socket.timeout):
-        logger.warning("provider body read timeout: %s %s", method, _redacted_target(url))
-        raise _timeout_error(provider)
-    except (requests.exceptions.RequestException, urllib3.exceptions.HTTPError, OSError):
-        raise ProviderError(f"{provider}_url_unreachable", provider, "connection", http_status=502)
-    finally:
-        response.close()
+        try:
+            if 300 <= response.status_code < 400:
+                origin = _redirect_origin(url, response.headers.get("Location"))
+                logger.warning("provider redirect refused: %s %s -> %s", method, _redacted_target(url), origin)
+                raise ProviderError(f"{provider}_url_redirected", provider, origin, http_status=502)
+            if (response.headers.get("Content-Encoding") or "identity").strip().lower() != "identity":
+                raise ProviderError(f"{provider}_unexpected_response", provider, "content_encoding", http_status=502)
+            content = _read_capped(response, provider, max_bytes, deadline)
+            if socket_deadline.expired:
+                raise _timeout_error(provider)
+        except (requests.exceptions.Timeout, urllib3.exceptions.TimeoutError, socket.timeout):
+            logger.warning("provider body read timeout: %s %s", method, _redacted_target(url))
+            raise _timeout_error(provider)
+        except (requests.exceptions.RequestException, urllib3.exceptions.HTTPError, OSError):
+            if socket_deadline.expired:
+                logger.warning("provider body read timeout: %s %s", method, _redacted_target(url))
+                raise _timeout_error(provider)
+            raise ProviderError(f"{provider}_url_unreachable", provider, "connection", http_status=502)
+        finally:
+            response.close()
 
     logger.info("provider request: %s %s -> %s", method, _redacted_target(url), response.status_code)
     return HttpResponse(status_code=response.status_code, headers=dict(response.headers), content=content)
