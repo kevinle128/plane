@@ -146,6 +146,8 @@
       "mirror_conclusions_hint": {
         "pull_request": "The conclusion of each run is also posted as a comment on the agent's pull request."
       },
+      "branch_format": "Branch format",
+      "branch_format_hint": "Each run gets its own branch. The run ID at the end keeps names unique, and a run keeps its branch when this format changes.",
       "saved": "Setting saved.",
       "save_failed": "The setting was not saved. Try again."
     }

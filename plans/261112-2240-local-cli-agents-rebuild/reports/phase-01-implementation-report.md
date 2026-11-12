@@ -51,6 +51,12 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Test first: 3 new cases; `test_admin_change_persists_and_the_delivery_policy_reads_it` failed (the API ignored `mirror_conclusions`). The default and member-403 cases already held because the model and the permission exist since 1.6.
 - Green: policy 9 passed; `ruff check plane` clean; web typecheck 10/10; i18n in sync.
 
+### 1.8 Choose the Agent branch format
+
+- Test first: `test_agent_branch_name.py` -> collection error (`agent_branch_name` missing). After the helper existed, 2 contract cases still failed because the API did not accept `branch_format`.
+- Green: `pytest plane/tests/unit/test_agent_branch_name.py plane/tests/contract/app -k 'agent or project_app'` 175 passed; `makemigrations --check` clean; web and constants typecheck 11/11; i18n in sync.
+- AC 4 (a Run keeps its branch after a format change) needs a Run and stays open for Phase 7 (3.1), as the plan states.
+
 ## Deviations from the plan
 
 1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.

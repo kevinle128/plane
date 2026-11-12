@@ -82,3 +82,32 @@ class TestConclusionMirroring:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert session_client.get(policy_url(workspace.slug)).data["mirror_conclusions"] is False
+
+
+@pytest.mark.contract
+class TestBranchFormat:
+    @pytest.mark.django_db
+    def test_issue_format_is_the_default(self, session_client, workspace):
+        assert session_client.get(policy_url(workspace.slug)).data["branch_format"] == "issue"
+
+    @pytest.mark.django_db
+    def test_project_issue_format_persists_after_reload(self, session_client, workspace):
+        patched = session_client.patch(policy_url(workspace.slug), {"branch_format": "project_issue"}, format="json")
+        reloaded = session_client.get(policy_url(workspace.slug))
+
+        assert patched.status_code == status.HTTP_200_OK
+        assert reloaded.data["branch_format"] == "project_issue"
+        assert change_request_policy(workspace.id, "github")["branch_format"] == "project_issue"
+
+    @pytest.mark.django_db
+    def test_unknown_format_returns_400(self, session_client, workspace):
+        response = session_client.patch(policy_url(workspace.slug), {"branch_format": "agent/{random}"}, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert session_client.get(policy_url(workspace.slug)).data["branch_format"] == "issue"
+
+    @pytest.mark.django_db
+    def test_member_cannot_change(self, member_client, workspace):
+        response = member_client.patch(policy_url(workspace.slug), {"branch_format": "project_issue"}, format="json")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN

@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 import useSWR from "swr";
 import { Switch } from "@makeplane/propel/components/switch";
 import { setToast } from "@plane/blocks/toast";
+import { AGENT_GIT_BRANCH_FORMATS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TAgentGitPolicy, TAgentGitProvider } from "@plane/types";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
@@ -49,6 +50,44 @@ function SwitchRow(props: {
         aria-describedby={hintId}
         onCheckedChange={onChange}
       />
+    </li>
+  );
+}
+
+function BranchFormatRow(props: {
+  label: string;
+  hint: string;
+  value: TAgentGitPolicy["branch_format"];
+  disabled: boolean;
+  onChange: (value: TAgentGitPolicy["branch_format"]) => void;
+}) {
+  const { label, hint, value, disabled, onChange } = props;
+  const selectId = useId();
+  const hintId = useId();
+  return (
+    <li className="flex flex-wrap items-center gap-3 border-b border-subtle px-4 py-3 last:border-b-0">
+      <span className="flex min-w-45 flex-1 flex-col">
+        <label htmlFor={selectId} className="text-body-sm-medium text-primary">
+          {label}
+        </label>
+        <span id={hintId} className="text-caption-sm-regular text-tertiary">
+          {hint}
+        </span>
+      </span>
+      <select
+        id={selectId}
+        value={value}
+        disabled={disabled}
+        aria-describedby={hintId}
+        onChange={(event) => onChange(event.target.value as TAgentGitPolicy["branch_format"])}
+        className="max-w-full min-w-50 rounded-md border border-subtle bg-surface-1 px-2 py-1 font-code text-caption-sm-regular text-primary disabled:cursor-not-allowed disabled:text-tertiary"
+      >
+        {AGENT_GIT_BRANCH_FORMATS.map((format) => (
+          <option key={format.key} value={format.key}>
+            {format.label}
+          </option>
+        ))}
+      </select>
     </li>
   );
 }
@@ -101,6 +140,13 @@ export const GitChangeRequestPolicy = observer(function GitChangeRequestPolicy(p
           checked={policy.mirror_conclusions}
           disabled={disabled}
           onChange={(checked) => void save({ mirror_conclusions: checked })}
+        />
+        <BranchFormatRow
+          label={t("agent_git.policy.branch_format")}
+          hint={t("agent_git.policy.branch_format_hint")}
+          value={policy.branch_format}
+          disabled={disabled}
+          onChange={(branchFormat) => void save({ branch_format: branchFormat })}
         />
       </ul>
     </section>
