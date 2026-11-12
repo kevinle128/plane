@@ -1,7 +1,7 @@
 ---
 title: "Local CLI Agents rebuild on current preview"
 description: "Rebuild all 43 Local CLI Agents stories, plus self-hosted GitLab parity, on current preview in seven PR-sized, test-first phases."
-status: pending
+status: in-progress
 priority: P1
 effort: "67d"
 branch: feat/local-cli-agents
@@ -30,23 +30,23 @@ Rebuild the Git provider connection (GitHub and self-hosted GitLab), four local 
 
 ## Prior phase to new phase
 
-| Prior phase | New phases | Epic |
-| --- | --- | --- |
-| 1 GitHub and repository | 1 | Epic 1 |
+| Prior phase                                        | New phases    | Epic   |
+| -------------------------------------------------- | ------------- | ------ |
+| 1 GitHub and repository                            | 1             | Epic 1 |
 | 2 Run control plane and UI + 3 Four-harness Worker | 2, 3, 4, 5, 6 | Epic 2 |
-| 4 Code jobs and draft PR | 7 | Epic 3 |
+| 4 Code jobs and draft PR                           | 7             | Epic 3 |
 
 ## Phases
 
-| # | Phase | Stories | Depends on | Status |
-|---|-------|---------|------------|--------|
-| 1 | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5) | none | Pending |
-| 2 | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md) | 2.1-2.6 (6) | 1 | Pending |
-| 3 | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md) | 2.7-2.8 (2) | 1, 2 | Pending |
-| 4 | [Run context and conversation](./phase-04-run-context-and-conversation.md) | 2.9-2.13 (5) | 3 | Pending |
-| 5 | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md) | 2.14-2.20 (7) | 4 | Pending |
-| 6 | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md) | 2.21-2.26 (6) | 5 | Pending |
-| 7 | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md) | 3.1-3.9 (9), G6-G7 (2) | 1, 5 | Pending |
+| #   | Phase                                                                                                                | Stories                | Depends on | Status  |
+| --- | -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------- | ------- |
+| 1   | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5) | none       | Pending |
+| 2   | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md)                           | 2.1-2.6 (6)            | 1          | Pending |
+| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)            | 1, 2       | Pending |
+| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)           | 3          | Pending |
+| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)          | 4          | Pending |
+| 6   | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md)                                          | 2.21-2.26 (6)          | 5          | Pending |
+| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2) | 1, 5       | Pending |
 
 Effort: 11d + 6d + 9d + 6d + 8d + 10d + 17d = 67d. GitLab adds 5d to Phase 1, 1d to Phase 3 and 3d to Phase 7 compared with the GitHub-only plan (58d).
 
@@ -99,29 +99,31 @@ The user accepted the recommended answers on 2026-11-12. The answer came through
 ## Red Team Review
 
 ### Session — 2026-11-12
+
 **Findings:** 15 (13 accepted and applied, 2 surface-to-user; 0 rejected). Report: [reports/red-team-261112-local-cli-agents-rebuild.md](./reports/red-team-261112-local-cli-agents-rebuild.md)
 **Severity breakdown:** 0 Critical, 4 High, 11 Medium
 **Method note:** one reviewer applied all four lenses (no subagent tool in this run). The lead's brief authorised direct edits for findings that do not touch user decisions. No user decision Q1-Q8 was changed.
 
-| # | Finding | Severity | Disposition | Applied To |
-|---|---------|----------|-------------|------------|
-| F1 | Project create plus binding not atomic; bind race gives 500 and an orphan project | High | Accept | Phase 1 Refactor, 1.5 |
-| F2 | Binding trusts client repository fields; `base_ref` reaches git unvalidated | High | Accept | Phase 1 Key decisions, 1.5 |
-| F3 | Single-use GitHub refresh tokens; concurrent refresh breaks connection | High | Accept | Phase 1 Key decisions, 1.1; Phase 7 Key decisions |
-| F4 | Grant revoke disconnects other workspaces; expired token must not block revoke | Medium | Accept | Phase 1 Key decisions, 1.4 |
-| F5 | `encrypt_data`/`decrypt_data` return `""` on error | Medium | Accept | Phase 1 Key decisions, 1.1 |
-| F6 | Q3 env fallback differs from `get_configuration_value` semantics | Medium | Accept (implements Q3) | Phase 1 Key decisions, Files, 1.1 |
-| F7 | Files list misses settings union, icon map, i18n namespace, constants export, admin form | Medium | Accept | Phase 1 Files |
-| F8 | Uninstall needs App JWT; detach must survive the next sync | Medium | Accept | Phase 1 Key decisions, 1.3 |
-| F9 | Device-flow poll has no concurrency guard | Medium | Accept | Phase 1 Key decisions, 1.1 |
-| F10 | Phase 3 pytest command with two `-k` skips agent contract tests | Medium | Accept | Phase 3 Verification |
-| F11 | 1.4 AC 2 and 1.8 AC 4 have no test in any phase | Medium | Accept | Phase 3 2.7, Phase 7 3.1, story-coverage, Phase 1 Success criteria |
-| F12 | Local `makemigrations --check` needs CI env; run in test container | Medium | Accept | Phases 1-5, 7 Verification; architecture-contracts §7 |
-| F13 | Installation scoping: connecting admin's token decides what all members can bind | High | Decided by user 2026-11-12 (Q9) | Phase 1 Key decisions, 1.2, G1 |
-| F14 | Connection outlives the admin who connected it | Medium | Decided by user 2026-11-12 (Q10) | Phase 1 Key decisions, 1.1, 1.4 |
-| F15 | Tests Before 3 is not a regression test; log assertion scope | Medium | Accept | Phase 1 Tests Before, 1.1 |
+| #   | Finding                                                                                  | Severity | Disposition                      | Applied To                                                         |
+| --- | ---------------------------------------------------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------------------------ |
+| F1  | Project create plus binding not atomic; bind race gives 500 and an orphan project        | High     | Accept                           | Phase 1 Refactor, 1.5                                              |
+| F2  | Binding trusts client repository fields; `base_ref` reaches git unvalidated              | High     | Accept                           | Phase 1 Key decisions, 1.5                                         |
+| F3  | Single-use GitHub refresh tokens; concurrent refresh breaks connection                   | High     | Accept                           | Phase 1 Key decisions, 1.1; Phase 7 Key decisions                  |
+| F4  | Grant revoke disconnects other workspaces; expired token must not block revoke           | Medium   | Accept                           | Phase 1 Key decisions, 1.4                                         |
+| F5  | `encrypt_data`/`decrypt_data` return `""` on error                                       | Medium   | Accept                           | Phase 1 Key decisions, 1.1                                         |
+| F6  | Q3 env fallback differs from `get_configuration_value` semantics                         | Medium   | Accept (implements Q3)           | Phase 1 Key decisions, Files, 1.1                                  |
+| F7  | Files list misses settings union, icon map, i18n namespace, constants export, admin form | Medium   | Accept                           | Phase 1 Files                                                      |
+| F8  | Uninstall needs App JWT; detach must survive the next sync                               | Medium   | Accept                           | Phase 1 Key decisions, 1.3                                         |
+| F9  | Device-flow poll has no concurrency guard                                                | Medium   | Accept                           | Phase 1 Key decisions, 1.1                                         |
+| F10 | Phase 3 pytest command with two `-k` skips agent contract tests                          | Medium   | Accept                           | Phase 3 Verification                                               |
+| F11 | 1.4 AC 2 and 1.8 AC 4 have no test in any phase                                          | Medium   | Accept                           | Phase 3 2.7, Phase 7 3.1, story-coverage, Phase 1 Success criteria |
+| F12 | Local `makemigrations --check` needs CI env; run in test container                       | Medium   | Accept                           | Phases 1-5, 7 Verification; architecture-contracts §7              |
+| F13 | Installation scoping: connecting admin's token decides what all members can bind         | High     | Decided by user 2026-11-12 (Q9)  | Phase 1 Key decisions, 1.2, G1                                     |
+| F14 | Connection outlives the admin who connected it                                           | Medium   | Decided by user 2026-11-12 (Q10) | Phase 1 Key decisions, 1.1, 1.4                                    |
+| F15 | Tests Before 3 is not a regression test; log assertion scope                             | Medium   | Accept                           | Phase 1 Tests Before, 1.1                                          |
 
 ### Whole-Plan Consistency Sweep
+
 - Files reread: plan.md, phase-01 to phase-07, architecture-contracts.md, story-coverage.md
 - Decision deltas checked: 11 (sync keeps detach, concurrency test DB mode, installation removal semantics, revoke endpoint, refresh locking, binding input source, `base_ref` rule, Q3 accessor, makemigrations command location, pytest `-k` split, deferred 1.4/1.8 ACs)
 - Reconciled stale references: 8 (Phase 1 1.3 and 1.4 rows, Tests Before 1-3 reference, two `app/(all)` paths without the `apps/web/` prefix, makemigrations lines in Phases 2, 3, 4, 5, 7 and architecture-contracts §7, Phase 7 PR token source)
@@ -129,26 +131,28 @@ The user accepted the recommended answers on 2026-11-12. The answer came through
 - GitLab scope (2026-11-12, after this review): Phase 1 now uses the provider-neutral model and ships GitHub and GitLab; Phases 3, 4, 5 and 7 use the provider boundary in [architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace). Every red-team fix F1-F12 and F15 is kept on the neutral model; F3, F4, F6 and F8 stay GitHub-only. The red-team gate ran on the GitLab additions on 2026-11-12 (session below).
 
 ### Session — 2026-11-12 (GitLab additions)
+
 **Findings:** 12 (10 accepted and applied, 1 surface-to-user, 1 rejected). Report: [addendum in reports/red-team-261112-local-cli-agents-rebuild.md](./reports/red-team-261112-local-cli-agents-rebuild.md#addendum-gitlab-red-team-pass-2026-11-12). Edits carry the marker `<!-- red-team 2026-11-12 gitlab -->`.
 **Severity breakdown:** 0 Critical, 4 High, 6 Medium, 2 Low
 **Method note:** one reviewer, four lenses, scope = diff `acd8965582` vs `d6f6b43d25`. No user decision (Q1-Q10, GitLab scope items 1-6) was changed; open questions 1-4 were not decided (evidence added to 4).
 
-| # | Finding | Severity | Disposition | Applied To |
-|---|---------|----------|-------------|------------|
-| GL1 | `/version` refuses `write_repository`-only tokens (403), so `gitlab_scope_missing` cannot occur; check `self` first | High | Accept | Phase 1 Key decisions, Files (fixtures), G1 tests |
-| GL2 | Worker token in `X-Api-Key` would store `git-credential` responses (GitLab token) through `APITokenLogMiddleware` | High | Accept | Phase 2 Key decisions, architecture-contracts §4 |
-| GL3 | Container rewrites the Worktree `.git` file; Worker git on the Host runs attacker config with the token in reach | High | Accept | Phase 7 Key decisions, G6 tests, architecture-contracts §11 |
-| GL4 | Worker git transport: system credential helper stores the token, redirects followed, no SSRF guard on the Mini | High | Accept | Phase 3 Key decisions, 2.7 tests, architecture-contracts §11 |
-| GL5 | GitLab reconnect with another group leaves the old group `attached` | Medium | Accept | Phase 1 Key decisions, G1 tests |
-| GL6 | Hostile GitLab server: no body cap, timeout multiplied by resolved IPs, no request-host guard | Medium | Accept | Phase 1 Key decisions, G1 tests |
-| GL7 | Phase 3 `-k` never selects `test_agent_git_credential_fetch.py` | Medium | Accept | Phase 3 Verification |
-| GL8 | Live GitLab smoke passes as a skip (exit 0); Phase 7 command runs outside the test container | Medium | Accept | Phase 1 Files, Verification, Success criteria; Phase 7 Verification |
-| GL9 | `ps` capture of git argv is a racy phantom test | Medium | Accept | Phase 3 2.7 tests, Phase 7 G6 tests |
-| GL10 | `gitlab_dns_failed` vs `gitlab_url_blocked` is an internal-name oracle | Medium | Surface to user (scope item 4) | plan.md open question 5 |
-| GL11 | `get_repository` has no caller; 401/403 status rule inconsistent; `protected_branches` paginated | Low | Accept | architecture-contracts §11, plan.md, Phase 1 Key decisions and Risks, Phase 7 |
-| GL12 | Custom CA bundle widens trust for other hosts | Low | Reject (verified safe) | none |
+| #    | Finding                                                                                                             | Severity | Disposition                    | Applied To                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| GL1  | `/version` refuses `write_repository`-only tokens (403), so `gitlab_scope_missing` cannot occur; check `self` first | High     | Accept                         | Phase 1 Key decisions, Files (fixtures), G1 tests                             |
+| GL2  | Worker token in `X-Api-Key` would store `git-credential` responses (GitLab token) through `APITokenLogMiddleware`   | High     | Accept                         | Phase 2 Key decisions, architecture-contracts §4                              |
+| GL3  | Container rewrites the Worktree `.git` file; Worker git on the Host runs attacker config with the token in reach    | High     | Accept                         | Phase 7 Key decisions, G6 tests, architecture-contracts §11                   |
+| GL4  | Worker git transport: system credential helper stores the token, redirects followed, no SSRF guard on the Mini      | High     | Accept                         | Phase 3 Key decisions, 2.7 tests, architecture-contracts §11                  |
+| GL5  | GitLab reconnect with another group leaves the old group `attached`                                                 | Medium   | Accept                         | Phase 1 Key decisions, G1 tests                                               |
+| GL6  | Hostile GitLab server: no body cap, timeout multiplied by resolved IPs, no request-host guard                       | Medium   | Accept                         | Phase 1 Key decisions, G1 tests                                               |
+| GL7  | Phase 3 `-k` never selects `test_agent_git_credential_fetch.py`                                                     | Medium   | Accept                         | Phase 3 Verification                                                          |
+| GL8  | Live GitLab smoke passes as a skip (exit 0); Phase 7 command runs outside the test container                        | Medium   | Accept                         | Phase 1 Files, Verification, Success criteria; Phase 7 Verification           |
+| GL9  | `ps` capture of git argv is a racy phantom test                                                                     | Medium   | Accept                         | Phase 3 2.7 tests, Phase 7 G6 tests                                           |
+| GL10 | `gitlab_dns_failed` vs `gitlab_url_blocked` is an internal-name oracle                                              | Medium   | Surface to user (scope item 4) | plan.md open question 5                                                       |
+| GL11 | `get_repository` has no caller; 401/403 status rule inconsistent; `protected_branches` paginated                    | Low      | Accept                         | architecture-contracts §11, plan.md, Phase 1 Key decisions and Risks, Phase 7 |
+| GL12 | Custom CA bundle widens trust for other hosts                                                                       | Low      | Reject (verified safe)         | none                                                                          |
 
 ### Whole-Plan Consistency Sweep (GitLab pass)
+
 - Files reread: plan.md, phase-01, phase-02 (Worker token line), phase-03, phase-07, architecture-contracts.md, gitlab-scope-decisions.md
 - Reconciled: "six methods" to five (plan.md, architecture-contracts §11 table and extension trace), Phase 7 "five Phase 7 methods" to four, Phase 1 G1 test order matches the new check order, 401/403 rule matches between Phase 1 Key decisions and Risks
 - Unresolved contradictions: 0. Open: questions 1-5.
