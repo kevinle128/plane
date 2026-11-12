@@ -17,14 +17,17 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 # Django imports
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 # Module imports
 from plane.agent.git_providers import http
 from plane.agent.git_providers.base import ProviderError
+from plane.agent.git_providers.github import api_headers, has_next_page, raise_for_status
 from plane.agent.services import git_connection
 from plane.db.models import (
+    AgentGitAccount,
+    AgentGitAccountState,
     AgentGitConnection,
     AgentGitConnectionStatus,
     AgentGitProvider,
@@ -95,14 +98,6 @@ def app_credentials():
 def install_url():
     slug = app_credentials().slug
     return f"{GITHUB_BASE_URL}/apps/{slug}/installations/new" if slug else ""
-
-
-def api_headers(token):
-    return {
-        "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {token}",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
 
 
 def _unexpected(response):
@@ -215,7 +210,8 @@ def poll_device_authorization(workspace, authorization_id, user):
         elif response.status_code != 200 or not body.get("access_token"):
             raise _unexpected(response)
         else:
-            _store_connection(workspace, user, body)
+            connection = _store_connection(workspace, user, body)
+            _sync_after_connect(connection, body["access_token"])
             authorization.status = AgentGithubDeviceAuthorizationStatus.COMPLETED
         authorization.save()
 
@@ -266,6 +262,74 @@ def _store_connection(workspace, user, token_body):
     connection.save()
     logger.info("github connection %s connected for workspace %s", connection.id, workspace.id)
     return connection
+
+
+# Installations
+
+MAX_INSTALLATION_PAGES = 50
+
+
+def _list_installations(token):
+    installations = []
+    for page in range(1, MAX_INSTALLATION_PAGES + 1):
+        response = http.request(
+            "GET",
+            f"{GITHUB_API_URL}/user/installations",
+            provider=PROVIDER,
+            headers=api_headers(token),
+            params={"per_page": 100, "page": page},
+        )
+        raise_for_status(response)
+        installations.extend((response.json() or {}).get("installations") or [])
+        if not has_next_page(response):
+            break
+    return installations
+
+
+def sync_installations(connection, token):
+    """Upsert the installations the token can see.
+
+    New installations become ``candidate``. Existing rows get new names only:
+    sync never attaches an installation and never clears ``detached``.
+    """
+    installations = _list_installations(token)
+    for installation in installations:
+        account_info = installation.get("account") or {}
+        fields = {
+            "login": str(account_info.get("login") or installation["id"])[:255],
+            "account_type": str(account_info.get("type") or installation.get("target_type") or "")[:32],
+            "repository_selection": str(installation.get("repository_selection") or "")[:16],
+        }
+        external_id = str(installation["id"])
+        try:
+            with transaction.atomic():
+                account, created = AgentGitAccount.objects.get_or_create(
+                    connection=connection,
+                    external_id=external_id,
+                    defaults={
+                        **fields,
+                        "workspace_id": connection.workspace_id,
+                        "provider": PROVIDER,
+                        "state": AgentGitAccountState.CANDIDATE,
+                    },
+                )
+                if not created:
+                    for name, value in fields.items():
+                        setattr(account, name, value)
+                    account.save(update_fields=[*fields.keys(), "updated_at"])
+        except IntegrityError:
+            # A concurrent sync created the same installation first.
+            logger.info("installation %s was created by a concurrent sync", external_id)
+    logger.info("github connection %s synced %s installations", connection.id, len(installations))
+    return list(AgentGitAccount.objects.filter(connection=connection))
+
+
+def _sync_after_connect(connection, token):
+    """Sync installations after connect; a failure leaves the connection and the admin can sync again."""
+    try:
+        sync_installations(connection, token)
+    except ProviderError as error:
+        logger.warning("installation sync after connect failed for %s: %s", connection.id, error.code)
 
 
 # Token use

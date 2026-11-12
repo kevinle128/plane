@@ -5,7 +5,11 @@
 from django.urls import path
 
 from plane.app.views.agent.git import (
+    AgentGitAccountAttachEndpoint,
+    AgentGitAccountsEndpoint,
     AgentGitConnectionsEndpoint,
+    AgentGitRepositoriesEndpoint,
+    AgentGithubAccountsSyncEndpoint,
     AgentGithubDeviceAuthorizationCancelEndpoint,
     AgentGithubDeviceAuthorizationEndpoint,
     AgentGithubDeviceAuthorizationPollEndpoint,
@@ -30,4 +34,16 @@ urlpatterns = [
         AgentGithubDeviceAuthorizationCancelEndpoint.as_view(),
         name="agent-git-github-device-authorization-cancel",
     ),
+    path(
+        f"{AGENT_GIT}/github/accounts/sync/",
+        AgentGithubAccountsSyncEndpoint.as_view(),
+        name="agent-git-github-accounts-sync",
+    ),
+    path(f"{AGENT_GIT}/<str:provider>/accounts/", AgentGitAccountsEndpoint.as_view(), name="agent-git-accounts"),
+    path(
+        f"{AGENT_GIT}/<str:provider>/accounts/<uuid:pk>/attach/",
+        AgentGitAccountAttachEndpoint.as_view(),
+        name="agent-git-account-attach",
+    ),
+    path(f"{AGENT_GIT}/repositories/", AgentGitRepositoriesEndpoint.as_view(), name="agent-git-repositories"),
 ]

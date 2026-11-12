@@ -132,3 +132,92 @@ class AgentGithubDeviceAuthorization(BaseModel):
 
     def __str__(self):
         return f"device authorization {self.user_code} ({self.status})"
+
+
+class AgentGitAccountState(models.TextChoices):
+    CANDIDATE = "candidate", "Candidate"
+    ATTACHED = "attached", "Attached"
+    DETACHED = "detached", "Detached"
+
+
+class AgentGitAccount(BaseModel):
+    """A GitHub installation or a GitLab group seen through a connection.
+
+    Only an admin attaches an account. Sync creates new GitHub installations
+    as ``candidate`` and never changes ``state``; the repository catalog and
+    project bindings read ``attached`` accounts only.
+    """
+
+    connection = models.ForeignKey(AgentGitConnection, on_delete=models.CASCADE, related_name="accounts")
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="agent_git_accounts")
+    provider = models.CharField(max_length=16, choices=AgentGitProvider.choices)
+    external_id = models.CharField(max_length=64)
+    login = models.CharField(max_length=255)
+    account_type = models.CharField(max_length=32, blank=True, default="")
+    repository_selection = models.CharField(max_length=16, blank=True, default="")
+    state = models.CharField(
+        max_length=16,
+        choices=AgentGitAccountState.choices,
+        default=AgentGitAccountState.CANDIDATE,
+    )
+    attached_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="agent_git_accounts_attached",
+    )
+    attached_at = models.DateTimeField(null=True, blank=True)
+    removed_at = models.DateTimeField(null=True, blank=True)
+    catalog_refreshed_at = models.DateTimeField(null=True, blank=True)
+    catalog_error = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Agent Git Account"
+        verbose_name_plural = "Agent Git Accounts"
+        db_table = "agent_git_accounts"
+        ordering = ("login",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["connection", "external_id"],
+                condition=Q(deleted_at__isnull=True),
+                name="agent_git_account_unique_connection_external_id",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.provider} account {self.login} ({self.state})"
+
+
+class AgentGitRepository(BaseModel):
+    """One repository of an attached account: a snapshot row of the catalog."""
+
+    account = models.ForeignKey(AgentGitAccount, on_delete=models.CASCADE, related_name="repositories")
+    workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="agent_git_repositories")
+    provider = models.CharField(max_length=16, choices=AgentGitProvider.choices)
+    external_id = models.CharField(max_length=64)
+    full_name = models.CharField(max_length=512)
+    owner_login = models.CharField(max_length=255)
+    private = models.BooleanField(default=True)
+    default_branch = models.CharField(max_length=255, blank=True, default="")
+    clone_url = models.CharField(max_length=2048)
+    web_url = models.CharField(max_length=2048, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Agent Git Repository"
+        verbose_name_plural = "Agent Git Repositories"
+        db_table = "agent_git_repositories"
+        ordering = ("owner_login", "full_name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "external_id"],
+                condition=Q(deleted_at__isnull=True),
+                name="agent_git_repository_unique_account_external_id",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["workspace", "owner_login", "full_name"], name="agent_git_repo_ws_owner_name"),
+        ]
+
+    def __str__(self):
+        return self.full_name

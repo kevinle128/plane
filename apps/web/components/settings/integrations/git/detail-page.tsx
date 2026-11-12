@@ -14,6 +14,7 @@ import type { TAgentGitConnection, TAgentGitProvider } from "@plane/types";
 import { getFileURL, renderFormattedDate } from "@plane/utils";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
+import { GitAccountsList } from "./accounts-list";
 import { GithubSetupCard } from "./github/setup-card";
 import { agentGitProviderLabel } from "./provider-meta";
 
@@ -98,7 +99,12 @@ export const GitProviderDetailPage = observer(function GitProviderDetailPage(pro
           {t(reconnectKey)}
         </p>
       )}
-      {!isLoading && isConnected && connection && <ConnectionMetaStrip connection={connection} />}
+      {!isLoading && isConnected && connection && (
+        <>
+          <ConnectionMetaStrip connection={connection} />
+          <GitAccountsList workspaceSlug={workspaceSlug} connection={connection} canEdit={canEdit} />
+        </>
+      )}
       {!isLoading && !isConnected && provider === "github" && (
         <GithubSetupCard workspaceSlug={workspaceSlug} canEdit={canEdit} />
       )}

@@ -6,7 +6,11 @@
 
 import { API_BASE_URL } from "@plane/constants";
 import type {
+  TAgentGitAccount,
   TAgentGitConnection,
+  TAgentGitProvider,
+  TAgentGitRepositoryPage,
+  TAgentGitRepositoryQuery,
   TAgentGithubDeviceAuthorization,
   TAgentGithubDeviceAuthorizationKind,
 } from "@plane/types";
@@ -57,6 +61,45 @@ export class AgentGitService extends APIService {
     authorizationId: string
   ): Promise<TAgentGithubDeviceAuthorization> {
     return this.post(`${this.base(workspaceSlug)}/github/device-authorizations/${authorizationId}/cancel/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async listAccounts(workspaceSlug: string, provider: TAgentGitProvider): Promise<TAgentGitAccount[]> {
+    return this.get(`${this.base(workspaceSlug)}/${provider}/accounts/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async syncGithubAccounts(workspaceSlug: string): Promise<TAgentGitAccount[]> {
+    return this.post(`${this.base(workspaceSlug)}/github/accounts/sync/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async attachAccount(
+    workspaceSlug: string,
+    provider: TAgentGitProvider,
+    accountId: string
+  ): Promise<TAgentGitAccount> {
+    return this.post(`${this.base(workspaceSlug)}/${provider}/accounts/${accountId}/attach/`, {})
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async listRepositories(
+    workspaceSlug: string,
+    query: TAgentGitRepositoryQuery = {}
+  ): Promise<TAgentGitRepositoryPage> {
+    return this.get(`${this.base(workspaceSlug)}/repositories/`, { params: query })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

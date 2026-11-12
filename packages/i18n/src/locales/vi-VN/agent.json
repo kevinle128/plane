@@ -58,6 +58,25 @@
       "token_encryption_failed": "Plane could not store the token securely. Nothing was connected.",
       "github_unexpected_response": "GitHub returned an unexpected response. Try again.",
       "github_url_unreachable": "Plane cannot reach GitHub. Check the network and try again."
+    },
+    "accounts": {
+      "title": "Connections",
+      "connect_organization": "Connect organisation",
+      "connect_organization_hint": "Install the GitHub App on an organisation in the new tab, then refresh this list.",
+      "refresh": "Refresh installations",
+      "attach": "Attach",
+      "attached": "Attached",
+      "candidate": "Not attached",
+      "candidate_hint": "Attach an installation to offer its repositories in this workspace.",
+      "organization": "Organisation",
+      "user": "Account",
+      "all_repositories": "All repositories",
+      "selected_repositories": "Selected repositories",
+      "personal_title": "Your personal GitHub account",
+      "personal_hint": "Connected · used to authorize the GitHub App for this workspace",
+      "empty": "No installations yet. Install the GitHub App on an account or organisation.",
+      "synced": "Installations refreshed.",
+      "attached_toast": "{name} is attached. Its repositories appear shortly."
     }
   }
 }

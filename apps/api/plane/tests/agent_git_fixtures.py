@@ -146,3 +146,54 @@ def connect_github(client, slug, fake, **routes):
 def expire_connection_token(connection):
     connection.token_expires_at = timezone.now() - timedelta(minutes=1)
     connection.save(update_fields=["token_expires_at"])
+
+
+def github_installation(installation_id=111, login="plane-mini", account_type="Organization", selection="all"):
+    return {
+        "id": installation_id,
+        "account": {"login": login, "id": installation_id * 10, "type": account_type},
+        "repository_selection": selection,
+        "target_type": account_type,
+    }
+
+
+def github_installations_response(*installations):
+    return json_response(200, {"total_count": len(installations), "installations": list(installations)})
+
+
+def github_repository(repo_id, full_name, private=True, default_branch="main"):
+    owner = full_name.split("/")[0]
+    return {
+        "id": repo_id,
+        "name": full_name.split("/")[1],
+        "full_name": full_name,
+        "owner": {"login": owner},
+        "private": private,
+        "default_branch": default_branch,
+        "clone_url": f"https://github.com/{full_name}.git",
+        "html_url": f"https://github.com/{full_name}",
+    }
+
+
+def github_repositories_page(*repositories, next_page=None):
+    headers = {}
+    if next_page:
+        headers["Link"] = (
+            f'<https://api.github.com/user/installations/111/repositories?per_page=100&page={next_page}>; rel="next"'
+        )
+    return json_response(200, {"total_count": len(repositories), "repositories": list(repositories)}, headers=headers)
+
+
+def github_installation_repositories_path(installation_id=111):
+    return f"api.github.com/user/installations/{installation_id}/repositories"
+
+
+def accounts_url(slug, provider="github", account_id=None, action=None):
+    base = f"/api/workspaces/{slug}/agent-git/{provider}/accounts/"
+    if account_id is None:
+        return f"{base}{action}/" if action else base
+    return f"{base}{account_id}/{action}/" if action else f"{base}{account_id}/"
+
+
+def repositories_url(slug):
+    return f"/api/workspaces/{slug}/agent-git/repositories/"

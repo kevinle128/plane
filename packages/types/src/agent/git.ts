@@ -38,7 +38,55 @@ export type TAgentGitConnection = {
   worker_last_error: string;
   worker_checked_at: string | null;
   has_ca_bundle: boolean;
+  /** GitHub App installation URL; empty for GitLab or when the App slug is not configured. */
+  install_url: string;
   updated_at: string;
+};
+
+export type TAgentGitAccountState = "candidate" | "attached" | "detached";
+
+/** A GitHub installation or a GitLab group. */
+export type TAgentGitAccount = {
+  id: string;
+  provider: TAgentGitProvider;
+  external_id: string;
+  login: string;
+  account_type: string;
+  repository_selection: string;
+  state: TAgentGitAccountState;
+  attached_by: string | null;
+  attached_at: string | null;
+  removed_at: string | null;
+  catalog_refreshed_at: string | null;
+  catalog_error: string;
+};
+
+/** A repository in the workspace catalog. */
+export type TAgentGitRepository = {
+  id: string;
+  provider: TAgentGitProvider;
+  host: string;
+  account_id: string;
+  account_login: string;
+  account_type: string;
+  external_id: string;
+  full_name: string;
+  owner_login: string;
+  private: boolean;
+  default_branch: string;
+  web_url: string;
+};
+
+export type TAgentGitRepositoryPage = {
+  results: TAgentGitRepository[];
+  next_cursor: string | null;
+};
+
+export type TAgentGitRepositoryQuery = {
+  provider?: TAgentGitProvider;
+  search?: string;
+  owner?: string;
+  cursor?: string;
 };
 
 export type TAgentGithubDeviceAuthorizationKind = "user" | "organization";

@@ -92,9 +92,12 @@ from .sticky import Sticky
 from .description import Description, DescriptionVersion
 
 from .agent_git import (
+    AgentGitAccount,
+    AgentGitAccountState,
     AgentGitConnection,
     AgentGitConnectionStatus,
     AgentGitProvider,
+    AgentGitRepository,
     AgentGithubDeviceAuthorization,
     AgentGithubDeviceAuthorizationKind,
     AgentGithubDeviceAuthorizationStatus,
