@@ -70,6 +70,12 @@ Branch `feat/local-cli-agents` (worktree `plane-worktrees/local-cli-agents`). On
 - Test first: 5 new GitLab catalog cases failed (no GitLab branch in `client_for`, no enqueue on connect, no `X-Next-Page` paging, no host filter).
 - Green: catalog plus provider contract 26 passed; with the expired-token case, `pytest plane/tests/contract/app -k agent plane/tests/unit/test_agent_git_provider_contract.py` 180 passed; `ruff check plane` clean.
 
+### G3 Bind a GitLab repository while creating a project
+
+- Test first: the 10 GitLab binding cases passed on their first run, because the 1.5 bind path is provider-neutral (it copies provider and host from the catalog row and the unique key includes both). They are kept as acceptance tests for G3 AC2-AC4. The blocks case `getRepositoryGroupLabel` failed first (`is not defined`).
+- Green: `pytest plane/tests/contract/app -k 'agent or project_app'` 203 passed; blocks agent-run 19 passed; web and blocks typecheck 11/11.
+- Change: each picker group heading and its `role="group"` label now name the provider in text ("GitLab · platform/tools"), so the provider is not shown by the icon alone.
+
 ## Deviations from the plan
 
 1. Migrations follow the four names of the plan, one per story that adds models: `0126_agent_git_connection` (connection, device authorization) in 1.1, `0127_agent_git_accounts` in 1.2, `0128_project_repository_binding` in 1.5, `0129_agent_git_policy` in 1.6. The policy model has all three fields from 1.6; 1.7 and 1.8 expose `mirror_conclusions` and `branch_format` in the API and UI without a new migration.

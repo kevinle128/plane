@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { AGENT_GIT_PROVIDER_LABELS } from "@plane/constants";
 import type { TAgentGitProvider, TAgentGitRepository } from "@plane/types";
 
 const PROVIDER_ORDER: TAgentGitProvider[] = ["github", "gitlab"];
@@ -78,4 +79,9 @@ export function describeRepositoryRow(row: TAgentGitRepository, selectedId: stri
     availability: usedElsewhere ? "already_used" : "available",
     boundProjectName: row.bound_project?.name ?? null,
   };
+}
+
+/** Group heading text such as "GitLab · platform/tools"; the provider icon next to it is decorative. */
+export function getRepositoryGroupLabel(provider: TAgentGitProvider, account: TRepositoryAccountGroup): string {
+  return `${AGENT_GIT_PROVIDER_LABELS[provider]} · ${account.login}`;
 }

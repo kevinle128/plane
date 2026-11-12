@@ -328,3 +328,150 @@ class TestConcurrentBind:
         assert Project.objects.filter(workspace=workspace).count() == 1
         project = Project.objects.get(workspace=workspace)
         assert ProjectRepositoryBinding.objects.get().project_id == project.id
+
+
+def gitlab_catalog(workspace, user, repositories=((101, "platform/api"), (102, "platform/tools/cli"))):
+    return make_catalog(workspace, user, provider="gitlab", host="git.example.com", repositories=list(repositories))
+
+
+@pytest.mark.contract
+class TestGitlabBind:
+    @pytest.mark.django_db
+    def test_bind_copies_the_gitlab_catalog_row(self, session_client, workspace, create_user, fake_http, mock_celery):
+        _, _, rows = gitlab_catalog(workspace, create_user)
+        payload = project_payload(
+            "Tools",
+            "TLS",
+            {"repository_id": str(rows[1].id), "provider": "github", "clone_url": "https://evil.example/x.git"},
+        )
+
+        response = session_client.post(projects_url(workspace.slug), payload, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        binding = ProjectRepositoryBinding.objects.get(project_id=response.data["id"])
+        assert (binding.provider, binding.host, binding.external_repository_id) == ("gitlab", "git.example.com", "102")
+        assert binding.full_name == "platform/tools/cli"
+        assert binding.clone_url == "https://git.example.com/platform/tools/cli.git"
+        assert binding.base_ref == "main"
+        assert binding.host == binding.account.connection.host
+        assert response.data["repository"]["provider"] == "gitlab"
+
+    @pytest.mark.django_db
+    def test_same_numeric_id_on_both_providers_binds_twice(
+        self, session_client, workspace, create_user, fake_http, mock_celery
+    ):
+        _, _, github_rows = catalog(workspace, create_user, repositories=((777, "plane-mini/api"),))
+        _, _, gitlab_rows = gitlab_catalog(workspace, create_user, repositories=((777, "platform/api"),))
+
+        first = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("Hub", "HUB", {"repository_id": str(github_rows[0].id)}),
+            format="json",
+        )
+        second = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("Lab", "LAB", {"repository_id": str(gitlab_rows[0].id)}),
+            format="json",
+        )
+
+        assert (first.status_code, second.status_code) == (201, 201)
+        assert sorted(ProjectRepositoryBinding.objects.values_list("provider", flat=True)) == ["github", "gitlab"]
+
+    @pytest.mark.django_db
+    def test_duplicate_gitlab_bind_returns_409(self, session_client, workspace, create_user, fake_http, mock_celery):
+        _, _, rows = gitlab_catalog(workspace, create_user)
+        repository = {"repository_id": str(rows[0].id)}
+        session_client.post(projects_url(workspace.slug), project_payload("One", "ONE", repository), format="json")
+
+        response = session_client.post(
+            projects_url(workspace.slug), project_payload("Two", "TWO", repository), format="json"
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert (response.data["error"], response.data["provider"]) == ("repository_already_bound", "gitlab")
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("base_ref", ["-x", "a..b", "bad\x01ref"])
+    def test_invalid_base_ref_on_gitlab_returns_400(
+        self, base_ref, session_client, workspace, create_user, fake_http, mock_celery
+    ):
+        _, _, rows = gitlab_catalog(workspace, create_user)
+
+        response = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("One", "ONE", {"repository_id": str(rows[0].id), "base_ref": base_ref}),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not Project.objects.filter(workspace=workspace).exists()
+
+    @pytest.mark.django_db
+    def test_gitlab_row_of_another_workspace_returns_404(
+        self, session_client, workspace, create_user, fake_http, mock_celery
+    ):
+        other = Workspace.objects.create(name="Other", slug="other-ws", owner=create_user)
+        WorkspaceMember.objects.create(workspace=other, member=create_user, role=20)
+        _, _, rows = gitlab_catalog(other, create_user)
+
+        response = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("One", "ONE", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.django_db
+    def test_disconnected_gitlab_rejects_the_bind(self, session_client, workspace, create_user, fake_http, mock_celery):
+        connection, _, rows = gitlab_catalog(workspace, create_user)
+        AgentGitConnection.objects.filter(pk=connection.pk).update(status="disconnected")
+
+        response = session_client.post(
+            projects_url(workspace.slug),
+            project_payload("One", "ONE", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+
+        assert response.data == {"error": "provider_disconnected", "provider": "gitlab"}
+
+    @pytest.mark.django_db
+    def test_guest_cannot_bind_a_gitlab_repository(self, guest_client, workspace, create_user, fake_http, mock_celery):
+        _, _, rows = gitlab_catalog(workspace, create_user)
+
+        response = guest_client.post(
+            projects_url(workspace.slug),
+            project_payload("One", "ONE", {"repository_id": str(rows[0].id)}),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @pytest.mark.django_db(transaction=True)
+    def test_concurrent_gitlab_binds_give_one_201_and_one_409(self, workspace, create_user, fake_http, mock_celery):
+        _, _, rows = gitlab_catalog(workspace, create_user)
+        repository = {"repository_id": str(rows[0].id)}
+        barrier = threading.Barrier(2)
+        results = []
+
+        def create(name, identifier):
+            try:
+                client = client_for_user(create_user)
+                barrier.wait(timeout=30)
+                results.append(
+                    client.post(
+                        projects_url(workspace.slug), project_payload(name, identifier, repository), format="json"
+                    ).status_code
+                )
+            finally:
+                db_connection.close()
+
+        threads = [threading.Thread(target=create, args=args) for args in (("First", "FST"), ("Second", "SND"))]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+            assert not thread.is_alive()
+
+        assert sorted(results) == [201, 409]
+        assert Project.objects.filter(workspace=workspace).count() == 1

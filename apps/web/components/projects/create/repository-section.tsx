@@ -13,6 +13,7 @@ import { UnlinkOutline } from "@makeplane/propel/icons";
 import {
   describeRepositoryRow,
   filterRepositories,
+  getRepositoryGroupLabel,
   getRepositoryOwners,
   groupRepositories,
 } from "@plane/blocks/agent-run";
@@ -201,10 +202,13 @@ export const ProjectRepositorySection = observer(function ProjectRepositorySecti
         )}
         {groups.map((group) =>
           group.accounts.map((account) => (
-            <div key={account.accountId} role="group" aria-label={account.login}>
+            <div key={account.accountId} role="group" aria-label={getRepositoryGroupLabel(group.provider, account)}>
               <div className="tracking-wider flex items-center gap-1.5 px-3 pt-3 pb-1 text-11 font-semibold text-tertiary uppercase">
                 <AgentGitProviderIcon provider={group.provider} className="size-3" />
-                {t("agent_git.repository.account_group", { login: account.login, type: account.type })}
+                {t("agent_git.repository.account_group", {
+                  login: getRepositoryGroupLabel(group.provider, account),
+                  type: account.type,
+                })}
               </div>
               {account.rows.map((row) => (
                 <RepositoryRow

@@ -6,7 +6,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { TAgentGitRepository } from "@plane/types";
-import { describeRepositoryRow, filterRepositories, getRepositoryOwners, groupRepositories } from "./repository-list";
+import {
+  describeRepositoryRow,
+  filterRepositories,
+  getRepositoryGroupLabel,
+  getRepositoryOwners,
+  groupRepositories,
+} from "./repository-list";
 
 function repo(overrides: Partial<TAgentGitRepository>): TAgentGitRepository {
   return {
@@ -107,5 +113,13 @@ describe("describeRepositoryRow", () => {
       availability: "already_used",
       boundProjectName: "Atlas",
     });
+  });
+});
+
+describe("getRepositoryGroupLabel", () => {
+  it("names the provider in text, so the provider is not shown by the icon alone", () => {
+    const groups = groupRepositories(ROWS);
+    expect(getRepositoryGroupLabel(groups[0].provider, groups[0].accounts[1])).toBe("GitHub · plane-mini");
+    expect(getRepositoryGroupLabel(groups[1].provider, groups[1].accounts[0])).toBe("GitLab · platform/tools");
   });
 });
