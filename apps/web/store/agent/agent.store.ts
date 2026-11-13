@@ -5,7 +5,7 @@
  */
 
 import { action, makeObservable, observable, runInAction } from "mobx";
-import type { TAgent, TAgentHarness } from "@plane/types";
+import type { TAgent, TAgentHarness, TAgentUpdate } from "@plane/types";
 import { AgentService } from "@/services/agent/agent.service";
 
 export interface IAgentStore {
@@ -14,6 +14,7 @@ export interface IAgentStore {
   getAgent: (workspaceSlug: string, harness: TAgentHarness) => TAgent | undefined;
   fetchAgents: (workspaceSlug: string) => Promise<TAgent[]>;
   fetchAgent: (workspaceSlug: string, harness: TAgentHarness) => Promise<TAgent>;
+  updateAgent: (workspaceSlug: string, harness: TAgentHarness, data: TAgentUpdate) => Promise<TAgent>;
   connect: (workspaceSlug: string, harness: TAgentHarness) => Promise<TAgent>;
   disconnect: (workspaceSlug: string, harness: TAgentHarness) => Promise<TAgent>;
 }
@@ -27,6 +28,7 @@ export class AgentStore implements IAgentStore {
       agentsByWorkspace: observable,
       fetchAgents: action,
       fetchAgent: action,
+      updateAgent: action,
       connect: action,
       disconnect: action,
     });
@@ -53,6 +55,12 @@ export class AgentStore implements IAgentStore {
 
   fetchAgent = async (workspaceSlug: string, harness: TAgentHarness) => {
     const agent = await this.service.retrieve(workspaceSlug, harness);
+    this.setAgent(workspaceSlug, agent);
+    return agent;
+  };
+
+  updateAgent = async (workspaceSlug: string, harness: TAgentHarness, data: TAgentUpdate) => {
+    const agent = await this.service.update(workspaceSlug, harness, data);
     this.setAgent(workspaceSlug, agent);
     return agent;
   };

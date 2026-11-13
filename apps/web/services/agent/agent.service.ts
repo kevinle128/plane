@@ -5,7 +5,7 @@
  */
 
 import { API_BASE_URL } from "@plane/constants";
-import type { TAgent, TAgentHarness, TAgentSettingsError } from "@plane/types";
+import type { TAgent, TAgentHarness, TAgentSettingsError, TAgentUpdate } from "@plane/types";
 import { APIService } from "@/services/api.service";
 
 /** API error body with the HTTP status; a body that is not JSON gives an empty error. */
@@ -36,6 +36,14 @@ export class AgentService extends APIService {
 
   async retrieve(workspaceSlug: string, harness: TAgentHarness): Promise<TAgent> {
     return this.get(`${this.base(workspaceSlug)}/${harness}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw toAgentSettingsError(error);
+      });
+  }
+
+  async update(workspaceSlug: string, harness: TAgentHarness, data: TAgentUpdate): Promise<TAgent> {
+    return this.patch(`${this.base(workspaceSlug)}/${harness}/`, data)
       .then((response) => response?.data)
       .catch((error) => {
         throw toAgentSettingsError(error);

@@ -114,3 +114,69 @@ class TestConcurrentFirstRead:
         assert Agent.objects.filter(workspace=workspace).count() == 4
         assert AgentConnection.objects.filter(agent__workspace=workspace).count() == 4
         assert User.objects.filter(is_bot=True, bot_type="AGENT").count() == 4
+
+
+def patch_agent(client, workspace, payload, harness="claude_code"):
+    return client.patch(agents_url(workspace.slug, harness), payload, format="json")
+
+
+@pytest.mark.contract
+class TestRenameAgent:
+    @pytest.mark.django_db
+    def test_valid_name_persists_and_names_the_bot_user(self, session_client, workspace):
+        response = patch_agent(session_client, workspace, {"name": "  Reviewer Claude  "})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["name"] == "Reviewer Claude"
+        listed = session_client.get(agents_url(workspace.slug)).data
+        assert listed[0]["name"] == "Reviewer Claude"
+        agent = Agent.objects.select_related("bot_user").get(workspace=workspace, harness="claude_code")
+        assert agent.bot_user.display_name == "Reviewer Claude"
+        assert agent.bot_user.first_name == "Reviewer Claude"
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        ("name", "code"),
+        [("", "blank"), ("   ", "blank"), ("x" * 65, "max_length"), ("Line\nbreak", "invalid")],
+    )
+    def test_empty_or_invalid_name_returns_400_and_keeps_the_old_name(self, session_client, workspace, name, code):
+        session_client.get(agents_url(workspace.slug))
+
+        response = patch_agent(session_client, workspace, {"name": name})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["name"]
+        assert response.data["codes"]["name"] == code
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["name"] == "Claude Code"
+        agent = Agent.objects.select_related("bot_user").get(workspace=workspace, harness="claude_code")
+        assert agent.bot_user.display_name == "Claude Code"
+
+    @pytest.mark.django_db
+    def test_member_cannot_rename(self, session_client, member_client, workspace):
+        session_client.get(agents_url(workspace.slug))
+
+        response = patch_agent(member_client, workspace, {"name": "Mine"})
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["name"] == "Claude Code"
+
+    @pytest.mark.django_db
+    def test_rename_keeps_the_agent_and_bot_user_identity(self, session_client, workspace):
+        before = session_client.get(agents_url(workspace.slug, "claude_code")).data
+        bot_user_id = Agent.objects.get(workspace=workspace, harness="claude_code").bot_user_id
+
+        after = patch_agent(session_client, workspace, {"name": "Renamed"}).data
+
+        assert after["id"] == before["id"]
+        assert Agent.objects.get(workspace=workspace, harness="claude_code").bot_user_id == bot_user_id
+
+    @pytest.mark.django_db
+    def test_read_only_fields_are_ignored(self, session_client, workspace):
+        response = patch_agent(session_client, workspace, {"name": "Renamed", "harness": "codex", "id": "x"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["harness"] == "claude_code"
+
+    @pytest.mark.django_db
+    def test_unknown_harness_returns_404(self, session_client, workspace):
+        assert patch_agent(session_client, workspace, {"name": "X"}, harness="aider").status_code == 404

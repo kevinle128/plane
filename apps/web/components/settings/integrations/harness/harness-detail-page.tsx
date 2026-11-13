@@ -4,15 +4,19 @@
  * See the LICENSE file for details.
  */
 
+import { useId, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Button } from "@makeplane/propel/components/button";
+import { Input } from "@makeplane/propel/components/input";
 import { AgentOutline, ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
 import { isConnectionPending } from "@plane/blocks/agent-run";
+import { setToast } from "@plane/blocks/toast";
 import { AGENT_CONNECTION_POLL_MS, AGENT_HARNESSES, AGENT_HARNESS_LABELS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import type { TAgent, TAgentHarness } from "@plane/types";
+import type { TAgent, TAgentHarness, TAgentSettingsError, TAgentSettingsField, TAgentUpdate } from "@plane/types";
 import { cn } from "@plane/utils";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgent } from "@/hooks/store/use-agent";
@@ -41,6 +45,143 @@ export function AgentsLoadError({ onRetry }: { onRetry: () => void }) {
     </div>
   );
 }
+
+type TTranslate = (key: string, params?: Record<string, unknown>) => string;
+
+/** Translated message of a field error; an unknown code shows the API message. */
+function fieldErrorMessage(t: TTranslate, error: TAgentSettingsError | null, field: TAgentSettingsField) {
+  const messages = error?.[field];
+  if (!messages?.length) return null;
+  const code = error?.codes?.[field];
+  if (code) {
+    const key = `agent_settings.errors.${field}_${code}`;
+    const message = t(key);
+    if (message && message !== key) return message;
+  }
+  return messages[0];
+}
+
+type TDraft = Pick<TAgent, "name">;
+
+const draftOf = (agent: TAgent): TDraft => ({ name: agent.name });
+
+/** Changed fields only, so a Save never rewrites a value that another admin changed meanwhile. */
+function changesOf(draft: TDraft, agent: TAgent): TAgentUpdate {
+  const changes: TAgentUpdate = {};
+  if (draft.name !== agent.name) changes.name = draft.name;
+  return changes;
+}
+
+function SettingRow(props: {
+  label: string;
+  hint: string;
+  error: string | null;
+  children: (ids: TRowIds) => ReactNode;
+}) {
+  const { label, hint, error, children } = props;
+  const labelId = useId();
+  const hintId = useId();
+  const errorId = useId();
+  const controlId = useId();
+  return (
+    <li className="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-3">
+      <span className="flex min-w-0 flex-1 basis-44 flex-col gap-0.5">
+        <label id={labelId} htmlFor={controlId} className="text-body-sm-medium text-primary">
+          {label}
+        </label>
+        <span id={hintId} className="text-caption-sm-regular text-tertiary">
+          {hint}
+        </span>
+      </span>
+      <span className="ml-auto flex w-full max-w-60 min-w-0 flex-col gap-1 sm:w-60">
+        {children({ controlId, describedBy: error ? `${hintId} ${errorId}` : hintId, invalid: !!error })}
+        {error && (
+          <span id={errorId} role="alert" className="text-caption-sm-regular text-danger-primary">
+            {error}
+          </span>
+        )}
+      </span>
+    </li>
+  );
+}
+
+type TRowIds = { controlId: string; describedBy: string; invalid: boolean };
+
+/**
+ * Agent settings with one Save. The whole fieldset is disabled while Save runs, so no edit is lost
+ * when the saved values replace the draft.
+ */
+const AgentSettingsForm = observer(function AgentSettingsForm(props: {
+  workspaceSlug: string;
+  agent: TAgent;
+  canEdit: boolean;
+}) {
+  const { workspaceSlug, agent, canEdit } = props;
+  const { t } = useTranslation();
+  const { updateAgent } = useAgent();
+  const [draft, setDraft] = useState<TDraft>(() => draftOf(agent));
+  const [error, setError] = useState<TAgentSettingsError | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const changes = changesOf(draft, agent);
+  const hasChanges = Object.keys(changes).length > 0;
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!hasChanges) return;
+    setIsSaving(true);
+    try {
+      const saved = await updateAgent(workspaceSlug, agent.harness, changes);
+      setDraft(draftOf(saved));
+      setError(null);
+      setToast({ type: "success", title: t("agent_settings.settings.saved") });
+    } catch (saveError) {
+      const body = (saveError ?? {}) as TAgentSettingsError;
+      setError(body);
+      if (!body.codes) setToast({ type: "error", title: t("agent_settings.settings.save_failed") });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void save(event)} noValidate>
+      <fieldset disabled={!canEdit || isSaving} className="m-0 min-w-0 border-0 p-0">
+        <ul>
+          <SettingRow
+            label={t("agent_settings.settings.name_label")}
+            hint={t("agent_settings.settings.name_hint")}
+            error={fieldErrorMessage(t, error, "name")}
+          >
+            {({ controlId, describedBy, invalid }) => (
+              <Input
+                id={controlId}
+                size="md"
+                value={draft.name}
+                maxLength={64}
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
+            )}
+          </SettingRow>
+        </ul>
+        {canEdit && (
+          <div className="flex justify-end px-4 py-3">
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              stretch="auto"
+              label={isSaving ? t("agent_settings.settings.saving") : t("agent_settings.settings.save")}
+              loading={isSaving}
+              disabled={!hasChanges}
+            />
+          </div>
+        )}
+      </fieldset>
+    </form>
+  );
+});
 
 function AgentSelector({ workspaceSlug, current }: { workspaceSlug: string; current: TAgentHarness }) {
   const { t } = useTranslation();
@@ -135,6 +276,7 @@ export const HarnessDetailPage = observer(function HarnessDetailPage({ workspace
             <ul>
               <HarnessConnectionRow workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
             </ul>
+            <AgentSettingsForm key={agent.id} workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
           </section>
         </div>
       )}

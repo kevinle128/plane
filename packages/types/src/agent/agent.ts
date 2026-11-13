@@ -53,8 +53,17 @@ export type TAgent = {
   connection: TAgentConnection;
 };
 
-/** API error body of the Agent settings endpoints. Field errors are lists of messages. */
+/** Settings an admin can change on an Agent. */
+export type TAgentSettingsField = "name" | "handle" | "instructions" | "mentionable" | "selected_model";
+
+export type TAgentUpdate = Partial<Pick<TAgent, TAgentSettingsField>>;
+
+/**
+ * API error body of the Agent settings endpoints. Field errors are lists of messages; `codes` has the
+ * first error code of each field, so the web app can show a translated message.
+ */
 export type TAgentSettingsError = {
   error?: string;
   status?: number;
-} & Partial<Record<"name" | "handle" | "instructions" | "mentionable" | "selected_model", string[]>>;
+  codes?: Partial<Record<TAgentSettingsField, string>>;
+} & Partial<Record<TAgentSettingsField, string[]>>;

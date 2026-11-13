@@ -13,9 +13,13 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.agent.services import harness_probe
-from plane.agent.services.agent_settings import ensure_workspace_agent, ensure_workspace_agents
+from plane.agent.services.agent_settings import (
+    ensure_workspace_agent,
+    ensure_workspace_agents,
+    update_agent_settings,
+)
 from plane.app.permissions import ROLE, allow_permission
-from plane.app.serializers.agent import AgentSerializer
+from plane.app.serializers.agent import AgentSerializer, AgentUpdateSerializer, error_codes
 from plane.app.views.base import BaseAPIView
 from plane.db.models import AgentHarness, Workspace
 
@@ -44,6 +48,17 @@ class AgentDetailEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug, harness):
         return Response(AgentSerializer(agent_for(slug, harness)).data, status=status.HTTP_200_OK)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def patch(self, request, slug, harness):
+        agent = agent_for(slug, harness)
+        serializer = AgentUpdateSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(
+                {**serializer.errors, "codes": error_codes(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        update_agent_settings(agent, serializer.validated_data)
+        return agent_response(agent)
 
 
 class AgentConnectEndpoint(BaseAPIView):

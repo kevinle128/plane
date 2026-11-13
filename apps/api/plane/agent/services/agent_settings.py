@@ -107,3 +107,17 @@ def is_available_for_mentions(agent, now=None):
     """A new Run can start only from a mentionable Agent whose Harness is connected."""
     state, _ = connection_view(agent.connection, now)
     return agent.mentionable and state == AgentConnectionState.CONNECTED
+
+
+def update_agent_settings(agent, changes):
+    """Apply validated setting changes. The bot user keeps the Agent name, so comments show it."""
+    with transaction.atomic():
+        locked = Agent.objects.select_for_update().select_related("bot_user").get(pk=agent.pk)
+        for field, value in changes.items():
+            setattr(locked, field, value)
+        locked.save()
+        if "name" in changes:
+            locked.bot_user.display_name = changes["name"]
+            locked.bot_user.first_name = changes["name"]
+            locked.bot_user.save(update_fields=["display_name", "first_name"])
+    return locked

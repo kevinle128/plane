@@ -278,6 +278,20 @@
       "permission": "The CLI did not ask before a write, or the read-only boundary did not hold. Check the CLI and the Worker, then retry.",
       "recovery": "The CLI could not continue after its process stopped. Update the CLI, then retry.",
       "generic": "The connection check did not pass. Retry."
+    },
+    "settings": {
+      "save": "Save",
+      "saving": "Saving",
+      "saved": "Agent settings saved.",
+      "save_failed": "The agent settings could not be saved.",
+      "name_label": "Name",
+      "name_hint": "Shown on the run card and in mention suggestions."
+    },
+    "errors": {
+      "name_blank": "Enter a name.",
+      "name_required": "Enter a name.",
+      "name_max_length": "Use 64 characters or fewer.",
+      "name_invalid": "Use one line of text without control characters."
     }
   }
 }

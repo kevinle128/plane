@@ -45,3 +45,20 @@ class AgentSerializer(serializers.Serializer):
             "available_for_mentions": is_available_for_mentions(agent, now),
             "connection": agent_connection_data(agent.connection, now),
         }
+
+
+def reject_control_characters(value):
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise serializers.ValidationError("Use one line of text without control characters.", code="invalid")
+    return value
+
+
+class AgentUpdateSerializer(serializers.Serializer):
+    """Fields an admin can change. Each story of the settings page adds its field here."""
+
+    name = serializers.CharField(max_length=64, trim_whitespace=True, validators=[reject_control_characters])
+
+
+def error_codes(errors):
+    """First error code of each field, so the web app can show a translated message."""
+    return {field: getattr(messages[0], "code", "invalid") for field, messages in errors.items() if messages}
