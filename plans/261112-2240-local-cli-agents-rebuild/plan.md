@@ -96,6 +96,15 @@ The user accepted the recommended answers on 2026-11-12. The answer came through
 14. Q14, token scopes: the connect check requires both `api` and `write_repository`. The current test token has `api` only, so it is used only for read-only checks.
 15. Q15, connect error detail: one code `gitlab_url_not_allowed_or_unresolved` for a name that does not resolve and for a blocked address. The other connect codes stay unchanged.
 
+## Claude sandbox decision (2026-11-13)
+
+16. Q16, Claude Q&A boundary: the user chose Claude Code's built-in sandbox instead of the outer OS sandbox around the whole `claude` process. This applies to the Claude Harness only; Codex, Grok and Omp keep decision Q1.
+    - Bash commands and their child processes run in Claude Code's built-in sandbox (OS-level, filesystem and network isolation). Writes are denied everywhere; reads of other Runs, the Worker token, credentials and other session folders are denied (`sandbox.filesystem.denyRead`).
+    - Built-in file tools (Edit, Write, NotebookEdit) are denied by permission rules; Read is limited to the Run clone by permission rules. MCP servers and hooks are turned off for Runs (no MCP config, no hooks, restricted setting sources).
+    - The `claude` process itself runs outside the boundary, so it writes its own session history normally and `--resume` works without an exception.
+    - This replaces, for Claude only, the AD-4/AD-7 rule "Q&A writes are denied at the OS boundary": file-tool denial is enforced by Claude Code's permission system, not by the OS. The probe's permission check changes from "write denied under the OS boundary" to "Edit/Write denied by permission rule and a Bash write denied by the built-in sandbox".
+    - Accepted trade-off (user, 2026-11-13): weaker isolation for Claude's own file tools, MCP and hooks than an outer OS sandbox, in exchange for no session-folder exception and simpler setup.
+
 ## Red Team Review
 
 ### Session — 2026-11-12
