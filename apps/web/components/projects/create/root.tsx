@@ -7,6 +7,7 @@
 import { useId, useState } from "react";
 import { observer } from "mobx-react";
 import { FormProvider, useForm } from "react-hook-form";
+import { mutate } from "swr";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { setToast } from "@plane/blocks/toast";
@@ -20,8 +21,10 @@ import { getCoverImageType, uploadCoverImage } from "@/helpers/cover-image.helpe
 import { useProject } from "@/hooks/store/use-project";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // plane web types
-import type { TProject } from "@plane/types";
+import type { TAgentGitRepositorySelection, TProject } from "@plane/types";
+import { agentGitErrorMessage, agentGitRepositoriesKey } from "@/components/settings/integrations/git/provider-meta";
 import { ProjectAttributes } from "./attributes";
+import { ProjectRepositorySection } from "./repository-section";
 import { getProjectFormValues } from "./utils";
 
 export type TCreateProjectFormProps = {
@@ -41,6 +44,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
   const { addProjectToFavorites, createProject, updateProject } = useProject();
   // states
   const [shouldAutoSyncIdentifier, setShouldAutoSyncIdentifier] = useState(true);
+  const [repository, setRepository] = useState<TAgentGitRepositorySelection | null>(null);
   // form info
   const methods = useForm<TProject>({
     defaultValues: { ...getProjectFormValues(), ...data },
@@ -94,8 +98,11 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
       }
     }
 
-    return createProject(workspaceSlug.toString(), formData)
+    const payload = repository ? { ...formData, repository } : formData;
+    return createProject(workspaceSlug.toString(), payload)
       .then(async (res) => {
+        // The new project now uses its repository; other forms must see it as used.
+        if (repository) void mutate(agentGitRepositoriesKey(workspaceSlug.toString()));
         if (uploadedAssetUrl) {
           await updateCoverImageStatus(res.id, uploadedAssetUrl);
           await updateProject(workspaceSlug.toString(), res.id, { cover_image_url: uploadedAssetUrl });
@@ -123,7 +130,12 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
           const identifierError = errorData?.identifier?.includes("PROJECT_IDENTIFIER_ALREADY_EXIST");
           const nameSpecialCharError = errorData?.name?.includes("PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS");
 
-          if (nameError || identifierError || nameSpecialCharError) {
+          if (typeof errorData.error === "string" && repository) {
+            // Repository binding errors carry a stable reason code; the project was not created.
+            setToast({ type: "error", title: t("toast.error"), message: agentGitErrorMessage(t, errorData) });
+            // The catalog is out of date (for example another project took the repository): load it again.
+            void mutate(agentGitRepositoriesKey(workspaceSlug.toString()));
+          } else if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
               setToast({
                 type: "error",
@@ -169,6 +181,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
   const handleClose = () => {
     onClose();
     setShouldAutoSyncIdentifier(true);
+    setRepository(null);
     setTimeout(() => {
       reset();
     }, 300);
@@ -189,6 +202,7 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
                 setShouldAutoSyncIdentifier={setShouldAutoSyncIdentifier}
               />
               <ProjectAttributes isMobile={isMobile} />
+              <ProjectRepositorySection workspaceSlug={workspaceSlug} value={repository} onChange={setRepository} />
             </div>
           </form>
         </div>

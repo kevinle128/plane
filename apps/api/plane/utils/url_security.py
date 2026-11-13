@@ -22,14 +22,29 @@ Redirects are never auto-followed (``requests`` would re-resolve each hop and
 reopen the rebinding window, and a ``Location`` can point at a new internal
 host). ``pinned_fetch_following_redirects`` follows them manually, re-resolving,
 re-validating and re-pinning every hop.
+
+A caller can opt in to an absolute deadline for one call: pass a
+:class:`SocketDeadline` as ``deadline``. Each TCP connect attempt, on each
+resolved address, waits at most the time that remains, and no attempt starts
+after the deadline. Every socket the call opens is shut down when the deadline
+passes. That ends the call in any phase after DNS resolution (TCP connect, TLS
+handshake, status line, headers, chunk-size lines, body, trailers), which a
+per-read timeout cannot do, because a server that sends one byte inside each
+read timeout resets it again and again. DNS resolution runs before the first
+connect and is not limited by the deadline; the system resolver timeouts limit
+it.
 """
 
 # Python imports
 import ipaddress
+import socket
+import threading
+import time
 from urllib.parse import unquote, urljoin, urlsplit
 
 # Third party imports
 import requests
+import urllib3
 from requests.adapters import HTTPAdapter
 
 # Module imports
@@ -43,7 +58,136 @@ _REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 _NO_PROXIES = {"http": None, "https": None}
 
 
-class PinnedIPAdapter(HTTPAdapter):
+class SocketDeadline:
+    """Shut down every socket attached to it when ``seconds`` have passed.
+
+    Use it as a context manager around one call and its body read; leaving the
+    block stops the timer. ``attach`` keeps a duplicate of each socket, so the
+    timer never acts on a file descriptor that urllib3 closed and the system
+    gave to another socket. ``shutdown`` on the duplicate ends the shared TCP
+    connection, so a blocked read on the original socket (plain or TLS)
+    returns at once. All state changes run under one lock, so the timer
+    thread and the calling thread can race safely.
+    """
+
+    THREAD_NAME = "plane-socket-deadline"
+
+    def __init__(self, seconds):
+        seconds = max(seconds, 0)
+        self._ends_at = time.monotonic() + seconds
+        self._lock = threading.Lock()
+        self._sockets = []
+        self._expired = False
+        self._closed = False
+        self._timer = threading.Timer(seconds, self._expire)
+        self._timer.name = self.THREAD_NAME
+        self._timer.daemon = True
+        self._timer.start()
+
+    @property
+    def expired(self):
+        """``True`` once the deadline passed and the sockets were shut down."""
+        return self._expired
+
+    def remaining(self):
+        """Return the seconds left before the deadline, or ``0.0`` when it passed."""
+        if self._expired:
+            return 0.0
+        return max(0.0, self._ends_at - time.monotonic())
+
+    def attach(self, sock):
+        """Shut ``sock`` down at the deadline, or at once when it already passed."""
+        with self._lock:
+            if self._expired or self._closed:
+                _shutdown(sock)
+                return
+            try:
+                self._sockets.append(sock.dup())
+            except OSError:
+                # Without a duplicate the deadline cannot hold, so the call must not go on.
+                sock.close()
+                raise
+
+    def _expire(self):
+        with self._lock:
+            if self._closed:
+                return
+            self._expired = True
+            for duplicate in self._sockets:
+                _shutdown(duplicate)
+
+    def cancel(self):
+        """Stop the timer and release the duplicates. Safe to call more than once."""
+        self._timer.cancel()
+        with self._lock:
+            self._closed = True
+            sockets, self._sockets = self._sockets, []
+        for duplicate in sockets:
+            duplicate.close()
+        if threading.current_thread() is not self._timer:
+            # The cancelled timer wakes at once; joining it means no thread outlives the call.
+            self._timer.join()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.cancel()
+        return False
+
+
+def _shutdown(sock):
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        # The peer or urllib3 already closed the connection.
+        pass
+
+
+def _connection_class_with_deadline(base, deadline):
+    """Return a subclass of the urllib3 connection class ``base`` that obeys ``deadline``.
+
+    The TCP connect waits at most the time that remains, and fails at once
+    when no time remains. ``_new_conn`` returns the TCP socket before TLS
+    wraps it, so attaching it there also covers the TLS handshake.
+    """
+
+    class _DeadlineConnection(base):
+        def _new_conn(self):
+            remaining = deadline.remaining()
+            if remaining <= 0:
+                raise urllib3.exceptions.ConnectTimeoutError(
+                    self, f"Connection to {self.host} not started: the call deadline passed."
+                )
+            # The pool sets the connect timeout here before each connect and the
+            # read timeout after it, so this changes the connect wait only.
+            self.timeout = remaining if self.timeout is None else min(self.timeout, remaining)
+            sock = super()._new_conn()
+            deadline.attach(sock)
+            return sock
+
+    _DeadlineConnection.socket_deadline = deadline
+    return _DeadlineConnection
+
+
+class _SocketDeadlineAdapter(HTTPAdapter):
+    """A ``requests`` adapter whose pools open connections that obey ``deadline``."""
+
+    def __init__(self, *args, deadline=None, **kwargs):
+        self._deadline = deadline
+        super().__init__(*args, **kwargs)
+
+    def _hook_pool(self, pool):
+        if self._deadline is not None and getattr(pool.ConnectionCls, "socket_deadline", None) is not self._deadline:
+            pool.ConnectionCls = _connection_class_with_deadline(pool.ConnectionCls, self._deadline)
+        return pool
+
+    def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        pool = super().get_connection_with_tls_context(request, verify, proxies=proxies, cert=cert)
+        return self._hook_pool(pool)
+
+
+class PinnedIPAdapter(_SocketDeadlineAdapter):
     """
     A ``requests`` transport adapter that connects to whatever IP literal is in
     the request URL while presenting ``server_hostname`` for TLS SNI and
@@ -60,9 +204,9 @@ class PinnedIPAdapter(HTTPAdapter):
     (prefork / threads / gevent).
     """
 
-    def __init__(self, server_hostname, *args, **kwargs):
+    def __init__(self, server_hostname, *args, deadline=None, **kwargs):
         self._server_hostname = server_hostname
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, deadline=deadline, **kwargs)
 
     def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
         # requests >= 2.32 calls this (it replaced get_connection() as part of
@@ -73,7 +217,7 @@ class PinnedIPAdapter(HTTPAdapter):
         # server_hostname is a recognised urllib3 SSL pool-key field, so pools
         # for different hostnames don't collide.
         pool_kwargs["server_hostname"] = self._server_hostname
-        return self.poolmanager.connection_from_host(**host_params, pool_kwargs=pool_kwargs)
+        return self._hook_pool(self.poolmanager.connection_from_host(**host_params, pool_kwargs=pool_kwargs))
 
 
 def _split_target(url):
@@ -100,12 +244,20 @@ def _split_target(url):
     return scheme, hostname, port, path, auth
 
 
-def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout, auth=None, **kwargs):
+def _request_to_ip(
+    method, scheme, hostname, ip, port, path, *, headers, timeout, auth=None, verify=True, deadline=None, **kwargs
+):
     """Issue a single request whose socket is pinned to ``ip``.
 
     With ``stream=True`` the session is kept open until the caller closes the
     response (closing the response also closes the session), so a streamed body
     can be read with a real size cap; otherwise the session is closed eagerly.
+
+    ``verify`` is passed to ``requests`` unchanged: ``True`` for system trust,
+    or a path to a CA bundle that applies to this one request only.
+
+    ``deadline``, when given, is a :class:`SocketDeadline` that limits the
+    connect and shuts down each socket the request opens when it passes.
     """
     ip_obj = ipaddress.ip_address(ip)
     host_for_url = f"[{ip}]" if ip_obj.version == 6 else ip
@@ -121,7 +273,9 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
     session = requests.Session()
     session.trust_env = False  # ignore ambient proxy / netrc / env (see _NO_PROXIES)
     if scheme == "https":
-        session.mount("https://", PinnedIPAdapter(server_hostname=hostname))
+        session.mount("https://", PinnedIPAdapter(server_hostname=hostname, deadline=deadline))
+    elif deadline is not None:
+        session.mount("http://", _SocketDeadlineAdapter(deadline=deadline))
 
     try:
         response = session.request(
@@ -130,7 +284,7 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
             headers=request_headers,
             timeout=timeout,
             allow_redirects=False,
-            verify=True,
+            verify=verify,
             proxies=_NO_PROXIES,
             auth=auth,
             **kwargs,
@@ -157,7 +311,9 @@ def _request_to_ip(method, scheme, hostname, ip, port, path, *, headers, timeout
     return response
 
 
-def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, timeout, **kwargs):
+def _fetch_validated_hop(
+    method, url, *, allowed_ips, allowed_hosts, headers, timeout, verify=True, deadline=None, **kwargs
+):
     """
     Resolve ``url``'s host, validate it, then issue a single (non-redirecting)
     request pinned to a resolved IP. Returns ``(response, normalized_host)``.
@@ -181,10 +337,13 @@ def _fetch_validated_hop(method, url, *, allowed_ips, allowed_hosts, headers, ti
 
     last_exc = None
     for ip in ips:
+        if deadline is not None and deadline.remaining() <= 0:
+            # Each later address would also fail at once, so stop here.
+            raise requests.exceptions.ConnectTimeout(f"Call deadline passed before connecting to host: {hostname}")
         try:
             response = _request_to_ip(
                 method, scheme, hostname, ip, port, path,
-                headers=headers, timeout=timeout, auth=auth, **kwargs,
+                headers=headers, timeout=timeout, auth=auth, verify=verify, deadline=deadline, **kwargs,
             )
             return response, normalized_host
         except requests.RequestException as exc:
@@ -203,12 +362,18 @@ def pinned_fetch(
     allowed_hosts=None,
     headers=None,
     timeout=30,
+    verify=True,
+    deadline=None,
     **kwargs,
 ):
     """
     SSRF-safe single request. Resolves + validates the target host and pins the
     connection to a validated IP (defeating DNS rebinding). Does NOT follow
     redirects.
+
+    ``deadline`` is opt-in: pass a :class:`SocketDeadline` to limit the TCP
+    connect on every resolved address and everything after it to one absolute
+    deadline. DNS resolution is not limited by it.
 
     Raises:
         ValueError: if the URL is invalid or resolves to a blocked address.
@@ -217,7 +382,7 @@ def pinned_fetch(
     response, _ = _fetch_validated_hop(
         method, url,
         allowed_ips=allowed_ips, allowed_hosts=allowed_hosts,
-        headers=headers, timeout=timeout, **kwargs,
+        headers=headers, timeout=timeout, verify=verify, deadline=deadline, **kwargs,
     )
     return response
 

@@ -10,6 +10,7 @@
   ],
   "exports": {
     "./activity": "./dist/activity/index.js",
+    "./agent-run": "./dist/agent-run/index.js",
     "./auth": "./dist/auth/index.js",
     "./breadcrumb": "./dist/breadcrumb/index.js",
     "./card": "./dist/card/index.js",

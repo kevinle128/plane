@@ -1,0 +1,227 @@
+{
+  "agent_git": {
+    "integrations": {
+      "description": "Connect the services that local agents use to read repositories and open draft changes.",
+      "essentials": "Essentials",
+      "github_blurb": "Bind projects to repositories and let agents open draft pull requests.",
+      "connect": "Connect",
+      "back": "Integrations",
+      "read_only": "Only workspace admins can change these settings.",
+      "gitlab_blurb": "Bind projects to a self-hosted GitLab and let agents open draft merge requests."
+    },
+    "status": {
+      "connected": "Connected",
+      "not_connected": "Not connected",
+      "reconnect_required": "Reconnect required",
+      "connecting": "Connecting"
+    },
+    "github": {
+      "description": "Bind projects to repositories, clone them on the Mini, and let agents open draft pull requests.",
+      "setup": {
+        "title": "Install the GitHub integration",
+        "description": "Plane uses a GitHub App that your workspace admin authorizes. Plane never stores your password.",
+        "check_repositories": "List the repositories the app has been granted",
+        "check_bind": "Bind one repository to each project",
+        "check_pull_requests": "Let agents open draft pull requests for review",
+        "authenticate": "Authenticate with GitHub",
+        "later": "I'll do this later"
+      },
+      "device": {
+        "region_label": "GitHub device authorization",
+        "waiting": "Waiting for GitHub",
+        "expires_in": "Expires in {time}",
+        "instructions": "Open {url} in your browser and enter this code to authorize Plane.",
+        "open_url": "Open GitHub",
+        "code_label": "Device code",
+        "entered": "I entered the code",
+        "cancel": "Cancel"
+      },
+      "result": {
+        "expired": "The code expired before GitHub confirmed it. Start again to get a new code.",
+        "denied": "GitHub did not authorize Plane. Start again if this was a mistake.",
+        "cancelled": "Authorization cancelled. Nothing was connected."
+      },
+      "meta": {
+        "enabled_by": "Enabled by",
+        "account": "Account",
+        "scopes": "Scopes",
+        "no_scopes": "App permissions"
+      },
+      "reconnect": {
+        "connected_admin_lost": "The admin who connected GitHub is no longer a workspace admin. Plane stopped using that token. Another admin must reconnect.",
+        "generic": "Plane cannot use the saved GitHub connection. Reconnect to continue."
+      }
+    },
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "github_app_not_configured": "The GitHub App is not configured on this Plane instance. Ask the instance admin to add its client ID.",
+      "device_flow_disabled": "Device flow is not enabled on the GitHub App. Enable it in the GitHub App settings.",
+      "token_encryption_failed": "Plane could not store the token securely. Nothing was connected.",
+      "github_unexpected_response": "GitHub returned an unexpected response. Try again.",
+      "github_url_unreachable": "Plane cannot reach GitHub. Check the network and try again.",
+      "account_remove_failed": "Plane could not remove the installation. It is still connected. Try again.",
+      "github_revoke_failed": "GitHub did not confirm that the token is revoked. GitHub is still connected. Try again.",
+      "provider_disconnected": "This provider is not connected in this workspace.",
+      "provider_reconnect_required": "This provider needs to be connected again.",
+      "repository_already_bound": "Another project already uses this repository. Choose another one.",
+      "repository_unavailable": "This repository is no longer available. Choose another one.",
+      "repository_not_found": "This repository is no longer in the catalog. Choose another one.",
+      "invalid_base_ref": "The base branch name is not valid.",
+      "invalid_repository": "The repository choice is not valid. Choose it again.",
+      "invalid_request": "Fill in every required field.",
+      "gitlab_url_invalid": "Enter an https URL without a user name, query or fragment, for example https://gitlab.example.com.",
+      "gitlab_url_not_allowed_or_unresolved": "Plane cannot resolve this address, or the address is not allowed. For a GitLab on a private network, ask the instance operator to allow it.",
+      "gitlab_url_unreachable": "Plane cannot reach GitLab ({detail}). Check the URL and the network.",
+      "gitlab_url_redirected": "GitLab redirected the request to {detail}. Enter the final GitLab URL.",
+      "gitlab_not_gitlab": "This URL does not answer like the GitLab API.",
+      "gitlab_version_unsupported": "This GitLab version is not supported: {detail}.",
+      "gitlab_tls_failed": "The GitLab certificate is not trusted. Add the CA bundle that signs it.",
+      "gitlab_ca_invalid": "The CA bundle is not a valid list of PEM certificates (256 KB at most).",
+      "gitlab_token_invalid": "The token is expired, revoked or not active.",
+      "gitlab_scope_missing": "The token is missing the scope {detail}. It needs api and write_repository.",
+      "gitlab_group_not_found": "The group does not exist, or the token cannot see it.",
+      "gitlab_role_too_low": "The token user's role in the group is {detail}. It needs Developer or higher.",
+      "gitlab_unexpected_response": "GitLab returned an unexpected response ({detail}).",
+      "gitlab_disconnect_first": "Disconnect the current GitLab before you connect another GitLab URL.",
+      "github_token_invalid": "GitHub no longer accepts the Plane token. Connect GitHub again.",
+      "github_tls_failed": "The GitHub certificate is not trusted. Ask the instance operator to check the network proxy.",
+      "github_url_redirected": "GitHub redirected the request to {detail}. Plane does not follow redirects. Ask the instance operator to check the network proxy.",
+      "github_url_not_allowed_or_unresolved": "Plane cannot resolve the GitHub address, or the address is not allowed. Ask the instance operator to check the network.",
+      "invalid_kind": "The authorization type is not valid. Start again.",
+      "invalid_cursor": "The repository list changed while it loaded. Load it again.",
+      "account_remove_not_supported": "You cannot remove this account here. Disconnect the provider to stop using it.",
+      "account_attach_not_supported": "You cannot attach this account here.",
+      "device_code_unreadable": "Plane could not read the saved device code. The instance secret key may have changed. Start again.",
+      "incorrect_client_credentials": "GitHub did not accept the GitHub App client ID. Ask the instance admin to check the GitHub App settings.",
+      "unsupported_grant_type": "GitHub did not accept the device flow request. Ask the instance admin to make sure Device Flow is enabled on the GitHub App.",
+      "incorrect_device_code": "GitHub did not recognize the device code. Start again.",
+      "github_identity_failed": "GitHub authorized Plane, but Plane could not read your GitHub account. Start again."
+    },
+    "accounts": {
+      "title": "Connections",
+      "connect_organization": "Connect organisation",
+      "connect_organization_hint": "Install the GitHub App on an organisation in the new tab, then refresh this list.",
+      "refresh": "Refresh installations",
+      "attach": "Attach",
+      "attached": "Attached",
+      "candidate": "Not attached",
+      "candidate_hint": "Attach an installation to offer its repositories in this workspace.",
+      "organization": "Organisation",
+      "user": "Account",
+      "all_repositories": "All repositories",
+      "selected_repositories": "Selected repositories",
+      "personal_title": "Your personal GitHub account",
+      "personal_hint": "Connected · used to authorize the GitHub App for this workspace",
+      "empty": "No installations yet. Install the GitHub App on an account or organisation.",
+      "synced": "Installations refreshed.",
+      "attached_toast": "{name} is attached. Its repositories appear shortly.",
+      "remove": "Remove",
+      "removing": "Removing",
+      "remove_confirm_title": "Remove {name} from Plane?",
+      "remove_confirm_content": "New projects can no longer use repositories from {name}. Projects already bound to one of them keep the binding for audit, but new Runs cannot use it. The GitHub App stays installed until you uninstall it in GitHub.",
+      "removed": "{name} was removed from Plane.",
+      "removed_hint": "To uninstall the GitHub App, open the installation settings in GitHub.",
+      "open_settings": "Open GitHub settings",
+      "group": "Group"
+    },
+    "connection": {
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting",
+      "disconnect_confirm_title": "Disconnect {provider}?",
+      "github_disconnect_confirm_content": "Plane revokes this workspace's GitHub token and stops using it. Projects keep their repository binding for history, but new agent work and pending pull requests fail until GitHub is connected again.",
+      "disconnected": "{provider} is disconnected.",
+      "github_revoke_in_provider": "Plane did not revoke the old token because it could not use it. Revoke it in GitHub under Settings, Applications, Authorized GitHub Apps.",
+      "open_github_authorizations": "Open GitHub settings",
+      "reconnect_generic": "Plane cannot use the saved {provider} connection. Connect again to continue.",
+      "gitlab_disconnect_confirm_content": "Plane deletes the stored GitLab token and stops using it. Plane does not revoke the token in GitLab: revoke it in the group settings under Access tokens. Projects keep their repository binding for history, but new agent work fails until GitLab is connected again.",
+      "gitlab_revoke_in_provider": "Revoke the Group Access Token in GitLab now: group Settings, Access tokens.",
+      "open_gitlab_token_settings": "Open GitLab access tokens",
+      "worker_error": "Worker cannot reach {host}: {reason}",
+      "load_error": "Plane could not load the Git connections."
+    },
+    "repository": {
+      "title": "Repository",
+      "description": "Repositories this workspace has been granted access to",
+      "manage_access": "Manage access",
+      "search_label": "Search repositories",
+      "search_placeholder": "Search owner/repository",
+      "owner_label": "Owner",
+      "all_owners": "All owners",
+      "list_label": "Repositories",
+      "none_option": "No repository",
+      "none_warning": "Without a repository, an agent run will ask for one and cannot start its harness until you choose it.",
+      "private": "Private",
+      "public": "Public",
+      "already_used": "Already used by {project}",
+      "empty": "No repository matches.",
+      "loading": "Loading repositories",
+      "load_error": "Repositories could not be loaded. Try again.",
+      "not_connected_title": "No Git provider is connected in this workspace",
+      "not_connected_description": "Connect GitHub to bind a repository to this project. You can also create the project now and choose a repository later.",
+      "open_integrations": "Open Workspace settings → Integrations",
+      "base_ref_label": "Base branch",
+      "base_ref_hint": "Agents start from this branch. Leave empty to use {branch}.",
+      "account_group": "{login} · {type}"
+    },
+    "policy": {
+      "title": {
+        "pull_request": "Pull requests from agents",
+        "merge_request": "Merge requests from agents"
+      },
+      "description": {
+        "pull_request": "Defaults for the pull requests that agents open from code jobs.",
+        "merge_request": "Defaults for the merge requests that agents open from code jobs."
+      },
+      "open_as_draft": {
+        "pull_request": "Open pull requests as drafts",
+        "merge_request": "Open merge requests as drafts"
+      },
+      "open_as_draft_hint": {
+        "pull_request": "Reviewers see the change as a draft until a person marks it ready.",
+        "merge_request": "Reviewers see the change as a draft until a person marks it ready."
+      },
+      "mirror_conclusions": {
+        "pull_request": "Post run conclusions as PR comments",
+        "merge_request": "Post run conclusions as merge request comments"
+      },
+      "mirror_conclusions_hint": {
+        "pull_request": "The conclusion of each run is also posted as a comment on the agent's pull request.",
+        "merge_request": "The conclusion of each run is also posted as a comment on the agent's merge request."
+      },
+      "branch_format": "Branch format",
+      "branch_format_hint": "Each run gets its own branch. The run ID at the end keeps names unique, and a run keeps its branch when this format changes.",
+      "saved": "Setting saved.",
+      "save_failed": "The setting was not saved. Try again."
+    },
+    "gitlab": {
+      "description": "Connect a self-hosted GitLab group, bind projects to its repositories, and let agents open draft merge requests.",
+      "setup": {
+        "title": "Connect a self-hosted GitLab",
+        "description": "Paste a Group Access Token of the group that holds your repositories. Plane checks the token and the server before it saves anything.",
+        "base_url_label": "GitLab URL",
+        "base_url_hint": "The https address of your GitLab, for example https://gitlab.example.com. A path is allowed for installs under a sub-path.",
+        "group_label": "Group path",
+        "group_hint": "The full path of the group, for example platform or platform/tools.",
+        "token_label": "Group Access Token",
+        "token_hint": "Role Developer or higher, scopes api and write_repository. Plane stores it encrypted and never shows it again.",
+        "ca_label": "CA bundle (optional)",
+        "ca_hint": "PEM certificates that sign your GitLab certificate. Plane trusts them for this GitLab only.",
+        "connect": "Connect GitLab",
+        "connecting": "Connecting"
+      },
+      "meta": {
+        "base_url": "GitLab URL",
+        "version": "Version",
+        "token": "Token",
+        "token_user": "Token user",
+        "expires": "Expires",
+        "never": "Never"
+      },
+      "warnings": {
+        "expires_soon": "The token expires on {date}. Create a new token and connect again before then.",
+        "not_bot": "This token belongs to a person, not a group bot. Pushes and merge requests appear as that person, and the connection stops when that person loses access to the group.",
+        "expired": "The token expired on {date}. Create a new token and connect again."
+      }
+    }
+  }
+}

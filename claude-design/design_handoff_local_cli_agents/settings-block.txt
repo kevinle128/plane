@@ -1,0 +1,182 @@
+        <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+          <div class="flex-1 overflow-y-auto px-8 py-6">
+            <div class="flex flex-col gap-5" style="max-width:1080px">
+              <div class="flex items-center gap-1.5 text-13">
+                <span class="text-secondary">Workspace settings</span>
+                {{ icoChevronRightOutline_size35texticonplaceholdershrink0 }}
+                <span class="text-primary font-medium">{{ pageTitle }}</span>
+                <span class="ml-2 rounded-sm bg-layer-1 px-1.5 py-0.5 text-caption-sm-regular font-code text-tertiary">{{ pagePath }}</span>
+              </div>
+              <div class="flex items-start gap-4">
+                <div class="flex flex-col gap-1">
+                  <h1 class="text-h4-semibold">{{ pageTitle }}</h1>
+                  <p class="text-body-sm-regular text-secondary" style="margin:0;max-width:620px">{{ pageBlurb }}</p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-6 items-start">
+                <div class="flex flex-col gap-3" style="flex:0 1 190px;min-width:160px">
+                  <div class="flex flex-col gap-0.5">
+                    <div class="px-2 py-1 text-11 font-semibold text-tertiary">Administration</div>
+                    <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-13 text-secondary"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">apartment</span>General</div>
+                    <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-13 text-secondary"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">group</span>Members</div>
+                    <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-13 text-secondary"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">credit_card</span>Billing &amp; Plans</div>
+                    <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-13 text-secondary"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">upload</span>Exports</div>
+                  </div>
+                  <div class="flex flex-col gap-0.5" style="border-top:1px solid var(--border-color-subtle);padding-top:12px">
+                    <div class="px-2 py-1 text-11 font-semibold text-tertiary">Developer</div>
+                    <div class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-13 text-secondary"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">webhook</span>Webhooks</div>
+                    <button type="button" onClick="{{ goConnectors }}" class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-13" style="{{ navConnectorsStyle }}"><span style="font-family:'Material Symbols Rounded';font-size:15px;line-height:1">cable</span>Integrations</button>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-6 items-start" style="flex:1 1 320px;min-width:0">
+                <sc-if value="{{ isListView }}" hint-placeholder-val="{{ true }}">
+                  <div class="flex flex-col gap-6 w-full">
+                    <sc-for list="{{ integrationGroups }}" as="grp" hint-placeholder-count="2">
+                      <div class="flex flex-col gap-2">
+                        <div class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">{{ grp.title }}</div>
+                        <div class="flex flex-wrap gap-3">
+                          <sc-for list="{{ grp.items }}" as="c" hint-placeholder-count="6">
+                            <button type="button" onClick="{{ c.open }}" class="rounded-lg border border-subtle bg-surface-1 flex flex-col gap-2 p-3 text-left" style="flex:1 1 210px;min-width:190px;max-width:260px" style-hover="border-color:var(--border-color-strong)">
+                              <span class="flex w-full items-center gap-2">
+                                <span class="grid size-7 shrink-0 place-items-center rounded-md border border-subtle bg-layer-2 text-secondary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">{{ c.icon }}</span>
+                                <span class="text-body-sm-semibold truncate">{{ c.name }}</span>
+                                <span class="ml-auto shrink-0 text-caption-sm-regular" style="{{ c.tagStyle }}">{{ c.tag }}</span>
+                              </span>
+                              <span class="text-caption-sm-regular text-secondary" style="text-wrap:pretty">{{ c.blurb }}</span>
+                              <sc-if value="{{ c.meta }}" hint-placeholder-val="{{ false }}">
+                                <span class="flex w-full items-center gap-2">
+                                  <span class="text-caption-sm-regular font-code text-tertiary truncate">{{ c.meta }}</span>
+                                  <sc-if value="{{ c.isAgent }}" hint-placeholder-val="{{ false }}">
+                                    <span class="ml-auto shrink-0 text-caption-sm-regular text-link-primary">Configure</span>
+                                  </sc-if>
+                                </span>
+                              </sc-if>
+                            </button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-for>
+
+                    <div class="flex flex-col gap-2">
+                      <div class="text-11 font-semibold text-tertiary" style="letter-spacing:.06em">GITHUB</div>
+                      <sc-if value="{{ ghConnected }}" hint-placeholder-val="{{ true }}">
+                        <div class="rounded-lg border border-subtle bg-surface-1 flex flex-col gap-2 px-4 py-3">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-caption-sm-medium font-code">github.com/kevinle128</span>
+                            <x-import component-from-global-scope="PlanePropel.Badge" variant="success" size="sm" hint-size="90px,20px">Connected</x-import>
+                            <span class="text-caption-sm-regular text-tertiary">read repo · write pull requests · 38 repositories</span>
+                            <button type="button" onClick="{{ ghReset }}" class="ml-auto text-caption-sm-regular text-tertiary">Disconnect</button>
+                          </div>
+                          <span class="text-caption-sm-regular text-tertiary">Projects pick a repository from this account. Clones use the SSH key already on the Mini; the token only lists repositories and opens draft PRs.</span>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ ghIdle }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg border border-subtle bg-surface-1 flex flex-wrap items-center gap-2 px-4 py-3">
+                          <span class="text-caption-sm-regular text-secondary">Not connected. Projects cannot bind a repository, so agents cannot run.</span>
+                          <span class="ml-auto"><x-import component-from-global-scope="PlanePropel.Button" variant="secondary" size="sm" on-click="{{ ghConnect }}" hint-size="130px,28px">Connect GitHub</x-import></span>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ ghPairing }}" hint-placeholder-val="{{ false }}">
+                        <div class="rounded-lg border border-subtle bg-surface-1 flex flex-col gap-2 px-4 py-3">
+                          <div class="flex items-center gap-2">
+                            <x-import component-from-global-scope="PlanePropel.Spinner" height="14px" width="14px" class-name="text-icon-tertiary" hint-size="14px,14px"></x-import>
+                            <span class="text-caption-sm-medium">Waiting for GitHub</span>
+                            <span class="ml-auto text-caption-sm-regular text-tertiary">expires in 14:22</span>
+                          </div>
+                          <p class="text-caption-sm-regular text-secondary" style="margin:0">Open <span class="font-code">github.com/login/device</span> on any machine and enter this code. The Mini only makes outbound calls, so no public hostname is needed.</p>
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-h5-medium font-code" style="letter-spacing:.18em">JQXK-7D24</span>
+                            <button type="button" onClick="{{ ghDone }}" class="text-caption-sm-regular text-link-primary">I entered the code</button>
+                            <button type="button" onClick="{{ ghReset }}" class="ml-auto text-caption-sm-regular text-tertiary">Cancel</button>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+
+                  <sc-if value="{{ isAgentDetail }}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{ backToList }}" class="flex w-full items-center gap-1.5 text-left text-caption-sm-regular text-tertiary" style-hover="color:var(--txt-secondary)">
+                      {{ icoBack }}Integrations
+                    </button>
+                  <div class="flex flex-col gap-1.5" style="flex:1 1 220px;min-width:0">
+                    <sc-for list="{{ agents }}" as="g" hint-placeholder-count="2">
+                      <button type="button" onClick="{{ g.select }}" class="flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left" style="{{ g.cardStyle }}">
+                        <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">{{ icoAgentOutline_size4 }}</span>
+                        <span class="flex flex-col" style="min-width:0">
+                          <span class="text-body-sm-semibold truncate">{{ g.name }}</span>
+                          <span class="text-caption-sm-regular font-code text-tertiary truncate">{{ g.handle }}</span>
+                        </span>
+                        <span class="ml-auto shrink-0"><x-import component-from-global-scope="PlanePropel.Badge" variant="{{ g.badge }}" size="sm" hint-size="70px,20px">{{ g.status }}</x-import></span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <div class="rounded-lg border border-subtle bg-surface-1 shadow-raised-100" style="flex:999 1 340px;min-width:0">
+                    <div class="flex items-center gap-3 border-b border-subtle px-4 py-3">
+                      <span class="grid size-8 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">{{ icoAgentOutline_size4 }}</span>
+                      <div class="flex flex-col" style="min-width:0">
+                        <span class="text-body-md-semibold truncate">{{ agent.name }}</span>
+                        <span class="text-caption-sm-regular text-tertiary truncate">{{ agent.cli }} · {{ agent.lastRun }}</span>
+                      </div>
+                      <span class="ml-auto shrink-0 flex items-center gap-2">
+                        <span class="text-caption-sm-regular text-secondary">Mentionable</span>
+                        <x-import component-from-global-scope="PlanePropel.Switch" value="{{ agent.enabled }}" on-change="{{ toggleAgent }}" size="sm" hint-size="32px,18px"></x-import>
+                      </span>
+                    </div>
+
+                    <div class="flex flex-col">
+                      <div class="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-3">
+                        <div class="flex flex-col gap-0.5" style="flex:1 1 180px;min-width:0">
+                          <span class="text-body-sm-medium">Name</span>
+                          <span class="text-caption-sm-regular text-tertiary">Shown on the run card; the handle follows it.</span>
+                        </div>
+                        <span style="flex:0 1 240px;min-width:0;margin-left:auto"><x-import component-from-global-scope="PlanePropel.Input" input-size="sm" value="{{ agent.name }}" class-name="w-full" hint-size="100%,32px"></x-import></span>
+                      </div>
+
+                      <div class="flex flex-col gap-2 border-b border-subtle px-4 py-3">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-body-sm-medium">Instructions</span>
+                          <span class="text-caption-sm-regular text-tertiary">Prepended to every run this agent starts, on top of the work item and the repo it is given.</span>
+                        </div>
+                        <textarea rows="5" class="w-full rounded-md border border-subtle px-2.5 py-2 text-body-sm-regular" style="background:var(--bg-surface-2);color:var(--txt-primary);outline:none;resize:vertical;font-family:var(--font-body)">{{ agent.instructions }}</textarea>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-3">
+                        <div class="flex flex-col gap-0.5" style="flex:1 1 180px;min-width:0">
+                          <span class="text-body-sm-medium">Harness</span>
+                          <span class="text-caption-sm-regular text-tertiary">The CLI the worker invokes on the Mini. No model runs inside Plane.</span>
+                        </div>
+                        <button type="button" class="flex items-center gap-2 rounded-md border border-subtle bg-surface-2 px-2.5 py-1.5" style="margin-left:auto;min-width:0" style-hover="border-color:var(--border-color-strong)">
+                          <span class="truncate text-body-sm-regular font-code">{{ agent.harness }}</span>
+                          <span class="shrink-0 text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">unfold_more</span>
+                        </button>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-3">
+                        <div class="flex flex-col gap-0.5" style="flex:1 1 180px;min-width:0">
+                          <span class="text-body-sm-medium">Model</span>
+                          <span class="text-caption-sm-regular text-tertiary">Passed to the harness for every run.</span>
+                        </div>
+                        <button type="button" class="flex items-center gap-2 rounded-md border border-subtle bg-surface-2 px-2.5 py-1.5" style="margin-left:auto;min-width:0" style-hover="border-color:var(--border-color-strong)">
+                          <span class="truncate text-body-sm-regular font-code">{{ agent.model }}</span>
+                          <span class="shrink-0 text-icon-tertiary" style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">unfold_more</span>
+                        </button>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+                        <div class="flex flex-col gap-0.5" style="flex:1 1 180px;min-width:0">
+                          <span class="text-body-sm-medium">Repository</span>
+                          <span class="text-caption-sm-regular text-tertiary">Follows the project. Each project maps to one remote and one clone path; an agent reads whatever the project it was mentioned in is bound to.</span>
+                        </div>
+                        <span class="text-caption-sm-regular text-link-primary" style="margin-left:auto">Project settings → Git repository</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+        </sc-if>

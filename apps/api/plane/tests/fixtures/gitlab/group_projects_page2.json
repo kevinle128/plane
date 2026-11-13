@@ -1,0 +1,34 @@
+[
+  {
+    "id": 103,
+    "name": "docs",
+    "path": "docs",
+    "path_with_namespace": "platform/docs",
+    "namespace": {
+      "id": 19,
+      "full_path": "platform",
+      "kind": "group"
+    },
+    "visibility": "public",
+    "default_branch": "trunk",
+    "http_url_to_repo": "https://git.example.com/platform/docs.git",
+    "web_url": "https://git.example.com/platform/docs",
+    "archived": false
+  },
+  {
+    "id": 104,
+    "name": "mirror",
+    "path": "mirror",
+    "path_with_namespace": "platform/mirror",
+    "namespace": {
+      "id": 19,
+      "full_path": "platform",
+      "kind": "group"
+    },
+    "visibility": "private",
+    "default_branch": "main",
+    "http_url_to_repo": "https://other.example.net/platform/mirror.git",
+    "web_url": "https://other.example.net/platform/mirror",
+    "archived": false
+  }
+]

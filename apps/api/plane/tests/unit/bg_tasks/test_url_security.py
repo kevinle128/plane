@@ -393,3 +393,539 @@ class TestReviewFixes:
         session.close.assert_not_called()  # deferred
         out.close()
         session.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Per-call trust for a custom CA bundle (Git provider connections)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+class TestPinnedFetchVerify:
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_default_still_verifies_against_system_trust(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = ["93.184.216.34"]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "https://example.com/x")
+
+        assert session.request.call_args.kwargs["verify"] is True
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_ca_bundle_path_reaches_the_request(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = ["93.184.216.34"]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "https://git.example.com/api/v4/version", verify="/tmp/plane-ca/abc.pem")
+
+        assert session.request.call_args.kwargs["verify"] == "/tmp/plane-ca/abc.pem"
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_a_second_host_in_the_same_process_keeps_system_trust(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = ["93.184.216.34"]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "https://git.example.com/api/v4/version", verify="/tmp/plane-ca/abc.pem")
+        pinned_fetch("GET", "https://other.example.com/hook")
+
+        verifies = [call.kwargs["verify"] for call in session.request.call_args_list]
+        assert verifies == ["/tmp/plane-ca/abc.pem", True]
+
+
+def _streamed(status_code=200, headers=None, chunks=(b"{}",)):
+    response = MagicMock()
+    response.status_code = status_code
+    response.headers = headers or {"Content-Type": "application/json"}
+    pending = list(chunks)
+    response.raw.read1.side_effect = lambda *args, **kwargs: pending.pop(0) if pending else b""
+    return response
+
+
+def _self_signed_certificate(directory):
+    """Write a certificate and key for ``127.0.0.1`` and return ``(cert_path, key_path, pem)``."""
+    import datetime
+    import os
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=5))
+        .not_valid_after(now + datetime.timedelta(hours=1))
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), True)
+        .sign(key, hashes.SHA256())
+    )
+    pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
+    cert_path = os.path.join(directory, "cert.pem")
+    key_path = os.path.join(directory, "key.pem")
+    with open(cert_path, "w") as handle:
+        handle.write(pem)
+    with open(key_path, "wb") as handle:
+        handle.write(
+            key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+            )
+        )
+    return cert_path, key_path, pem
+
+
+class _DrippingServer:
+    """A local HTTP server that sends ``head`` at once, then ``drip`` one byte per ``interval`` seconds.
+
+    ``drip`` can be endless. The server stops after ``max_seconds`` and closes
+    the connection, so a client that does not end the call itself fails the
+    test instead of hanging it. With ``tls`` set to ``(cert_path, key_path)``
+    the connection uses TLS.
+    """
+
+    def __init__(self, interval, head=b"", drip=b"", max_seconds=5.0, tls=None):
+        import socket
+        import threading
+
+        self.interval = interval
+        self.head = head
+        self.drip = drip
+        self.max_seconds = max_seconds
+        self._tls = tls
+        self._stop = threading.Event()
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.bind(("127.0.0.1", 0))
+        self._socket.listen(1)
+        self.port = self._socket.getsockname()[1]
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+
+    def _serve(self):
+        import ssl
+        import time
+
+        try:
+            connection, _ = self._socket.accept()
+        except OSError:
+            return
+        if self._tls:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            context.load_cert_chain(*self._tls)
+            try:
+                connection = context.wrap_socket(connection, server_side=True)
+            except (OSError, ssl.SSLError):
+                connection.close()
+                return
+        stop_at = time.monotonic() + self.max_seconds
+        with connection:
+            try:
+                connection.recv(65536)
+                if self.head:
+                    connection.sendall(self.head)
+                for byte in self.drip:
+                    if self._stop.wait(self.interval) or time.monotonic() > stop_at:
+                        return
+                    connection.sendall(bytes([byte]))
+            except OSError:
+                return
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._socket.close()
+        self._thread.join(timeout=5)
+
+
+class _FullAcceptQueueListener:
+    """A listener on all local addresses whose accept queue is full, so a new TCP connect hangs.
+
+    It never accepts. Linux drops the SYN of a new connection while the queue
+    is full, so ``connect`` waits until its timeout. The test is skipped on a
+    kernel that refuses or accepts the connection instead.
+    """
+
+    def __enter__(self):
+        import socket
+
+        self._fillers = []
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            # Bind to all addresses so that connects to 127.0.0.2-4 reach this
+            # test-only listener; it lives only for the duration of one test.
+            self._socket.bind(("0.0.0.0", 0))  # noqa: S104
+            self._socket.listen(0)
+            self.port = self._socket.getsockname()[1]
+            for _ in range(16):
+                filler = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                filler.settimeout(0.3)
+                try:
+                    filler.connect(("127.0.0.1", self.port))
+                except socket.timeout:
+                    filler.close()
+                    return self
+                except OSError:
+                    filler.close()
+                    break
+                self._fillers.append(filler)
+        except BaseException:
+            self.__exit__()
+            raise
+        self.__exit__()
+        pytest.skip("this kernel does not hold a TCP connect when the accept queue is full")
+
+    def __exit__(self, *exc):
+        for filler in self._fillers:
+            filler.close()
+        self._socket.close()
+
+
+_CHUNKED_HEAD = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
+_SLOW_SERVER_CASES = ["fixed-length-body", "chunk-size-line", "trailer-lines", "status-line-and-headers"]
+
+
+def _slow_server(case):
+    """Return ``(head, drip)`` for a server that never finishes the response in time.
+
+    Every single byte arrives well inside the read timeout, so only a deadline
+    for the whole call can end it.
+    """
+    import itertools
+
+    endless_header = itertools.cycle(b"X-Pad: 1\r\n")
+    return {
+        "fixed-length-body": (
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 40\r\n\r\n",
+            b" " * 40,
+        ),
+        "chunk-size-line": (_CHUNKED_HEAD, itertools.cycle(b"0")),
+        "trailer-lines": (_CHUNKED_HEAD + b"2\r\n[]\r\n0\r\n", endless_header),
+        "status-line-and-headers": (b"", itertools.chain(b"HTTP/1.1 200 OK\r\n", endless_header)),
+    }[case]
+
+
+@pytest.mark.unit
+class TestAgentGitHttpSeam:
+    """Transport failures of the Git provider seam map to fixed reason codes."""
+
+    def _request(self, **kwargs):
+        from plane.agent.git_providers import http
+
+        return http.request("GET", "https://git.example.com/api/v4/version", provider="gitlab", **kwargs)
+
+    @pytest.mark.parametrize(
+        "error, code, detail",
+        [
+            (ValueError("Hostname could not be resolved"), "gitlab_url_not_allowed_or_unresolved", ""),
+            (
+                ValueError("Access to private/internal networks is not allowed"),
+                "gitlab_url_not_allowed_or_unresolved",
+                "",
+            ),
+            (requests.exceptions.ConnectTimeout("timed out"), "gitlab_url_unreachable", "timeout"),
+            (requests.exceptions.ReadTimeout("timed out"), "gitlab_url_unreachable", "timeout"),
+            (requests.exceptions.ConnectionError("refused"), "gitlab_url_unreachable", "connection"),
+            (requests.exceptions.SSLError("certificate verify failed"), "gitlab_tls_failed", ""),
+        ],
+        ids=["dns", "private-ip", "connect-timeout", "read-timeout", "refused", "tls"],
+    )
+    def test_transport_failures_map_to_codes(self, error, code, detail):
+        from plane.agent.git_providers.base import ProviderError
+
+        with patch("plane.agent.git_providers.http.pinned_fetch", side_effect=error):
+            with pytest.raises(ProviderError) as raised:
+                self._request()
+
+        assert (raised.value.code, raised.value.detail) == (code, detail)
+
+    def test_redirect_is_refused_and_shows_only_scheme_and_host(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        response = _streamed(302, {"Location": "http://10.0.0.5/admin?private_token=leak"})
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response):
+            with pytest.raises(ProviderError) as raised:
+                self._request()
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_redirected", "http://10.0.0.5")
+        response.close.assert_called_once()
+
+    def test_body_over_one_mebibyte_is_refused(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        chunk = b"x" * (64 * 1024)
+        response = _streamed(chunks=[chunk] * 17)
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response):
+            with pytest.raises(ProviderError) as raised:
+                self._request()
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_unexpected_response", "response_too_large")
+        response.close.assert_called_once()
+
+    def test_body_at_the_limit_is_read(self):
+        chunk = b"x" * (64 * 1024)
+        response = _streamed(chunks=[chunk] * 16)
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response):
+            result = self._request()
+
+        assert len(result.content) == 1024 * 1024
+
+    def test_spent_budget_makes_no_request(self):
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        with patch("plane.agent.git_providers.http.pinned_fetch") as fetch:
+            with pytest.raises(ProviderError) as raised:
+                self._request(deadline=http.new_deadline(-1))
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        fetch.assert_not_called()
+
+    def test_budget_spent_during_a_call_fails_the_call(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        response = _streamed()
+        times = iter([100.0, 131.0, 131.0])
+        with (
+            patch("plane.agent.git_providers.http.pinned_fetch", return_value=response),
+            patch("plane.agent.git_providers.http.time.monotonic", side_effect=lambda: next(times)),
+        ):
+            with pytest.raises(ProviderError) as raised:
+                self._request(deadline=130.0)
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+
+    @pytest.mark.parametrize("case", _SLOW_SERVER_CASES)
+    @pytest.mark.parametrize("use_shared_deadline", [True, False], ids=["shared-deadline", "own-call-budget"])
+    def test_slow_server_is_stopped_at_the_budget(self, settings, monkeypatch, case, use_shared_deadline):
+        import time
+
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["127.0.0.1"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        budget = 1.0
+        monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
+        head, drip = _slow_server(case)
+        with _DrippingServer(interval=0.1, head=head, drip=drip) as server:
+            started = time.monotonic()
+            with pytest.raises(ProviderError) as raised:
+                http.request(
+                    "GET",
+                    f"http://127.0.0.1:{server.port}/api/v4/version",
+                    provider="gitlab",
+                    deadline=http.new_deadline(budget) if use_shared_deadline else None,
+                )
+            elapsed = time.monotonic() - started
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        # The server needs 5 s, so this margin still proves the deadline ended the call.
+        assert elapsed < budget + 1.0
+
+    @pytest.mark.parametrize("case", ["trailer-lines", "status-line-and-headers"])
+    def test_slow_tls_server_is_stopped_at_the_budget(self, settings, monkeypatch, tmp_path, case):
+        import time
+
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["127.0.0.1"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        budget = 1.0
+        monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
+        cert_path, key_path, pem = _self_signed_certificate(str(tmp_path))
+        head, drip = _slow_server(case)
+        with _DrippingServer(interval=0.1, head=head, drip=drip, tls=(cert_path, key_path)) as server:
+            started = time.monotonic()
+            with pytest.raises(ProviderError) as raised:
+                http.request("GET", f"https://127.0.0.1:{server.port}/api/v4/version", provider="gitlab", ca_bundle=pem)
+            elapsed = time.monotonic() - started
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        # The server needs 5 s, so this margin still proves the deadline ended the call.
+        assert elapsed < budget + 1.0
+
+    @patch("plane.utils.url_security.resolve_and_validate")
+    def test_hanging_connect_on_many_addresses_is_stopped_at_the_budget(self, mock_resolve, settings, monkeypatch):
+        import time
+
+        from plane.agent.git_providers import http
+        from plane.agent.git_providers.base import ProviderError
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["git.example.com"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        budget = 2.5
+        monkeypatch.setattr(http, "CALL_BUDGET_SECONDS", budget)
+        # The second address starts at 2.0 s. If its connect wait is not cut to the
+        # time that remains, it ends at about 4.0 s, past the asserted limit.
+        monkeypatch.setattr(http, "CONNECT_TIMEOUT_SECONDS", 2.0)
+        # Patch the resolver above the socket module: urllib3 still resolves each IP literal itself.
+        mock_resolve.return_value = [f"127.0.0.{last}" for last in range(1, 5)]
+        with _FullAcceptQueueListener() as listener:
+            started = time.monotonic()
+            with pytest.raises(ProviderError) as raised:
+                http.request("GET", f"http://git.example.com:{listener.port}/api/v4/version", provider="gitlab")
+            elapsed = time.monotonic() - started
+
+        assert (raised.value.code, raised.value.detail) == ("gitlab_url_unreachable", "timeout")
+        assert elapsed < budget + 1.0
+
+    def test_complete_chunked_response_with_trailers_is_read_and_leaves_no_timer(self, settings):
+        import threading
+
+        from plane.agent.git_providers import http
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["127.0.0.1"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["127.0.0.0/8"]
+        head = _CHUNKED_HEAD + b"2\r\n[]\r\n0\r\nX-Trailer: 1\r\n\r\n"
+        with _DrippingServer(interval=0.1, head=head) as server:
+            result = http.request("GET", f"http://127.0.0.1:{server.port}/api/v4/version", provider="gitlab")
+
+        assert (result.status_code, result.json()) == (200, [])
+        assert not [thread for thread in threading.enumerate() if thread.name == "plane-socket-deadline"]
+
+    def test_identity_encoding_is_requested_and_an_encoded_body_is_refused(self):
+        from plane.agent.git_providers.base import ProviderError
+
+        response = _streamed(headers={"Content-Type": "application/json", "Content-Encoding": "gzip"})
+        with patch("plane.agent.git_providers.http.pinned_fetch", return_value=response) as fetch:
+            with pytest.raises(ProviderError) as raised:
+                self._request(headers={"Accept": "application/json"})
+
+        assert fetch.call_args.kwargs["headers"]["Accept-Encoding"] == "identity"
+        assert fetch.call_args.kwargs["headers"]["Accept"] == "application/json"
+        assert (raised.value.code, raised.value.detail) == ("gitlab_unexpected_response", "content_encoding")
+        response.close.assert_called_once()
+
+    def test_deeply_nested_json_is_not_json(self):
+        from plane.agent.git_providers.http import HttpResponse
+
+        assert HttpResponse(status_code=200, content=b"[" * 100000 + b"]" * 100000).json() is None
+
+    def test_timeouts_never_exceed_the_remaining_budget(self):
+        response = _streamed()
+        with (
+            patch("plane.agent.git_providers.http.pinned_fetch", return_value=response) as fetch,
+            patch("plane.agent.git_providers.http.time.monotonic", return_value=100.0),
+        ):
+            self._request(deadline=103.0)
+
+        assert fetch.call_args.kwargs["timeout"] == (3.0, 3.0)
+
+    def test_ca_bundle_is_passed_as_a_private_file_and_default_is_system_trust(self, settings):
+        import os
+        import stat
+
+        settings.AGENT_GIT_ALLOWED_HOSTS = ["git.internal"]
+        settings.AGENT_GIT_ALLOWED_IPS = ["10.0.0.0/8"]
+        pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
+        with patch("plane.agent.git_providers.http.pinned_fetch", side_effect=lambda *a, **k: _streamed()) as fetch:
+            self._request(ca_bundle=pem)
+            self._request()
+
+        with_bundle, without_bundle = fetch.call_args_list
+        path = with_bundle.kwargs["verify"]
+        assert open(path).read() == pem
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+        assert stat.S_IMODE(os.stat(os.path.dirname(path)).st_mode) == 0o700
+        assert without_bundle.kwargs["verify"] is True
+        assert with_bundle.kwargs["allowed_hosts"] == ["git.internal"]
+        assert with_bundle.kwargs["allowed_ips"] == ["10.0.0.0/8"]
+
+
+@pytest.mark.unit
+class TestSocketDeadline:
+    def test_expiry_shuts_down_an_attached_socket(self):
+        import socket
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        left, right = socket.socketpair()
+        with left, right, SocketDeadline(0.2) as deadline:
+            deadline.attach(left)
+            left.settimeout(5)
+            started = time.monotonic()
+            assert left.recv(1) == b""
+            assert time.monotonic() - started < 2
+            assert deadline.expired
+
+    def test_socket_attached_after_expiry_is_shut_down_at_once(self):
+        import socket
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        left, right = socket.socketpair()
+        with left, right, SocketDeadline(0) as deadline:
+            time.sleep(0.1)
+            deadline.attach(left)
+            left.settimeout(5)
+            assert left.recv(1) == b""
+
+    def test_remaining_counts_down_to_zero_at_expiry(self):
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        with SocketDeadline(0.2) as deadline:
+            assert 0 < deadline.remaining() <= 0.2
+            time.sleep(0.4)
+            assert deadline.expired
+            assert deadline.remaining() == 0.0
+        with SocketDeadline(-1) as spent:
+            assert spent.remaining() == 0.0
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.ip_address.socket.getaddrinfo")
+    def test_no_address_is_tried_after_the_deadline(self, mock_resolve, mock_session_cls):
+        from plane.utils.url_security import SocketDeadline
+
+        mock_resolve.return_value = [_addr("93.184.216.34"), _addr("93.184.216.35")]
+        with SocketDeadline(0) as deadline:
+            with pytest.raises(requests.exceptions.ConnectTimeout):
+                pinned_fetch("GET", "https://example.com/late", deadline=deadline)
+
+        mock_session_cls.return_value.request.assert_not_called()
+
+    def test_cancel_before_expiry_keeps_the_socket_open_and_stops_the_timer(self):
+        import socket
+        import threading
+        import time
+
+        from plane.utils.url_security import SocketDeadline
+
+        left, right = socket.socketpair()
+        with left, right:
+            with SocketDeadline(0.2) as deadline:
+                deadline.attach(left)
+            time.sleep(0.4)
+            right.sendall(b"x")
+            left.settimeout(5)
+            assert left.recv(1) == b"x"
+            assert not deadline.expired
+        assert not [thread for thread in threading.enumerate() if thread.name == "plane-socket-deadline"]
+
+    @patch("plane.utils.url_security.requests.Session")
+    @patch("plane.utils.ip_address.socket.getaddrinfo")
+    def test_without_a_socket_hook_the_plain_http_adapter_is_kept(self, mock_resolve, mock_session_cls):
+        mock_resolve.return_value = [_addr("93.184.216.34")]
+        session = mock_session_cls.return_value
+        session.request.return_value = _resp(200)
+
+        pinned_fetch("GET", "http://example.com/hook")
+
+        session.mount.assert_not_called()
+        assert "deadline" not in session.request.call_args.kwargs
