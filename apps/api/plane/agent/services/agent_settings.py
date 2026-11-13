@@ -34,6 +34,8 @@ HARNESS_DEFAULTS = {
     AgentHarness.OMP: {"name": "Omp", "handle": "Omp"},
 }
 
+HANDLE_TAKEN_MESSAGE = "An agent with this handle already exists in this workspace."
+
 # Bot users get an address in the reserved ``.invalid`` domain, so no mail can reach a real mailbox.
 BOT_EMAIL_DOMAIN = "agents.plane.invalid"
 
@@ -109,15 +111,24 @@ def is_available_for_mentions(agent, now=None):
     return agent.mentionable and state == AgentConnectionState.CONNECTED
 
 
+class HandleTaken(Exception):
+    """Another Agent of the workspace took the handle first (case-insensitive unique constraint)."""
+
+
 def update_agent_settings(agent, changes):
     """Apply validated setting changes. The bot user keeps the Agent name, so comments show it."""
-    with transaction.atomic():
-        locked = Agent.objects.select_for_update().select_related("bot_user").get(pk=agent.pk)
-        for field, value in changes.items():
-            setattr(locked, field, value)
-        locked.save()
-        if "name" in changes:
-            locked.bot_user.display_name = changes["name"]
-            locked.bot_user.first_name = changes["name"]
-            locked.bot_user.save(update_fields=["display_name", "first_name"])
+    try:
+        with transaction.atomic():
+            locked = Agent.objects.select_for_update().select_related("bot_user").get(pk=agent.pk)
+            for field, value in changes.items():
+                setattr(locked, field, value)
+            locked.save()
+            if "name" in changes:
+                locked.bot_user.display_name = changes["name"]
+                locked.bot_user.first_name = changes["name"]
+                locked.bot_user.save(update_fields=["display_name", "first_name"])
+    except IntegrityError as error:
+        if "handle" in changes:
+            raise HandleTaken from error
+        raise
     return locked

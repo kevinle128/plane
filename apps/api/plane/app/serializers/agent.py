@@ -4,6 +4,9 @@
 
 """Workspace Agent settings. The bot user and Worker identity are never serialized."""
 
+# Python imports
+import re
+
 # Django imports
 from django.utils import timezone
 
@@ -11,7 +14,11 @@ from django.utils import timezone
 from rest_framework import serializers
 
 # Module imports
-from plane.agent.services.agent_settings import connection_view, is_available_for_mentions
+from plane.agent.services.agent_settings import HANDLE_TAKEN_MESSAGE, connection_view, is_available_for_mentions
+from plane.db.models import Agent
+
+# A mention handle: a letter, then letters, digits, "-" or "_"; 32 characters at most.
+HANDLE_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
 
 
 def agent_connection_data(connection, now):
@@ -57,6 +64,19 @@ class AgentUpdateSerializer(serializers.Serializer):
     """Fields an admin can change. Each story of the settings page adds its field here."""
 
     name = serializers.CharField(max_length=64, trim_whitespace=True, validators=[reject_control_characters])
+    handle = serializers.CharField(trim_whitespace=True)
+
+    def validate_handle(self, value):
+        handle = value.removeprefix("@")
+        if not HANDLE_PATTERN.fullmatch(handle):
+            raise serializers.ValidationError(
+                "Use 1 to 32 letters, digits, - or _, starting with a letter.", code="invalid"
+            )
+        agent = self.context["agent"]
+        # Case-insensitive, like the database constraint; the constraint still decides a concurrent change.
+        if Agent.objects.filter(workspace_id=agent.workspace_id, handle__iexact=handle).exclude(pk=agent.pk).exists():
+            raise serializers.ValidationError(HANDLE_TAKEN_MESSAGE, code="taken")
+        return handle
 
 
 def error_codes(errors):

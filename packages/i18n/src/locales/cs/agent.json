@@ -285,13 +285,18 @@
       "saved": "Agent settings saved.",
       "save_failed": "The agent settings could not be saved.",
       "name_label": "Name",
-      "name_hint": "Shown on the run card and in mention suggestions."
+      "name_hint": "Shown on the run card and in mention suggestions.",
+      "handle_label": "Handle",
+      "handle_hint": "Members type @handle in a comment to ask this agent. Unique in this workspace."
     },
     "errors": {
       "name_blank": "Enter a name.",
       "name_required": "Enter a name.",
       "name_max_length": "Use 64 characters or fewer.",
-      "name_invalid": "Use one line of text without control characters."
+      "name_invalid": "Use one line of text without control characters.",
+      "handle_blank": "Enter a handle.",
+      "handle_invalid": "Use 1 to 32 letters, digits, - or _, starting with a letter.",
+      "handle_taken": "An agent with this handle already exists in this workspace."
     }
   }
 }

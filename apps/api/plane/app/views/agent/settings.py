@@ -14,6 +14,8 @@ from rest_framework.response import Response
 # Module imports
 from plane.agent.services import harness_probe
 from plane.agent.services.agent_settings import (
+    HANDLE_TAKEN_MESSAGE,
+    HandleTaken,
     ensure_workspace_agent,
     ensure_workspace_agents,
     update_agent_settings,
@@ -52,12 +54,17 @@ class AgentDetailEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def patch(self, request, slug, harness):
         agent = agent_for(slug, harness)
-        serializer = AgentUpdateSerializer(data=request.data, partial=True)
+        serializer = AgentUpdateSerializer(data=request.data, partial=True, context={"agent": agent})
         if not serializer.is_valid():
             return Response(
                 {**serializer.errors, "codes": error_codes(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST
             )
-        update_agent_settings(agent, serializer.validated_data)
+        try:
+            update_agent_settings(agent, serializer.validated_data)
+        except HandleTaken:
+            return Response(
+                {"handle": [HANDLE_TAKEN_MESSAGE], "codes": {"handle": "taken"}}, status=status.HTTP_400_BAD_REQUEST
+            )
         return agent_response(agent)
 
 

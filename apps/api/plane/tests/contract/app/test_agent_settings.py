@@ -8,7 +8,7 @@ import pytest
 from django.db import connection as db_connection
 from rest_framework import status
 
-from plane.db.models import Agent, AgentConnection, User
+from plane.db.models import Agent, AgentConnection, User, Workspace, WorkspaceMember
 from plane.tests.agent_git_fixtures import client_for_user
 from plane.tests.agent_settings_fixtures import agents_url
 
@@ -180,3 +180,106 @@ class TestRenameAgent:
     @pytest.mark.django_db
     def test_unknown_harness_returns_404(self, session_client, workspace):
         assert patch_agent(session_client, workspace, {"name": "X"}, harness="aider").status_code == 404
+
+
+HANDLE_TAKEN = "An agent with this handle already exists in this workspace."
+
+
+def handles(client, workspace):
+    return {agent["harness"]: agent["handle"] for agent in client.get(agents_url(workspace.slug)).data}
+
+
+@pytest.mark.contract
+class TestAgentHandle:
+    @pytest.mark.django_db
+    def test_unused_valid_handle_saves(self, session_client, workspace):
+        response = patch_agent(session_client, workspace, {"handle": "@Reviewer_2"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["handle"] == "Reviewer_2"
+        assert handles(session_client, workspace)["claude_code"] == "Reviewer_2"
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("taken", ["Codex", "codex", "@CODEX"])
+    def test_collision_returns_400_and_keeps_both_handles(self, session_client, workspace, taken):
+        before = handles(session_client, workspace)
+
+        response = patch_agent(session_client, workspace, {"handle": taken})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["handle"] == [HANDLE_TAKEN]
+        assert response.data["codes"]["handle"] == "taken"
+        assert handles(session_client, workspace) == before
+
+    @pytest.mark.django_db
+    def test_changing_only_the_case_of_its_own_handle_is_allowed(self, session_client, workspace):
+        response = patch_agent(session_client, workspace, {"handle": "CLAUDE"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["handle"] == "CLAUDE"
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        ("handle", "code"),
+        [("", "blank"), ("two words", "invalid"), ("1st", "invalid"), ("a" * 33, "invalid"), ("é", "invalid")],
+    )
+    def test_invalid_handle_returns_400(self, session_client, workspace, handle, code):
+        session_client.get(agents_url(workspace.slug))
+
+        response = patch_agent(session_client, workspace, {"handle": handle})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["codes"]["handle"] == code
+        assert handles(session_client, workspace)["claude_code"] == "Claude"
+
+    @pytest.mark.django_db
+    def test_same_handle_in_another_workspace_is_allowed(self, session_client, workspace, create_user):
+        other = Workspace.objects.create(name="Other", owner=create_user, slug="other-workspace")
+        WorkspaceMember.objects.create(workspace=other, member=create_user, role=20)
+        session_client.get(agents_url(other.slug))
+
+        response = patch_agent(session_client, workspace, {"handle": "Codex"}, harness="grok")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        other_response = session_client.patch(agents_url(other.slug, "grok"), {"handle": "Helper"}, format="json")
+        mine = patch_agent(session_client, workspace, {"handle": "Helper"}, harness="grok")
+        assert other_response.status_code == status.HTTP_200_OK
+        assert mine.status_code == status.HTTP_200_OK
+
+    @pytest.mark.django_db
+    def test_member_cannot_change_a_handle(self, session_client, member_client, workspace):
+        session_client.get(agents_url(workspace.slug))
+
+        assert patch_agent(member_client, workspace, {"handle": "Mine"}).status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.contract
+class TestConcurrentHandleChange:
+    @pytest.mark.django_db(transaction=True)
+    def test_two_agents_taking_one_handle_at_once_give_one_200_and_one_400(self, workspace, create_user):
+        client_for_user(create_user).get(agents_url(workspace.slug))
+        barrier = threading.Barrier(2)
+        results = []
+        errors = []
+
+        def take(harness):
+            try:
+                client = client_for_user(create_user)
+                barrier.wait(timeout=30)
+                response = client.patch(agents_url(workspace.slug, harness), {"handle": "Shared"}, format="json")
+                results.append((response.status_code, response.data.get("codes", {}).get("handle")))
+            except Exception as exc:  # surfaced through the errors list
+                errors.append(exc)
+            finally:
+                db_connection.close()
+
+        threads = [threading.Thread(target=take, args=(harness,)) for harness in ("grok", "omp")]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+            assert not thread.is_alive()
+
+        assert not errors, errors
+        assert sorted(results, key=lambda item: item[0]) == [(200, None), (400, "taken")]
+        assert Agent.objects.filter(workspace=workspace, handle__iexact="shared").count() == 1

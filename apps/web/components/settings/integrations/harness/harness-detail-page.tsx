@@ -10,7 +10,7 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Button } from "@makeplane/propel/components/button";
-import { Input } from "@makeplane/propel/components/input";
+import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { AgentOutline, ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
 import { isConnectionPending } from "@plane/blocks/agent-run";
 import { setToast } from "@plane/blocks/toast";
@@ -61,14 +61,15 @@ function fieldErrorMessage(t: TTranslate, error: TAgentSettingsError | null, fie
   return messages[0];
 }
 
-type TDraft = Pick<TAgent, "name">;
+type TDraft = Pick<TAgent, "name" | "handle">;
 
-const draftOf = (agent: TAgent): TDraft => ({ name: agent.name });
+const draftOf = (agent: TAgent): TDraft => ({ name: agent.name, handle: agent.handle });
 
 /** Changed fields only, so a Save never rewrites a value that another admin changed meanwhile. */
 function changesOf(draft: TDraft, agent: TAgent): TAgentUpdate {
   const changes: TAgentUpdate = {};
   if (draft.name !== agent.name) changes.name = draft.name;
+  if (draft.handle !== agent.handle) changes.handle = draft.handle;
   return changes;
 }
 
@@ -162,6 +163,30 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                 aria-invalid={invalid || undefined}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
+            )}
+          </SettingRow>
+          <SettingRow
+            label={t("agent_settings.settings.handle_label")}
+            hint={t("agent_settings.settings.handle_hint")}
+            error={fieldErrorMessage(t, error, "handle")}
+          >
+            {({ controlId, describedBy, invalid }) => (
+              <InputGroup size="md">
+                <span aria-hidden="true" className="pl-2 font-code text-body-sm-regular text-tertiary">
+                  @
+                </span>
+                <Input
+                  id={controlId}
+                  size="md"
+                  value={draft.handle}
+                  maxLength={33}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid || undefined}
+                  onChange={(event) => setDraft({ ...draft, handle: event.target.value })}
+                />
+              </InputGroup>
             )}
           </SettingRow>
         </ul>
