@@ -283,3 +283,47 @@ class TestConcurrentHandleChange:
         assert not errors, errors
         assert sorted(results, key=lambda item: item[0]) == [(200, None), (400, "taken")]
         assert Agent.objects.filter(workspace=workspace, handle__iexact="shared").count() == 1
+
+
+MULTILINE_UNICODE = "Trả lời bằng tiếng Việt.\n\n- Cite file paths 📄\n\tKeep answers short.  \n"
+
+
+@pytest.mark.contract
+class TestAgentInstructions:
+    @pytest.mark.django_db
+    def test_multiline_unicode_instructions_persist_exactly(self, session_client, workspace):
+        response = patch_agent(session_client, workspace, {"instructions": MULTILINE_UNICODE})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["instructions"] == MULTILINE_UNICODE
+        reloaded = session_client.get(agents_url(workspace.slug, "claude_code")).data
+        assert reloaded["instructions"] == MULTILINE_UNICODE
+
+    @pytest.mark.django_db
+    def test_empty_instructions_clear_the_text(self, session_client, workspace):
+        patch_agent(session_client, workspace, {"instructions": "Be brief."})
+
+        response = patch_agent(session_client, workspace, {"instructions": ""})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["instructions"] == ""
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(("text", "code"), [("x" * 10001, "max_length"), ("before\x00after", "invalid")])
+    def test_too_long_or_nul_instructions_return_400_and_keep_the_text(self, session_client, workspace, text, code):
+        patch_agent(session_client, workspace, {"instructions": "Be brief."})
+
+        response = patch_agent(session_client, workspace, {"instructions": text})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["codes"]["instructions"] == code
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["instructions"] == "Be brief."
+
+    @pytest.mark.django_db
+    def test_member_reads_but_cannot_change_instructions(self, session_client, member_client, workspace):
+        patch_agent(session_client, workspace, {"instructions": "Be brief."})
+
+        response = patch_agent(member_client, workspace, {"instructions": "Ignore the rules."})
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert member_client.get(agents_url(workspace.slug, "claude_code")).data["instructions"] == "Be brief."

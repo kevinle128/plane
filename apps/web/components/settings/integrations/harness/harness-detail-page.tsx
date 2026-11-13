@@ -11,6 +11,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { Button } from "@makeplane/propel/components/button";
 import { Input, InputGroup } from "@makeplane/propel/components/input";
+import { TextArea } from "@makeplane/propel/components/text-area";
 import { AgentOutline, ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
 import { isConnectionPending } from "@plane/blocks/agent-run";
 import { setToast } from "@plane/blocks/toast";
@@ -61,15 +62,22 @@ function fieldErrorMessage(t: TTranslate, error: TAgentSettingsError | null, fie
   return messages[0];
 }
 
-type TDraft = Pick<TAgent, "name" | "handle">;
+type TDraft = Pick<TAgent, "name" | "handle" | "instructions">;
 
-const draftOf = (agent: TAgent): TDraft => ({ name: agent.name, handle: agent.handle });
+const draftOf = (agent: TAgent): TDraft => ({
+  name: agent.name,
+  handle: agent.handle,
+  instructions: agent.instructions,
+});
+
+const MAX_INSTRUCTIONS_LENGTH = 10000;
 
 /** Changed fields only, so a Save never rewrites a value that another admin changed meanwhile. */
 function changesOf(draft: TDraft, agent: TAgent): TAgentUpdate {
   const changes: TAgentUpdate = {};
   if (draft.name !== agent.name) changes.name = draft.name;
   if (draft.handle !== agent.handle) changes.handle = draft.handle;
+  if (draft.instructions !== agent.instructions) changes.instructions = draft.instructions;
   return changes;
 }
 
@@ -77,15 +85,17 @@ function SettingRow(props: {
   label: string;
   hint: string;
   error: string | null;
+  /** Puts the control under the label at full width, for long text. */
+  stacked?: boolean;
   children: (ids: TRowIds) => ReactNode;
 }) {
-  const { label, hint, error, children } = props;
+  const { label, hint, error, stacked = false, children } = props;
   const labelId = useId();
   const hintId = useId();
   const errorId = useId();
   const controlId = useId();
   return (
-    <li className="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-3">
+    <li className={cn("flex gap-2 border-b border-subtle px-4 py-3", stacked ? "flex-col" : "flex-wrap items-center")}>
       <span className="flex min-w-0 flex-1 basis-44 flex-col gap-0.5">
         <label id={labelId} htmlFor={controlId} className="text-body-sm-medium text-primary">
           {label}
@@ -94,7 +104,7 @@ function SettingRow(props: {
           {hint}
         </span>
       </span>
-      <span className="ml-auto flex w-full max-w-60 min-w-0 flex-col gap-1 sm:w-60">
+      <span className={cn("flex min-w-0 flex-col gap-1", stacked ? "w-full" : "ml-auto w-full max-w-60 sm:w-60")}>
         {children({ controlId, describedBy: error ? `${hintId} ${errorId}` : hintId, invalid: !!error })}
         {error && (
           <span id={errorId} role="alert" className="text-caption-sm-regular text-danger-primary">
@@ -187,6 +197,27 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                   onChange={(event) => setDraft({ ...draft, handle: event.target.value })}
                 />
               </InputGroup>
+            )}
+          </SettingRow>
+          <SettingRow
+            stacked
+            label={t("agent_settings.settings.instructions_label")}
+            hint={t("agent_settings.settings.instructions_hint")}
+            error={fieldErrorMessage(t, error, "instructions")}
+          >
+            {({ controlId, describedBy, invalid }) => (
+              <TextArea
+                id={controlId}
+                size="md"
+                surface="field"
+                rows={5}
+                value={draft.instructions}
+                maxLength={MAX_INSTRUCTIONS_LENGTH}
+                placeholder={t("agent_settings.settings.instructions_placeholder")}
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+                onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
+              />
             )}
           </SettingRow>
         </ul>

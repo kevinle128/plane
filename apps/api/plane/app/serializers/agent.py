@@ -60,11 +60,25 @@ def reject_control_characters(value):
     return value
 
 
+def reject_nul(value):
+    # PostgreSQL text columns cannot hold NUL.
+    if "\x00" in value:
+        raise serializers.ValidationError("Remove the NUL character.", code="invalid")
+    return value
+
+
+MAX_INSTRUCTIONS_LENGTH = 10000
+
+
 class AgentUpdateSerializer(serializers.Serializer):
     """Fields an admin can change. Each story of the settings page adds its field here."""
 
     name = serializers.CharField(max_length=64, trim_whitespace=True, validators=[reject_control_characters])
     handle = serializers.CharField(trim_whitespace=True)
+    # Kept exactly as typed (no trimming): it is the Agent's configuration for new Runs.
+    instructions = serializers.CharField(
+        allow_blank=True, trim_whitespace=False, max_length=MAX_INSTRUCTIONS_LENGTH, validators=[reject_nul]
+    )
 
     def validate_handle(self, value):
         handle = value.removeprefix("@")

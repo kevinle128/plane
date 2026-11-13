@@ -287,7 +287,10 @@
       "name_label": "Name",
       "name_hint": "Shown on the run card and in mention suggestions.",
       "handle_label": "Handle",
-      "handle_hint": "Members type @handle in a comment to ask this agent. Unique in this workspace."
+      "handle_hint": "Members type @handle in a comment to ask this agent. Unique in this workspace.",
+      "instructions_label": "Instructions",
+      "instructions_hint": "Added to every new run of this agent as its configuration, apart from the work item and the repository. Existing runs keep the instructions they started with.",
+      "instructions_placeholder": "For example: Answer in the language of the work item. Cite file paths for every claim."
     },
     "errors": {
       "name_blank": "Enter a name.",
@@ -296,7 +299,9 @@
       "name_invalid": "Use one line of text without control characters.",
       "handle_blank": "Enter a handle.",
       "handle_invalid": "Use 1 to 32 letters, digits, - or _, starting with a letter.",
-      "handle_taken": "An agent with this handle already exists in this workspace."
+      "handle_taken": "An agent with this handle already exists in this workspace.",
+      "instructions_max_length": "Use 10,000 characters or fewer.",
+      "instructions_invalid": "Remove the NUL character."
     }
   }
 }
