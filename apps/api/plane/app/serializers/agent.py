@@ -79,6 +79,8 @@ class AgentUpdateSerializer(serializers.Serializer):
     instructions = serializers.CharField(
         allow_blank=True, trim_whitespace=False, max_length=MAX_INSTRUCTIONS_LENGTH, validators=[reject_nul]
     )
+    # Off blocks new Runs from mentions; existing Runs and their history stay available.
+    mentionable = serializers.BooleanField()
 
     def validate_handle(self, value):
         handle = value.removeprefix("@")

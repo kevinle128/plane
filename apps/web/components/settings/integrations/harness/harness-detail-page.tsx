@@ -11,6 +11,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { Button } from "@makeplane/propel/components/button";
 import { Input, InputGroup } from "@makeplane/propel/components/input";
+import { Switch } from "@makeplane/propel/components/switch";
 import { TextArea } from "@makeplane/propel/components/text-area";
 import { AgentOutline, ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
 import { isConnectionPending } from "@plane/blocks/agent-run";
@@ -239,6 +240,50 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
   );
 });
 
+/** Saves on change. Off blocks new Runs from mentions; existing Runs stay available. */
+const MentionableSwitch = observer(function MentionableSwitch(props: {
+  workspaceSlug: string;
+  agent: TAgent;
+  canEdit: boolean;
+}) {
+  const { workspaceSlug, agent, canEdit } = props;
+  const { t } = useTranslation();
+  const { updateAgent } = useAgent();
+  const [isSaving, setIsSaving] = useState(false);
+  const labelId = useId();
+  const hintId = useId();
+
+  const toggle = async (mentionable: boolean) => {
+    setIsSaving(true);
+    try {
+      await updateAgent(workspaceSlug, agent.harness, { mentionable });
+    } catch {
+      setToast({ type: "error", title: t("agent_settings.settings.save_failed") });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-2">
+      <span id={labelId} className="text-caption-sm-regular text-secondary">
+        {t("agent_settings.settings.mentionable_label")}
+      </span>
+      <span id={hintId} className="sr-only">
+        {t("agent_settings.settings.mentionable_hint")}
+      </span>
+      <Switch
+        size="sm"
+        checked={agent.mentionable}
+        disabled={!canEdit || isSaving}
+        aria-labelledby={labelId}
+        aria-describedby={hintId}
+        onCheckedChange={(checked) => void toggle(checked)}
+      />
+    </span>
+  );
+});
+
 function AgentSelector({ workspaceSlug, current }: { workspaceSlug: string; current: TAgentHarness }) {
   const { t } = useTranslation();
   const { getAgent } = useAgent();
@@ -323,6 +368,7 @@ export const HarnessDetailPage = observer(function HarnessDetailPage({ workspace
                     : harnessCliLabel(harness, "")}
                 </span>
               </div>
+              <MentionableSwitch workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
             </div>
             {!canEdit && (
               <p className="border-b border-subtle px-4 py-2 text-caption-sm-regular text-tertiary">

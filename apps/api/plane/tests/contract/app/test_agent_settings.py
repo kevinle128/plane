@@ -10,7 +10,7 @@ from rest_framework import status
 
 from plane.db.models import Agent, AgentConnection, User, Workspace, WorkspaceMember
 from plane.tests.agent_git_fixtures import client_for_user
-from plane.tests.agent_settings_fixtures import agents_url
+from plane.tests.agent_settings_fixtures import agents_url, make_worker, probe_report, worker_client_for
 
 HARNESS_ORDER = ["claude_code", "codex", "grok", "omp"]
 
@@ -327,3 +327,62 @@ class TestAgentInstructions:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert member_client.get(agents_url(workspace.slug, "claude_code")).data["instructions"] == "Be brief."
+
+
+def connect_claude(session_client, workspace):
+    """Connect Claude Code through a claimed probe and a passing report, as the Worker does."""
+    session_client.post(agents_url(workspace.slug, "claude_code", "connect"), {}, format="json")
+    _, token = make_worker(name=f"worker-{workspace.slug}")
+    worker = worker_client_for(token)
+    probe = worker.post("/api/agent-worker/v1/probes/claim/", {"harnesses": ["claude_code"]}, format="json").data[
+        "probe"
+    ]
+    report = worker.post(
+        f"/api/agent-worker/v1/probes/{probe['id']}/report/", probe_report(probe["generation"]), format="json"
+    )
+    assert report.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.contract
+class TestAgentMentionable:
+    @pytest.mark.django_db
+    def test_disabling_mentions_persists_and_blocks_new_runs_but_keeps_the_connection(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["available_for_mentions"] is True
+
+        response = patch_agent(session_client, workspace, {"mentionable": False})
+
+        assert response.status_code == status.HTTP_200_OK
+        reloaded = session_client.get(agents_url(workspace.slug, "claude_code")).data
+        assert reloaded["mentionable"] is False
+        assert reloaded["available_for_mentions"] is False
+        assert reloaded["connection"]["state"] == "connected"
+
+    @pytest.mark.django_db
+    def test_enabling_mentions_again_restores_availability(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+        patch_agent(session_client, workspace, {"mentionable": False})
+
+        response = patch_agent(session_client, workspace, {"mentionable": True})
+
+        assert response.data["mentionable"] is True
+        assert response.data["available_for_mentions"] is True
+
+    @pytest.mark.django_db
+    def test_non_boolean_returns_400(self, session_client, workspace):
+        session_client.get(agents_url(workspace.slug))
+
+        response = patch_agent(session_client, workspace, {"mentionable": "maybe"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["codes"]["mentionable"] == "invalid"
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["mentionable"] is True
+
+    @pytest.mark.django_db
+    def test_member_cannot_toggle_mentions(self, session_client, member_client, workspace):
+        session_client.get(agents_url(workspace.slug))
+
+        response = patch_agent(member_client, workspace, {"mentionable": False})
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["mentionable"] is True
