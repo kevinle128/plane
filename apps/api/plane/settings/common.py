@@ -54,31 +54,43 @@ DEBUG = int(os.environ.get("DEBUG", "0"))
 # Self-hosted mode
 IS_SELF_MANAGED = True
 
+
+def _parse_allowed_ips(setting_name):
+    """Parse a comma-separated list of IPs or CIDR ranges from the environment, skipping invalid entries."""
+    networks = []
+    for entry in os.environ.get(setting_name, "").split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            _logger.warning("%s: skipping invalid entry %r", setting_name, entry)
+    return networks
+
+
+def _parse_allowed_hosts(setting_name):
+    """Parse a comma-separated list of hostnames from the environment (lower case, no trailing dot)."""
+    return [host.strip().rstrip(".").lower() for host in os.environ.get(setting_name, "").split(",") if host.strip()]
+
+
 # Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
 # webhook targets even if they resolve to private networks.
 # Example: "10.0.0.0/8,192.168.1.0/24,172.16.0.5"
-_webhook_allowed_ips_raw = os.environ.get("WEBHOOK_ALLOWED_IPS", "")
-WEBHOOK_ALLOWED_IPS = []
-for _cidr in _webhook_allowed_ips_raw.split(","):
-    _cidr = _cidr.strip()
-    if not _cidr:
-        continue
-    try:
-        WEBHOOK_ALLOWED_IPS.append(ipaddress.ip_network(_cidr, strict=False))
-    except ValueError:
-        _logger.warning("WEBHOOK_ALLOWED_IPS: skipping invalid entry %r", _cidr)
+WEBHOOK_ALLOWED_IPS = _parse_allowed_ips("WEBHOOK_ALLOWED_IPS")
 
 # Webhook hostname allowlist — comma-separated hostnames that bypass the
 # private-IP SSRF check. Useful for trusted internal services whose IPs are
 # dynamic in containerised deployments (e.g. docker-compose service DNS,
 # kubernetes service hostnames).
 # Example: "silo,silo.namespace.svc.cluster.local,internal-api.lan"
-_webhook_allowed_hosts_raw = os.environ.get("WEBHOOK_ALLOWED_HOSTS", "")
-WEBHOOK_ALLOWED_HOSTS = [
-    _host.strip().rstrip(".").lower()
-    for _host in _webhook_allowed_hosts_raw.split(",")
-    if _host.strip()
-]
+WEBHOOK_ALLOWED_HOSTS = _parse_allowed_hosts("WEBHOOK_ALLOWED_HOSTS")
+
+# Git provider allowlists for local CLI agents (self-hosted GitLab). Same
+# format as the webhook allowlists above. Only the instance operator sets
+# them; a GitLab URL on a private network is refused unless it is listed.
+AGENT_GIT_ALLOWED_IPS = _parse_allowed_ips("AGENT_GIT_ALLOWED_IPS")
+AGENT_GIT_ALLOWED_HOSTS = _parse_allowed_hosts("AGENT_GIT_ALLOWED_HOSTS")
 
 # Webhook disallowed domains — comma-separated hostnames. Webhooks targeting
 # these domains or any of their subdomains are rejected (the request host is

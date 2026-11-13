@@ -1358,12 +1358,14 @@ p { margin: .55rem 0; color: var(--ink); }
       var el = document.getElementById(ids[i]);
       if (el && el.offsetTop <= y) cur = ids[i];
     }
-    rack.forEach(function (a) {
-      a.setAttribute("aria-current", a.getAttribute("href") === "#" + cur ? "true" : "false");
-    });
-    mnav.forEach(function (a) {
-      a.setAttribute("aria-current", a.getAttribute("href") === "#" + cur ? "true" : "false");
-    });
+    for (var j = 0; j < rack.length; j++) {
+      var rackLink = rack[j];
+      rackLink.setAttribute("aria-current", rackLink.getAttribute("href") === "#" + cur ? "true" : "false");
+    }
+    for (var k = 0; k < mnav.length; k++) {
+      var mnavLink = mnav[k];
+      mnavLink.setAttribute("aria-current", mnavLink.getAttribute("href") === "#" + cur ? "true" : "false");
+    }
   }
   window.addEventListener("scroll", setCurrent, { passive: true });
   setCurrent();

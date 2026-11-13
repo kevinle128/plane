@@ -95,6 +95,29 @@ github_config_variables = [
     },
 ]
 
+# GitHub App used by local CLI agents (device flow, installations, pull
+# requests). Separate from the GitHub login keys above.
+github_app_config_variables = [
+    {
+        "key": "GITHUB_APP_CLIENT_ID",
+        "value": os.environ.get("GITHUB_APP_CLIENT_ID"),
+        "category": "GITHUB_APP",
+        "is_encrypted": False,
+    },
+    {
+        "key": "GITHUB_APP_CLIENT_SECRET",
+        "value": os.environ.get("GITHUB_APP_CLIENT_SECRET"),
+        "category": "GITHUB_APP",
+        "is_encrypted": True,
+    },
+    {
+        "key": "GITHUB_APP_SLUG",
+        "value": os.environ.get("GITHUB_APP_SLUG"),
+        "category": "GITHUB_APP",
+        "is_encrypted": False,
+    },
+]
+
 
 gitlab_config_variables = [
     {
@@ -255,6 +278,7 @@ core_config_variables = [
     *workspace_management_config_variables,
     *google_config_variables,
     *github_config_variables,
+    *github_app_config_variables,
     *gitlab_config_variables,
     *gitea_config_variables,
     *smtp_config_variables,

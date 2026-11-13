@@ -59,6 +59,18 @@ class TestProjectAPIPost(TestProjectBase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
+    def test_create_project_without_repository_keeps_the_response_shape(self, session_client, workspace):
+        from plane.app.serializers import ProjectListSerializer
+
+        url = self.get_project_url(workspace.slug)
+
+        response = session_client.post(url, {"name": "Plain Project", "identifier": "PLN"}, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert "repository" not in response.data
+        assert set(response.data.keys()) == set(ProjectListSerializer().get_fields().keys())
+
+    @pytest.mark.django_db
     def test_create_project_valid_data(self, session_client, workspace, create_user):
         url = self.get_project_url(workspace.slug)
 
