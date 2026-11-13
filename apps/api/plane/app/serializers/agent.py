@@ -15,7 +15,7 @@ from rest_framework import serializers
 
 # Module imports
 from plane.agent.services.agent_settings import HANDLE_TAKEN_MESSAGE, connection_view, is_available_for_mentions
-from plane.db.models import Agent
+from plane.db.models import Agent, AgentConnectionState
 
 # A mention handle: a letter, then letters, digits, "-" or "_"; 32 characters at most.
 HANDLE_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
@@ -81,6 +81,19 @@ class AgentUpdateSerializer(serializers.Serializer):
     )
     # Off blocks new Runs from mentions; existing Runs and their history stay available.
     mentionable = serializers.BooleanField()
+    # Copied to each new Run when it is created, so a later change never touches an existing Run.
+    selected_model = serializers.CharField(allow_blank=True, max_length=128)
+
+    def validate_selected_model(self, value):
+        if value == "":
+            return value
+        agent = self.context["agent"]
+        state, _ = connection_view(agent.connection)
+        if state != AgentConnectionState.CONNECTED:
+            raise serializers.ValidationError("Connect the Harness before you choose a model.", code="not_connected")
+        if value not in {model["id"] for model in agent.connection.reported_models}:
+            raise serializers.ValidationError("Choose a model that the Harness reported.", code="not_reported")
+        return value
 
     def validate_handle(self, value):
         handle = value.removeprefix("@")

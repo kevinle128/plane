@@ -304,7 +304,16 @@
       "handle_taken": "An agent with this handle already exists in this workspace.",
       "instructions_max_length": "Use 10,000 characters or fewer.",
       "instructions_invalid": "Remove the NUL character.",
-      "mentionable_invalid": "Choose on or off."
+      "mentionable_invalid": "Choose on or off.",
+      "selected_model_not_connected": "Connect the agent before you choose a model.",
+      "selected_model_not_reported": "Choose a model that the agent reported.",
+      "selected_model_max_length": "Choose a model that the agent reported."
+    },
+    "model": {
+      "label": "Model",
+      "hint": "Reported by the agent when it connects; picked per agent. New runs use it; started runs keep their model.",
+      "unavailable": "Available after connecting",
+      "placeholder": "Choose a model"
     }
   }
 }

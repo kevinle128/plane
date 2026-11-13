@@ -20,7 +20,7 @@ from django.utils import timezone
 
 # Module imports
 from plane.agent.services.agent_settings import PROBE_ANSWER_SECONDS, is_probe_expired
-from plane.db.models import AgentConnection, AgentConnectionState, AgentHarness
+from plane.db.models import Agent, AgentConnection, AgentConnectionState, AgentHarness
 
 # Harnesses with a Worker probe. The other Harnesses can be configured but not connected yet.
 PROBE_HARNESSES = frozenset({AgentHarness.CLAUDE_CODE})
@@ -154,4 +154,10 @@ def apply_report(worker, probe_id, report):
         connection.reported_models = report["models"] if connected else []
         connection.verified_at = timezone.now() if connected else None
         connection.save(disable_auto_set_user=True)
+        if connected:
+            # A model the Harness no longer reports cannot stay selected; new Runs then use the Harness default.
+            reported = {model["id"] for model in connection.reported_models}
+            Agent.objects.filter(pk=connection.agent_id).exclude(selected_model="").exclude(
+                selected_model__in=reported
+            ).update(selected_model="")
     return connection

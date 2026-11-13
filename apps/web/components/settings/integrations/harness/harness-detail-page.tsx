@@ -24,6 +24,7 @@ import { SettingsHeading } from "@/components/settings/heading";
 import { useAgent } from "@/hooks/store/use-agent";
 import { HarnessConnectionRow, HarnessStatusTag } from "./connection-row";
 import { agentsKey, harnessCliLabel } from "./harness-card";
+import { HarnessModelSelect } from "./model-select";
 
 type Props = {
   workspaceSlug: string;
@@ -63,12 +64,13 @@ function fieldErrorMessage(t: TTranslate, error: TAgentSettingsError | null, fie
   return messages[0];
 }
 
-type TDraft = Pick<TAgent, "name" | "handle" | "instructions">;
+type TDraft = Pick<TAgent, "name" | "handle" | "instructions" | "selected_model">;
 
 const draftOf = (agent: TAgent): TDraft => ({
   name: agent.name,
   handle: agent.handle,
   instructions: agent.instructions,
+  selected_model: agent.selected_model,
 });
 
 const MAX_INSTRUCTIONS_LENGTH = 10000;
@@ -79,6 +81,7 @@ function changesOf(draft: TDraft, agent: TAgent): TAgentUpdate {
   if (draft.name !== agent.name) changes.name = draft.name;
   if (draft.handle !== agent.handle) changes.handle = draft.handle;
   if (draft.instructions !== agent.instructions) changes.instructions = draft.instructions;
+  if (draft.selected_model !== agent.selected_model) changes.selected_model = draft.selected_model;
   return changes;
 }
 
@@ -218,6 +221,22 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                 aria-describedby={describedBy}
                 aria-invalid={invalid || undefined}
                 onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
+              />
+            )}
+          </SettingRow>
+          <SettingRow
+            label={t("agent_settings.model.label")}
+            hint={t("agent_settings.model.hint")}
+            error={fieldErrorMessage(t, error, "selected_model")}
+          >
+            {({ controlId, describedBy, invalid }) => (
+              <HarnessModelSelect
+                connection={agent.connection}
+                value={draft.selected_model}
+                controlId={controlId}
+                describedBy={describedBy}
+                invalid={invalid}
+                onChange={(modelId) => setDraft({ ...draft, selected_model: modelId })}
               />
             )}
           </SettingRow>

@@ -10,7 +10,13 @@ from rest_framework import status
 
 from plane.db.models import Agent, AgentConnection, User, Workspace, WorkspaceMember
 from plane.tests.agent_git_fixtures import client_for_user
-from plane.tests.agent_settings_fixtures import agents_url, make_worker, probe_report, worker_client_for
+from plane.tests.agent_settings_fixtures import (
+    agents_url,
+    failing_checks,
+    make_worker,
+    probe_report,
+    worker_client_for,
+)
 
 HARNESS_ORDER = ["claude_code", "codex", "grok", "omp"]
 
@@ -386,3 +392,107 @@ class TestAgentMentionable:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert session_client.get(agents_url(workspace.slug, "claude_code")).data["mentionable"] is True
+
+
+def reconnect_claude(session_client, workspace, models):
+    """Run another probe generation that reports ``models``."""
+    session_client.post(agents_url(workspace.slug, "claude_code", "connect"), {}, format="json")
+    _, token = make_worker(name=f"worker-{workspace.slug}-again")
+    worker = worker_client_for(token)
+    probe = worker.post("/api/agent-worker/v1/probes/claim/", {"harnesses": ["claude_code"]}, format="json").data[
+        "probe"
+    ]
+    worker.post(
+        f"/api/agent-worker/v1/probes/{probe['id']}/report/",
+        probe_report(probe["generation"], models=models),
+        format="json",
+    )
+
+
+@pytest.mark.contract
+class TestAgentModelSelection:
+    @pytest.mark.django_db
+    def test_reported_model_saves_and_stays_after_refresh(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+
+        response = patch_agent(session_client, workspace, {"selected_model": "sonnet"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["selected_model"] == "sonnet"
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["selected_model"] == "sonnet"
+
+    @pytest.mark.django_db
+    def test_model_outside_the_report_returns_400(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+        patch_agent(session_client, workspace, {"selected_model": "sonnet"})
+
+        response = patch_agent(session_client, workspace, {"selected_model": "gpt-5"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["codes"]["selected_model"] == "not_reported"
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["selected_model"] == "sonnet"
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("state", ["not_connected", "connecting", "failed"])
+    def test_selection_is_unavailable_unless_connected(self, session_client, worker_client, workspace, state):
+        session_client.get(agents_url(workspace.slug))
+        if state != "not_connected":
+            session_client.post(agents_url(workspace.slug, "claude_code", "connect"), {}, format="json")
+        if state == "failed":
+            probe = worker_client.post(
+                "/api/agent-worker/v1/probes/claim/", {"harnesses": ["claude_code"]}, format="json"
+            ).data["probe"]
+            worker_client.post(
+                f"/api/agent-worker/v1/probes/{probe['id']}/report/",
+                probe_report(probe["generation"], checks=failing_checks("authentication")),
+                format="json",
+            )
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["connection"]["state"] == state
+
+        response = patch_agent(session_client, workspace, {"selected_model": "sonnet"})
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["codes"]["selected_model"] == "not_connected"
+        agent = session_client.get(agents_url(workspace.slug, "claude_code")).data
+        assert agent["selected_model"] == ""
+        assert agent["connection"]["models"] == []
+
+    @pytest.mark.django_db
+    def test_clearing_the_selection_is_always_allowed(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+        patch_agent(session_client, workspace, {"selected_model": "sonnet"})
+        session_client.post(agents_url(workspace.slug, "claude_code", "disconnect"), {}, format="json")
+
+        response = patch_agent(session_client, workspace, {"selected_model": ""})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["selected_model"] == ""
+
+    @pytest.mark.django_db
+    def test_disconnect_keeps_the_choice_for_a_later_reconnect(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+        patch_agent(session_client, workspace, {"selected_model": "sonnet"})
+        session_client.post(agents_url(workspace.slug, "claude_code", "disconnect"), {}, format="json")
+
+        reconnect_claude(session_client, workspace, models=[{"id": "sonnet", "label": "Sonnet", "description": ""}])
+
+        assert session_client.get(agents_url(workspace.slug, "claude_code")).data["selected_model"] == "sonnet"
+
+    @pytest.mark.django_db
+    def test_new_report_without_the_selected_model_clears_it(self, session_client, workspace):
+        connect_claude(session_client, workspace)
+        patch_agent(session_client, workspace, {"selected_model": "sonnet"})
+
+        reconnect_claude(session_client, workspace, models=[{"id": "opus", "label": "Opus", "description": ""}])
+
+        agent = session_client.get(agents_url(workspace.slug, "claude_code")).data
+        assert agent["connection"]["state"] == "connected"
+        assert agent["selected_model"] == ""
+
+    @pytest.mark.django_db
+    def test_member_cannot_select_a_model(self, session_client, member_client, workspace):
+        connect_claude(session_client, workspace)
+
+        response = patch_agent(member_client, workspace, {"selected_model": "sonnet"})
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
