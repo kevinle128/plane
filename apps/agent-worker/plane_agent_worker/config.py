@@ -1,0 +1,163 @@
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
+"""Worker configuration from the environment.
+
+Rules:
+- Plane is reached only on localhost, so the Worker token never leaves the Mini.
+- The token file is a private regular file (mode 0600, owned by the Worker user,
+  not a symbolic link) outside the Run root, where Harness processes can read.
+- The Run root is private to the Worker user and is outside the Plane checkout.
+"""
+
+import os
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import urlsplit
+
+LOCALHOST_NAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+DEFAULT_POLL_SECONDS = 2.0
+MAX_TOKEN_BYTES = 256
+
+ENV_ORIGIN = "PLANE_AGENT_WORKER_API_ORIGIN"
+ENV_TOKEN_FILE = "PLANE_AGENT_WORKER_TOKEN_FILE"
+ENV_RUN_ROOT = "PLANE_AGENT_WORKER_RUN_ROOT"
+ENV_PLANE_CHECKOUT = "PLANE_AGENT_WORKER_PLANE_CHECKOUT"
+ENV_CLAUDE_BIN = "PLANE_AGENT_WORKER_CLAUDE_BIN"
+ENV_POLL_SECONDS = "PLANE_AGENT_WORKER_POLL_SECONDS"
+
+
+class ConfigError(Exception):
+    """The Worker configuration is not safe to use."""
+
+
+@dataclass(frozen=True)
+class WorkerConfig:
+    api_origin: str
+    token_file: Path
+    run_root: Path
+    plane_checkout: Path
+    claude_bin: str | None = None
+    poll_seconds: float = DEFAULT_POLL_SECONDS
+
+    def read_token(self):
+        """Read the token again, with the same file checks as at start."""
+        return read_token_file(self.token_file)
+
+
+def _is_within(path, parent):
+    return path == parent or parent in path.parents
+
+
+def _absolute(env, name, required=True):
+    value = (env.get(name) or "").strip()
+    if not value:
+        if required:
+            raise ConfigError(f"{name} is required.")
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        raise ConfigError(f"{name} must be an absolute path.")
+    return path
+
+
+def validate_origin(origin):
+    parts = urlsplit(origin or "")
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ConfigError(f"{ENV_ORIGIN} must be an http or https origin, for example http://localhost:8000.")
+    if parts.hostname not in LOCALHOST_NAMES:
+        raise ConfigError(f"{ENV_ORIGIN} must point to localhost; the Worker token never leaves the Mini.")
+    if parts.username or parts.password or parts.path not in ("", "/") or parts.query or parts.fragment:
+        raise ConfigError(f"{ENV_ORIGIN} must be a bare origin without user info, path, query or fragment.")
+    try:
+        _ = parts.port  # urlsplit raises ValueError only when the port is read
+    except ValueError as error:
+        raise ConfigError(f"{ENV_ORIGIN} has an invalid port.") from error
+    return origin.rstrip("/")
+
+
+def read_token_file(path):
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError as error:
+        raise ConfigError(f"The token file {path} does not exist.") from error
+    if stat.S_ISLNK(info.st_mode):
+        raise ConfigError("The token file must not be a symbolic link.")
+    if not stat.S_ISREG(info.st_mode):
+        raise ConfigError("The token file must be a regular file.")
+    if info.st_uid != os.getuid():
+        raise ConfigError("The token file must belong to the Worker user.")
+    if info.st_mode & 0o077:
+        raise ConfigError("The token file must have mode 0600 (no group or other access).")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        raw = os.read(descriptor, MAX_TOKEN_BYTES + 1)
+    finally:
+        os.close(descriptor)
+    if len(raw) > MAX_TOKEN_BYTES:
+        raise ConfigError("The token file is too large.")
+    token = raw.decode("utf-8", errors="strict").strip()
+    if not token:
+        raise ConfigError("The token file is empty.")
+    return token
+
+
+def _prepare_run_root(run_root):
+    run_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = os.lstat(run_root)
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise ConfigError(f"{ENV_RUN_ROOT} must be a directory, not a symbolic link.")
+    if info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise ConfigError(f"{ENV_RUN_ROOT} must be private to the Worker user (mode 0700).")
+
+
+def default_plane_checkout():
+    """The checkout that contains this package, when the Worker runs from a Plane checkout."""
+    candidate = Path(__file__).resolve().parents[3]
+    return candidate if (candidate / "apps" / "api").is_dir() else None
+
+
+def _poll_seconds(env):
+    raw = (env.get(ENV_POLL_SECONDS) or "").strip()
+    if not raw:
+        return DEFAULT_POLL_SECONDS
+    try:
+        value = float(raw)
+    except ValueError as error:
+        raise ConfigError(f"{ENV_POLL_SECONDS} must be a number of seconds from 1 to 60.") from error
+    if not 1 <= value <= 60:
+        raise ConfigError(f"{ENV_POLL_SECONDS} must be a number of seconds from 1 to 60.")
+    return value
+
+
+def load_config(env):
+    origin = validate_origin((env.get(ENV_ORIGIN) or "").strip())
+    run_root = _absolute(env, ENV_RUN_ROOT)
+    token_file = _absolute(env, ENV_TOKEN_FILE)
+    checkout = _absolute(env, ENV_PLANE_CHECKOUT, required=False) or default_plane_checkout()
+    if checkout is None:
+        raise ConfigError(f"{ENV_PLANE_CHECKOUT} is required when the Worker does not run from a Plane checkout.")
+
+    run_root = Path(os.path.realpath(run_root))
+    checkout = Path(os.path.realpath(checkout))
+    if _is_within(run_root, checkout) or _is_within(checkout, run_root):
+        raise ConfigError(f"{ENV_RUN_ROOT} must be outside the Plane checkout, and the checkout outside it.")
+    # The real parent directory decides containment; the file itself must not be a link (checked on read).
+    token_location = Path(os.path.realpath(token_file.parent)) / token_file.name
+    if _is_within(token_location, run_root):
+        raise ConfigError("The token file must be outside the Run root, where Harness processes can read.")
+
+    _prepare_run_root(run_root)
+    read_token_file(token_file)
+
+    claude_bin = (env.get(ENV_CLAUDE_BIN) or "").strip() or None
+    return WorkerConfig(
+        api_origin=origin,
+        token_file=token_file,
+        run_root=run_root,
+        plane_checkout=checkout,
+        claude_bin=claude_bin,
+        poll_seconds=_poll_seconds(env),
+    )

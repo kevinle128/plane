@@ -19,6 +19,8 @@ import { StateStore } from "@/store/state.store";
 import type { ICommandPaletteStore } from "@/store/base-command-palette.store";
 import { CommandPaletteStore } from "@/store/base-command-palette.store";
 import { WorkspaceRootStore } from "@/store/workspace";
+import type { IAgentStore } from "./agent/agent.store";
+import { AgentStore } from "./agent/agent.store";
 import type { IAgentGitStore } from "./agent/git.store";
 import { AgentGitStore } from "./agent/git.store";
 import type { ITimelineStore } from "./timeline/timeline.store";
@@ -106,6 +108,7 @@ export class CoreRootStore {
   powerK: IPowerKStore;
   timelineStore: ITimelineStore;
   agentGit: IAgentGitStore;
+  agent: IAgentStore;
 
   constructor() {
     this.router = new RouterStore();
@@ -139,6 +142,7 @@ export class CoreRootStore {
     this.powerK = new PowerKStore();
     this.timelineStore = new TimeLineStore(this);
     this.agentGit = new AgentGitStore();
+    this.agent = new AgentStore();
   }
 
   resetOnSignOut() {
@@ -174,6 +178,7 @@ export class CoreRootStore {
     this.powerK = new PowerKStore();
     this.timelineStore = new TimeLineStore(this);
     this.agentGit = new AgentGitStore();
+    this.agent = new AgentStore();
   }
 }
 

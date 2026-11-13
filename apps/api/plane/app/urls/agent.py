@@ -4,6 +4,12 @@
 
 from django.urls import path
 
+from plane.app.views.agent.settings import (
+    AgentConnectEndpoint,
+    AgentDetailEndpoint,
+    AgentDisconnectEndpoint,
+    AgentsEndpoint,
+)
 from plane.app.views.agent.git import (
     AgentGitAccountAttachEndpoint,
     AgentGitAccountDetailEndpoint,
@@ -19,8 +25,13 @@ from plane.app.views.agent.git import (
 )
 
 AGENT_GIT = "workspaces/<str:slug>/agent-git"
+AGENTS = "workspaces/<str:slug>/agents"
 
 urlpatterns = [
+    path(f"{AGENTS}/", AgentsEndpoint.as_view(), name="agents"),
+    path(f"{AGENTS}/<str:harness>/", AgentDetailEndpoint.as_view(), name="agent-detail"),
+    path(f"{AGENTS}/<str:harness>/connect/", AgentConnectEndpoint.as_view(), name="agent-connect"),
+    path(f"{AGENTS}/<str:harness>/disconnect/", AgentDisconnectEndpoint.as_view(), name="agent-disconnect"),
     path(f"{AGENT_GIT}/connections/", AgentGitConnectionsEndpoint.as_view(), name="agent-git-connections"),
     path(
         f"{AGENT_GIT}/github/device-authorizations/",

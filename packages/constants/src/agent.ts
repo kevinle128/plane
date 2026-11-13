@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import type { TAgentGitConnectionStatus, TAgentGitPolicy, TAgentGitProvider } from "@plane/types";
+import type { TAgentGitConnectionStatus, TAgentGitPolicy, TAgentGitProvider, TAgentHarness } from "@plane/types";
 
 export const AGENT_GIT_PROVIDERS: TAgentGitProvider[] = ["github", "gitlab"];
 
@@ -25,3 +25,28 @@ export const AGENT_GIT_BRANCH_FORMATS: { key: TAgentGitPolicy["branch_format"]; 
   { key: "issue", label: "agent/<issue-identifier>-<run-short-id>" },
   { key: "project_issue", label: "agent/<project-identifier>/<issue-identifier>-<run-short-id>" },
 ];
+
+/** Harness order on the Integrations page and in the Agent selector. */
+export const AGENT_HARNESSES: TAgentHarness[] = ["claude_code", "codex", "grok", "omp"];
+
+/** Harness names are product names and are not translated. */
+export const AGENT_HARNESS_LABELS: Record<TAgentHarness, string> = {
+  claude_code: "Claude Code",
+  codex: "Codex CLI",
+  grok: "Grok CLI",
+  omp: "Omp",
+};
+
+/** The CLI command of each Harness, shown when no version is known yet. */
+export const AGENT_HARNESS_COMMANDS: Record<TAgentHarness, string> = {
+  claude_code: "claude",
+  codex: "codex",
+  grok: "grok",
+  omp: "omp",
+};
+
+/** Harnesses whose connection probe the Worker can run. The others can be configured but not connected yet. */
+export const AGENT_PROBE_HARNESSES: TAgentHarness[] = ["claude_code"];
+
+/** Poll interval of the Harness detail page while a probe runs. */
+export const AGENT_CONNECTION_POLL_MS = 2000;

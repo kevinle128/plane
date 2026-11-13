@@ -1,0 +1,31 @@
+;; Read-only OS boundary for Q&A Harness processes on macOS (sandbox-exec).
+;; Every path comes in as a parameter from sandbox_macos.py; this file has no machine path.
+;; In this language a later rule wins over an earlier rule for the same operation.
+(version 1)
+(allow default)
+
+;; No write on the Host. Exceptions: the device files a CLI needs, the private
+;; temporary directory of this probe or Run, and the Harness session directory
+;; of this probe or Run (Claude Code keeps its session there; without it the
+;; session cannot resume).
+(deny file-write*)
+(allow file-write*
+  (literal "/dev/null")
+  (literal "/dev/zero")
+  (literal "/dev/dtracehelper")
+  (regex #"^/dev/tty")
+  (regex #"^/dev/fd/")
+  (subpath (param "PRIVATE_TMP"))
+  (subpath (param "SESSION_DIR")))
+
+;; Other Runs and probes are not readable; only this one is.
+(deny file-read* (subpath (param "RUN_ROOT")))
+(allow file-read* (subpath (param "OWN_DIR")))
+
+;; Session files of other Runs are not readable; only this one is.
+(deny file-read* (subpath (param "SESSION_ROOT")))
+(allow file-read* (subpath (param "SESSION_DIR")))
+
+;; The Worker token and the Plane checkout are never readable.
+(deny file-read* (literal (param "TOKEN_FILE")))
+(deny file-read* (subpath (param "PLANE_CHECKOUT")))

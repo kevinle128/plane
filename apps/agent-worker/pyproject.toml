@@ -1,0 +1,22 @@
+[project]
+name = "plane-agent-worker"
+version = "0.1.0"
+description = "Local Worker that runs CLI Harness probes and Runs for Plane on the Mac Mini"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.12,<3.13"
+# The Worker uses the standard library only, so no third-party code runs next to the Worker token.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "ruff==0.9.7",
+]
+
+[tool.uv]
+# Same uv version as apps/api; CI reads it through setup-uv's version-file.
+required-version = "==0.12.21"
+# The Worker runs from this checkout with `python -m plane_agent_worker`; uv only manages its environment.
+package = false
+default-groups = ["dev"]

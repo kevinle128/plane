@@ -14,15 +14,18 @@ import { agentGitProviderLabel } from "@/components/settings/integrations/git/pr
 import { SettingsPageHeader } from "@/components/settings/page-header";
 import { WORKSPACE_SETTINGS_ICONS } from "@/components/settings/workspace/sidebar/item-icon";
 
-type Props = { workspaceSlug: string; provider?: TAgentGitProvider };
+/** `provider` names a Git provider page; `title` names any other detail page, for example a Harness. */
+type Props = { workspaceSlug: string; provider?: TAgentGitProvider; title?: string };
 
 export const IntegrationsWorkspaceSettingsHeader = observer(function IntegrationsWorkspaceSettingsHeader({
   workspaceSlug,
   provider,
+  title,
 }: Props) {
   const { t } = useTranslation();
   const settingsDetails = WORKSPACE_SETTINGS.integrations;
   const Icon = WORKSPACE_SETTINGS_ICONS.integrations;
+  const detailLabel = provider ? agentGitProviderLabel(provider) : title;
 
   return (
     <SettingsPageHeader
@@ -33,12 +36,12 @@ export const IntegrationsWorkspaceSettingsHeader = observer(function Integration
               component={
                 <BreadcrumbLink
                   label={t(settingsDetails.i18n_label)}
-                  href={provider ? `/${workspaceSlug}/settings/integrations` : undefined}
+                  href={detailLabel ? `/${workspaceSlug}/settings/integrations` : undefined}
                   icon={<Icon className="size-4 text-tertiary" />}
                 />
               }
             />
-            {provider && <Breadcrumbs.Item component={<BreadcrumbLink label={agentGitProviderLabel(provider)} />} />}
+            {detailLabel && <Breadcrumbs.Item component={<BreadcrumbLink label={detailLabel} />} />}
           </Breadcrumbs>
         </div>
       }

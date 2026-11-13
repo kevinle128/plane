@@ -1,0 +1,20 @@
+# Matches requires-python in pyproject.toml.
+target-version = "py312"
+line-length = 120
+indent-width = 4
+exclude = [".venv", ".ruff_cache", "__pycache__"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = []
+
+[lint.isort]
+known-first-party = ["plane_agent_worker"]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]

@@ -8,8 +8,10 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useTranslation } from "@plane/i18n";
+import { AGENT_HARNESSES } from "@plane/constants";
 import type { TAgentGitProvider } from "@plane/types";
 import { SettingsHeading } from "@/components/settings/heading";
+import { useAgent } from "@/hooks/store/use-agent";
 import { useAgentGit } from "@/hooks/store/use-agent-git";
 import {
   AgentGitConnectionsError,
@@ -18,6 +20,8 @@ import {
   agentGitConnectionsKey,
   agentGitProviderLabel,
 } from "./git/provider-meta";
+import { HarnessCard, agentsKey } from "./harness/harness-card";
+import { AgentsLoadError } from "./harness/harness-detail-page";
 
 type Props = { workspaceSlug: string };
 
@@ -35,6 +39,9 @@ export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ w
   const hasLoadError = !!error && !isLoading;
   // Without loaded connections the status is unknown, so the cards show no status or "Connect" label.
   const isStatusKnown = data !== undefined;
+  const { fetchAgents, getAgent } = useAgent();
+  const agents = useSWR(agentsKey(workspaceSlug), () => fetchAgents(workspaceSlug));
+  const hasAgentsError = !!agents.error && !agents.isLoading;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -72,6 +79,22 @@ export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ w
               </Link>
             );
           })}
+        </div>
+      </section>
+      <section aria-labelledby="agent-harnesses" className="flex flex-col gap-3">
+        <h4 id="agent-harnesses" className="tracking-wider text-11 font-semibold text-tertiary uppercase">
+          {t("agent_settings.integrations.harnesses")}
+        </h4>
+        {hasAgentsError && <AgentsLoadError onRetry={() => void agents.mutate()} />}
+        <div className="flex flex-wrap gap-3">
+          {AGENT_HARNESSES.map((harness) => (
+            <HarnessCard
+              key={harness}
+              workspaceSlug={workspaceSlug}
+              harness={harness}
+              agent={agents.data ? getAgent(workspaceSlug, harness) : undefined}
+            />
+          ))}
         </div>
       </section>
     </div>
