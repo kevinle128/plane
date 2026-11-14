@@ -64,6 +64,8 @@ Report: [sbx-verification.md](./sbx-verification.md). Criterion 9 PASS with one 
 
 - Linux check (CI runs `ubuntu-latest`): in `python:3.12-slim` with git 2.47.3 (GnuTLS), 3 git transport tests failed because GnuTLS reports "server verification failed: certificate signer not trusted", which the TLS mapping did not match (the other failures of the first Linux run came from the image lacking `ps`; with `procps`, which `ubuntu-latest` has, they pass). Fix: the mapping also matches the GnuTLS text, with a mapping case for it. After: Linux `255 passed, 4 deselected`, ruff clean; macOS `test_git_transport.py` 57 passed.
 
+- Host check fix (found in the final review): Plane stores the connection host without the port (`apps/api/plane/agent/services/gitlab_connection.py:85`, passed by `lease.py:146`), but the transport required `host` to equal the clone URL's host and port, so a GitLab on a port other than 443 would fail every clone with `git_failed`. Test first: `test_host_without_the_port_matches_a_clone_url_with_a_port` failed (`The clone URL host does not match 127.0.0.1`). Fix: `host` may be the URL host with or without its port; the CA scope and the pipe helper use the URL's host and port. A host with another port is still refused. After: Worker unit `257 passed, 4 deselected`.
+
 ## Live end-to-end check (2026-11-14, this Mac)
 
 Setup: the API test stack ran `runserver` on `127.0.0.1:8765` (`docker compose -f docker-compose-test.yml run -d -p 127.0.0.1:8765:8000 api-tests ...`); a workspace `e2e` with project `HELLO` bound to the public GitHub repository `octocat/Hello-World` (rows made with the API test fixtures in `manage.py shell`); a Worker token from `create_agent_worker`, copied to a 0600 file and never printed; the real Worker (`python -m plane_agent_worker run`, Run root `/private/tmp/plane-p3-e2e/runs`, MCP port 7451) against the real `sbx` (`deny-all`) and the host `~/.claude/settings.json`.
@@ -78,7 +80,7 @@ Setup: the API test stack ran `runserver` on `127.0.0.1:8765` (`docker compose -
 
 Not checked live: a GitLab-bound project on git.oceanlabs.dev (no GitLab connection was set up in this stack), and the browser review of the Run card and panel (no web server ran).
 
-## Phase verification (final, on `43e8750b40`'s tree)
+## Phase verification (final)
 
 | Command                                                                                                                                                                                            | Result                                                                                                           |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |

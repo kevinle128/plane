@@ -165,6 +165,27 @@ def test_plane_token_clone_succeeds_with_ca_bundle(server, certificates, recorde
     assert shallow.stdout.strip() == "true"
 
 
+def test_host_without_the_port_matches_a_clone_url_with_a_port(server, certificates, recorder, ca_dir, private_dir):
+    # Plane stores the connection host without the port; a GitLab on another port keeps it in the clone URL.
+    destination = private_dir / "clone"
+    fetch = TokenSource()
+
+    clone(
+        recorder, ca_dir, destination, url=server.url(), host="127.0.0.1", ca_pem=certificates["a"].ca_pem, fetch=fetch
+    )
+
+    assert (destination / "README.md").read_text() == "main\n"
+    assert fetch.calls == 1
+
+
+def test_clone_url_of_another_host_is_refused(recorder, ca_dir, private_dir):
+    error = clone_error(
+        recorder, ca_dir, private_dir / "clone", url="https://other.test:8443/repo.git", host="git.test"
+    )
+
+    assert error.code == "git_failed"
+
+
 def test_clone_uses_the_hardened_git_options(server, certificates, recorder, ca_dir, private_dir):
     host = f"localhost:{server.port}"
     url = f"https://{host}/repo.git"
@@ -586,9 +607,9 @@ def test_existing_destination_is_refused_and_kept(recorder, ca_dir, private_dir)
     assert recorder.calls() == []
 
 
-def test_host_that_does_not_match_the_url_is_refused(recorder, ca_dir, private_dir):
+def test_host_with_another_port_than_the_url_is_refused(recorder, ca_dir, private_dir):
     error = clone_error(
-        recorder, ca_dir, private_dir / "clone", url="https://127.0.0.1:8443/repo.git", host="127.0.0.1"
+        recorder, ca_dir, private_dir / "clone", url="https://127.0.0.1:8443/repo.git", host="127.0.0.1:9443"
     )
 
     assert error.code == "git_failed"

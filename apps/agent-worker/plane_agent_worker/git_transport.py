@@ -254,7 +254,8 @@ def clone_repository(
         raise GitTransportError("git_host_blocked", "Only https clone URLs are allowed.")
     if parts.username is not None or parts.password is not None:
         raise GitTransportError("git_failed", "The clone URL must not contain credentials.")
-    if parts.netloc != host or not parts.hostname:
+    # Plane stores the connection host without the port; a clone-spec host with the port must match it too.
+    if not parts.hostname or host.lower() not in (parts.netloc.lower(), parts.hostname.lower()):
         raise GitTransportError("git_failed", f"The clone URL host does not match {host}.")
     try:
         port = parts.port or 443
@@ -281,7 +282,7 @@ def clone_repository(
     ]
     if ca_bundle:
         ca_file = _write_ca_bundle(ca_dir, ca_bundle)
-        transport += ["-c", f"http.{parts.scheme}://{host}/.sslCAInfo={ca_file}"]
+        transport += ["-c", f"http.{parts.scheme}://{parts.netloc}/.sslCAInfo={ca_file}"]
 
     logger.info("Cloning %s (%s credentials) into %s", clone_url, credential_mode, destination)
     try:
