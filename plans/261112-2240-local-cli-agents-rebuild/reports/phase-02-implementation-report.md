@@ -134,7 +134,34 @@ Commit `899597a27f` (web: type, constants, the Grok blurb in 22 locales).
 
 ### Live check on this Mac (remaining item 8): NOT RUN
 
-The check must use this Mac's own Claude login, not an environment token. With a clean environment (`env -i HOME USER PATH LANG`), `claude auth status` reports `loggedIn: true`, `authMethod: oauth_token`. But every model turn answers "Your account is on hold and can't use Claude Code. View details or appeal: https://claude.ai/restricted". A recorded local probe (`python -m plane_agent_worker probe --record`) showed this text for each turn of session A. The probe then fails its permission check ("Write was not attempted, so the permission rule was not proven"), so it correctly does not report Connected. The code before these changes (`40f7d32e51`) fails the same way, so this is not a regression. The session's environment token was not used. The first Connect and the cached second Connect times are therefore not recorded; the native test `test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite` asserts both (second Connect under 10 s) when a working login exists.
+The check must use this Mac's own Claude login, not an environment token, so every `claude` run used a clean environment (`env -i HOME USER LOGNAME PATH LANG TERM`).
+
+First attempt: `claude auth status` reports `loggedIn: true`, `authMethod: oauth_token`, but every model turn answered "Your account is on hold and can't use Claude Code. View details or appeal: https://claude.ai/restricted". A recorded local probe (`python -m plane_agent_worker probe --record`) showed this text for each turn of session A. The code before these changes (`40f7d32e51`) fails the same way.
+
+Second attempt, after the user fixed the login: `pytest -m native` -> `1 failed` (`permission: Write was not attempted, so the permission rule was not proven`). Cause, from one "Reply with the single word READY." prompt per case (clean environment with `USER`):
+
+| Command                               | Answer                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `claude -p`                           | READY, with "another auth source is set and takes precedence over your claude.ai login" |
+| `claude -p --setting-sources user`    | READY                                                                                   |
+| `claude -p --setting-sources ""`      | "Your account is on hold and can't use Claude Code"                                     |
+| `claude -p --restricted`              | "Your account is on hold and can't use Claude Code"                                     |
+| `--setting-sources ""` without `USER` | "Not logged in · Please run /login"                                                     |
+
+The working credential comes from a user settings source (the settings file was not read), and the keychain claude.ai login is still the account on hold. The Worker runs Claude with `--setting-sources ""` and `--restricted` on purpose, so user settings cannot add hooks, permissions or MCP servers. It therefore uses only the keychain login or an allowlisted environment variable. To unblock: sign the keychain login in with a working account (`claude auth logout`, then `claude auth login`). Check that `env -i HOME=$HOME PATH=$PATH USER=$USER claude -p --setting-sources "" "Reply with the single word READY."` answers READY. The other way out, `CLAUDE_CODE_OAUTH_TOKEN` in the Worker environment, is an environment token and is not allowed for this check.
+
+Not done because of this: the first Connect and cached second Connect times (the native test `test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite` asserts both, second under 10 s), the stored report from a real Worker, and recording the transcripts again. A recording made now would contain only the on-hold reply. Two probe runs were made with this login and both failed, so no suite result was cached.
+
+### Finding: an account on hold reads as a permission problem
+
+With a login whose account is on hold, `auth status` passes, the model list arrives, and each turn ends with `result` subtype `success` whose text is the hold notice. The probe then reports `permission: Write was not attempted, so the permission rule was not proven` as the first failure (follow-up, progress, interruption and recovery fail too). An admin would read that as a sandbox defect. The probe still does not report Connected, so this is a wrong reason, not a wrong verdict.
+
+Proposal (not implemented; it needs a decision on the matching rule and it touches the check contract):
+
+1. In the first turn of session A, before the permission turns, compare the result text with known account-block replies ("Your account is on hold", "Not logged in · Please run /login", "Invalid API key"). Use a prefix match on Claude Code's exact strings, kept in one constant with the CLI version they were seen on.
+2. On a match, stop the suite: set every suite check to "not run: Claude Code refused to run a turn for this login", and set the failure hint to "Claude Code is signed in, but the account cannot run turns. Sign in on the Mini with a working account, then retry." Keep the CLI text in the Worker log only. The suite result is not cached, because it did not pass.
+3. Plane needs no change: the missing action stays the first failed check. An optional follow-up is a separate missing action `account_unusable` with its own message, which needs a new code in `harness_probe.py` and the blocks `KNOWN_MISSING_ACTIONS`.
+4. Tests first: a fake scenario `account_on_hold` that answers every turn with the hold text; the report must name the account in its failure hint and must not blame the permission rule.
 
 ### Browser check of scene 11 (remaining item 9): NOT RUN
 
