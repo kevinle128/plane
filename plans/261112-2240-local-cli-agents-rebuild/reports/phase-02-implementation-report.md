@@ -136,25 +136,43 @@ Commits `899597a27f` (web: type, constants, the Grok blurb in 22 locales) and `e
 - API, test first: the list of exactly three Harnesses, the 404 for `grok` and the migration tests failed before the change (`6 failed, 100 passed`, and a collection error for the missing migration). After it: settings + probe + `plane/tests/unit/db` -> `121 passed`; `makemigrations --check --dry-run` -> "No changes detected".
 - Migration `0131_remove_grok_harness` first deletes the Grok Agents that earlier builds of this branch created (with their connections and bot users, soft-deleted rows included), then changes the choices. It is needed because such a hidden Agent would keep the "Grok" handle in its workspace. On a database that never ran this branch it does nothing.
 
-### Live check on this Mac (remaining item 8): NOT RUN
+### Live check on this Mac (remaining item 8): PASSED after Q28 (2026-11-14)
 
-The check must use this Mac's own Claude login, not an environment token, so every `claude` run used a clean environment (`env -i HOME USER LOGNAME PATH LANG TERM`).
+Every `claude` run used a clean environment (`env -i HOME USER LOGNAME PATH LANG TERM`); the Worker never received a token, and the token was not read. Claude reads its own settings (Q28), so it uses the login and gateway that the user set up in `~/.claude/settings.json`.
 
-First attempt: `claude auth status` reports `loggedIn: true`, `authMethod: oauth_token`, but every model turn answered "Your account is on hold and can't use Claude Code. View details or appeal: https://claude.ai/restricted". A recorded local probe (`python -m plane_agent_worker probe --record`) showed this text for each turn of session A. The code before these changes (`40f7d32e51`) fails the same way.
+Before Q28 the check could not pass: the Worker ran Claude with `--setting-sources ""` and `--restricted`, which hid the user settings, so Claude fell back to the keychain claude.ai login, an account on hold ("Your account is on hold and can't use Claude Code"). Evidence (one "Reply with the single word READY." prompt per case): `claude -p` and `claude -p --setting-sources user` answered READY; `claude -p --setting-sources ""` and `claude -p --restricted` answered with the hold notice.
 
-Second attempt, after the user fixed the login: `pytest -m native` -> `1 failed` (`permission: Write was not attempted, so the permission rule was not proven`). Cause, from one "Reply with the single word READY." prompt per case (clean environment with `USER`):
+After Q28 and Q29 (commits `f08b6e3cde`, `04a40a3301`, `053ccecee4`), two local probes on one Run root (`python -m plane_agent_worker probe`, Claude Code 2.1.289):
 
-| Command                               | Answer                                                                                  |
-| ------------------------------------- | --------------------------------------------------------------------------------------- |
-| `claude -p`                           | READY, with "another auth source is set and takes precedence over your claude.ai login" |
-| `claude -p --setting-sources user`    | READY                                                                                   |
-| `claude -p --setting-sources ""`      | "Your account is on hold and can't use Claude Code"                                     |
-| `claude -p --restricted`              | "Your account is on hold and can't use Claude Code"                                     |
-| `--setting-sources ""` without `USER` | "Not logged in · Please run /login"                                                     |
+| Probe     | Time   | Result                                                                                                                                               |
+| --------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect 1 | 48.8 s | exit 0; all seven checks passed; suite `{"suite_version": 2, "cli_version": "2.1.289", "verified_at": "2026-11-14T11:44:31+00:00", "ran_now": true}` |
+| Connect 2 | 2.9 s  | exit 0; all seven checks passed; same suite record with `"ran_now": false`                                                                           |
 
-The working credential comes from a user settings source (the settings file was not read), and the keychain claude.ai login is still the account on hold. The Worker runs Claude with `--setting-sources ""` and `--restricted` on purpose, so user settings cannot add hooks, permissions or MCP servers. It therefore uses only the keychain login or an allowlisted environment variable. To unblock: sign the keychain login in with a working account (`claude auth logout`, then `claude auth login`). Check that `env -i HOME=$HOME PATH=$PATH USER=$USER claude -p --setting-sources "" "Reply with the single word READY."` answers READY. The other way out, `CLAUDE_CODE_OAUTH_TOKEN` in the Worker environment, is an environment token and is not allowed for this check.
+Both reports list 5 models with source `reported` (`default`, `opus`, `claude-fable-5-1[1m]`, `sonnet`, `haiku`), capabilities `midturn_input=false`, `native_resume=true`, `permission_prompt=true`, and an empty failure hint. The times include the `uv run` start and the start of the user's MCP servers. `uv run pytest -m native` -> `1 passed` in 41.4 s (`test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite`, second Connect under 10 s). The transcripts were recorded again from the first probe (`053ccecee4`); a scan of the recording found no home path, user name, email, key-like text, MCP tool names or temporary paths.
 
-Not done because of this: the first Connect and cached second Connect times (the native test `test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite` asserts both, second under 10 s), the stored report from a real Worker, and recording the transcripts again. A recording made now would contain only the on-hold reply. Two probe runs were made with this login and both failed, so no suite result was cached.
+Not done: an end-to-end run through a real Plane API and the Worker poll loop with this setup; the probe ran locally. The last end-to-end run through the API was in Phase 2's first increment.
+
+### Q28 and Q29: Claude runs as installed
+
+Sources: code.claude.com docs (settings, permissions, sandboxing, env-vars, cli-reference), read directly because Context7 is not callable from this session.
+
+- Removed flags: `--setting-sources ""`, `--restricted`, `--strict-mcp-config` and `--safe-mode`. The last one is needed for Q29: it turns off hooks, MCP servers, plugins, skills and CLAUDE.md. `disableAllHooks` is no longer set.
+- The `--settings` file ranks above user, project and local settings; lists merge across scopes; deny rules are evaluated before allow rules.
+- File tools: without `--restricted`, a scoped `Edit(<cwd>/**)` deny leaves Write open outside the working directory, and a user allow rule would merge in. The Worker now uses bare-name denies (`Edit`, `Write`, `NotebookEdit`). Checked natively: the tools are removed although `--tools Bash,Write` asks for Write, and Bash keeps its temporary folder. The permission check now requires that the `init` message does not offer them.
+- Bash prompts: Claude Code 2.1.289 asks before a Bash write to a path the sandbox denies, and before code it cannot analyze (a `python3 -c` write). Checked natively: the prompt still comes with user hooks turned off, and after an allow the command runs in the sandbox, which denies the write (`operation not permitted`, `PermissionError: [Errno 1] Operation not permitted`). The probe allows only that Bash call and requires the sandbox denial. No earlier native run of the built-in-sandbox permission check had passed: the earlier passing runs used the outer sandbox.
+- User settings cannot widen these points (unit test `test_user_settings_cannot_widen_the_boundary`, plus a native run with a local-scope settings file holding `allow: Write, Edit, Bash(*)`, `sandbox.enabled: false` and `allowWrite: <cwd>`: Write stayed removed and the Bash write was denied).
+- Residual risk the Worker cannot close: settings lists merge, and only managed settings can lock them. A user `sandbox.filesystem.allowRead` entry re-opens a narrower part of a denied read path, and user `sandbox.excludedCommands` run outside the sandbox. Recorded in the Worker README.
+- Open decision for Phase 3 (needs the user): in `claude -p`, a repository's `.claude/settings.json` `env` block and `apiKeyHelper` are used without workspace trust, so a cloned repository could redirect `ANTHROPIC_BASE_URL` or run a command on the Mini. `--setting-sources user` would keep Q28's reason (auth from user settings) and leave out project and local files. Phase 2 implements Q28 literally, which is equivalent here because the probe folder is created empty by the Worker.
+
+### Final review fixes (code-review-phase-02-final.md)
+
+- I1, reduced by the user (token exposure is a minor accepted risk): `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` is set for every `claude` process, covered by `test_harness_scrubs_credentials_from_its_subprocesses` and by `suite_fingerprint()`. No canary checks were added.
+- M2: the Worker README says the Mini needs no managed Claude policy and that the suite cache must be deleted after a policy or settings change that affects the sandbox or permissions.
+- M3: `test_record_with_a_failed_check_is_not_used`.
+- M4: the Worker stops at start when `HOME` is missing, relative or not a directory (`04a40a3301`, 4 cases in `test_config.py`).
+- M1 and M5: not done (M1 awaits a user decision; M5 is optional).
+- Test first: after the test changes, `9 failed, 100 passed`; after the change `109 passed`; with the prompt handling `110 passed`. The fingerprint pin has entries for suite versions 1 and 2.
 
 ### Finding: an account on hold reads as a permission problem
 
@@ -167,7 +185,7 @@ Proposal (not implemented; it needs a decision on the matching rule and it touch
 3. Plane needs no change: the missing action stays the first failed check. An optional follow-up is a separate missing action `account_unusable` with its own message, which needs a new code in `harness_probe.py` and the blocks `KNOWN_MISSING_ACTIONS`.
 4. Tests first: a fake scenario `account_on_hold` that answers every turn with the hold text; the report must name the account in its failure hint and must not blame the permission rule.
 
-### Final gates (2026-11-14, branch head `e7042d02d1`)
+### Final gates (2026-11-14, branch head `e7042d02d1`; Worker rows updated at `053ccecee4`)
 
 | Command                                                                                                                         | Result                                                                                          |
 | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -175,9 +193,9 @@ Proposal (not implemented; it needs a decision on the matching rule and it touch
 | `... pytest plane/tests/contract/app plane/tests/unit -k "agent or api_token or project_app or url_security"`                   | 546 passed, 1166 deselected                                                                     |
 | `... python manage.py makemigrations --check --dry-run`                                                                         | No changes detected                                                                             |
 | `... ruff check .` (test image)                                                                                                 | All checks passed                                                                               |
-| Worker on macOS: `uv run pytest -m "not native and not docker"`, `ruff check .`, `ruff format --check .` (uv 0.12.21 via `uvx`) | 102 passed; clean; 22 files formatted                                                           |
-| Worker on Linux: `python:3.12-slim` with `procps`, uv 0.12.21, non-root user, same three commands                               | 102 passed; clean; 22 files formatted                                                           |
-| Worker native on this Mac: `uv run pytest -m native` (clean environment)                                                        | 1 failed: the keychain login is the account on hold (see the live check above)                  |
+| Worker on macOS: `uv run pytest -m "not native and not docker"`, `ruff check .`, `ruff format --check .` (uv 0.12.21 via `uvx`) | 110 passed; clean; 22 files formatted                                                           |
+| Worker on Linux: `python:3.12-slim` with `procps`, uv 0.12.21, non-root user, same three commands                               | 110 passed; clean; 22 files formatted                                                           |
+| Worker native on this Mac: `uv run pytest -m native` (clean environment)                                                        | 1 passed (41.4 s)                                                                               |
 | `pnpm --filter=@plane/blocks test`                                                                                              | 46 files, 452 passed                                                                            |
 | `pnpm turbo run check:types --filter=web --filter=@plane/blocks --filter=@plane/types --filter=@plane/constants`                | 13/13                                                                                           |
 | `pnpm check:lint`, `pnpm check:format`                                                                                          | exit 0                                                                                          |
