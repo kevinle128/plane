@@ -95,6 +95,7 @@ export const IssueActivityCommentRoot = observer(function IssueActivityCommentRo
             <AgentRunCardRow
               key={`agent-run-${row.run.id}`}
               runId={row.run.id}
+              issueId={issueId}
               workspaceSlug={workspaceSlug}
               projectId={projectId}
               ends={getEnds(index)}

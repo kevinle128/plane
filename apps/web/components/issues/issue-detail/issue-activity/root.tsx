@@ -18,6 +18,7 @@ import { useTranslation } from "@plane/i18n";
 //types
 import type { TFileSignedURLResponse, TIssueComment } from "@plane/types";
 // components
+import { AgentRunPanelRoot } from "@/components/agent-run/panel-root";
 import { CommentCreate } from "@/components/comments/comment-create";
 // hooks
 import { useAgentRun } from "@/hooks/store/use-agent-run";
@@ -207,6 +208,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
           </div>
         </div>
       </div>
+      <AgentRunPanelRoot workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} />
     </div>
   );
 });

@@ -16,14 +16,17 @@ import { calculateTimeAgo, getFileURL, renderFormattedDate, renderFormattedTime 
 // components
 import { LiteTextEditor } from "@/components/editor/lite-text";
 // hooks
+import { useAgentRun } from "@/hooks/store/use-agent-run";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 // local imports
+import { getOpenRunButtonId } from "./panel-root";
 import { useRunElapsed } from "./use-run-elapsed";
 
 type Props = {
   run: TAgentRun;
+  issueId: string;
   workspaceSlug: string;
   projectId: string;
   /** Draw the activity rail down to the next entry. */
@@ -35,13 +38,14 @@ type Props = {
  * ends, its conclusion. Thoughts and tool calls stay in the Run panel.
  */
 export const AgentRunCard = observer(function AgentRunCard(props: Props) {
-  const { run, workspaceSlug, projectId, showConnector } = props;
+  const { run, issueId, workspaceSlug, projectId, showConnector } = props;
   const { t } = useTranslation();
   const { getUserDetails } = useMember();
   const {
     comment: { getCommentById },
   } = useIssueDetail();
   const { getWorkspaceBySlug } = useWorkspace();
+  const { openRun, openPanel } = useAgentRun();
   const elapsed = useRunElapsed(run);
   // derived values
   const requester = getUserDetails(run.requester_id);
@@ -86,6 +90,15 @@ export const AgentRunCard = observer(function AgentRunCard(props: Props) {
             {t("agent_run.kind.qa_read_only")}
           </span>
           <span className="font-code text-caption-sm-regular text-tertiary">{elapsed}</span>
+          <button
+            id={getOpenRunButtonId(run.id)}
+            type="button"
+            aria-expanded={openRun?.runId === run.id}
+            onClick={() => openPanel(issueId, run.id)}
+            className="ms-auto rounded-sm text-caption-sm-medium text-link-primary hover:underline focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:outline-none"
+          >
+            {t("agent_run.card.open_run")} →
+          </button>
         </div>
         {showFailure && (
           <p className="text-caption-sm-regular break-words text-danger-primary">

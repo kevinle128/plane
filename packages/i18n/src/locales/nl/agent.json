@@ -334,7 +334,8 @@
     },
     "card": {
       "mentioned": "mentioned {agent}",
-      "failed_generic": "The Run failed before it started."
+      "failed_generic": "The Run failed before it started.",
+      "open_run": "Open run"
     },
     "mention": {
       "section_title": "Agents",
@@ -350,6 +351,32 @@
         "not_found": "{agent} does not exist in this workspace. The comment was not saved.",
         "generic": "{agent} cannot start a Run now. The comment was not saved."
       }
+    },
+    "timeline": {
+      "region_label": "Run activity",
+      "working": "Working · {count, plural, one {# step} other {# steps}}",
+      "worked_for": "Worked for {duration}",
+      "working_tail": "Working…",
+      "tool_output": "Tool output",
+      "tool_failed": "Failed",
+      "tool_input": "Tool input",
+      "tool_result": "Tool result",
+      "result_partial": "More output is on the way.",
+      "conclusion": "Conclusion",
+      "load_error": "The Run activity could not load. Close the panel and open the Run again."
+    },
+    "panel": {
+      "label": "Run {id}",
+      "close": "Close run panel",
+      "started": "started {time}",
+      "activities": "{count, plural, one {# activity} other {# activities}}",
+      "cwd": "cwd {path}",
+      "cwd_pending": "cwd not ready",
+      "sandbox_read_only": "Read-only sandbox"
+    },
+    "composer": {
+      "placeholder": "Replies to {agent} are not available yet.",
+      "send": "Send"
     }
   }
 }

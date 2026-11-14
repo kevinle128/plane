@@ -12,6 +12,7 @@ import { useAgentRun } from "@/hooks/store/use-agent-run";
 
 type Props = {
   runId: string;
+  issueId: string;
   workspaceSlug: string;
   projectId: string;
   ends: "top" | "bottom" | undefined;
@@ -19,11 +20,17 @@ type Props = {
 
 /** The Run card at its place in the activity list. */
 export const AgentRunCardRow = observer(function AgentRunCardRow(props: Props) {
-  const { runId, workspaceSlug, projectId, ends } = props;
+  const { runId, issueId, workspaceSlug, projectId, ends } = props;
   const { getRunById } = useAgentRun();
   const run = getRunById(runId);
   if (!run) return null;
   return (
-    <AgentRunCard run={run} workspaceSlug={workspaceSlug} projectId={projectId} showConnector={ends !== "bottom"} />
+    <AgentRunCard
+      run={run}
+      issueId={issueId}
+      workspaceSlug={workspaceSlug}
+      projectId={projectId}
+      showConnector={ends !== "bottom"}
+    />
   );
 });
