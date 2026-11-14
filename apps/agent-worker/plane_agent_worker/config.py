@@ -39,6 +39,8 @@ ENV_IMPORT_MCP_SERVERS = "PLANE_AGENT_IMPORT_MCP_SERVERS"
 ENV_GIT_ALLOWED_HOSTS = "AGENT_GIT_ALLOWED_HOSTS"
 ENV_GIT_ALLOWED_IPS = "AGENT_GIT_ALLOWED_IPS"
 DEFAULT_MCP_PORT = 7450
+ENV_RUN_FOLDER_DAYS = "PLANE_AGENT_WORKER_RUN_FOLDER_DAYS"
+DEFAULT_RUN_FOLDER_DAYS = 7
 
 
 class ConfigError(Exception):
@@ -59,6 +61,7 @@ class WorkerConfig:
     import_mcp_servers: tuple = ()
     git_allowed_hosts: frozenset = frozenset()
     git_allowed_ips: tuple = ()
+    run_folder_days: int = DEFAULT_RUN_FOLDER_DAYS
 
     def read_token(self):
         """Read the token again, with the same file checks as at start."""
@@ -181,6 +184,15 @@ def _mcp_port(env):
     return int(raw)
 
 
+def _run_folder_days(env):
+    raw = (env.get(ENV_RUN_FOLDER_DAYS) or "").strip()
+    if not raw:
+        return DEFAULT_RUN_FOLDER_DAYS
+    if not raw.isdigit() or int(raw) < 1:
+        raise ConfigError(f"{ENV_RUN_FOLDER_DAYS} must be a whole number of days, 1 or more.")
+    return int(raw)
+
+
 def _names(env, name):
     return tuple(item.strip() for item in (env.get(name) or "").split(",") if item.strip())
 
@@ -229,4 +241,5 @@ def load_config(env):
         import_mcp_servers=_names(env, ENV_IMPORT_MCP_SERVERS),
         git_allowed_hosts=frozenset(host.lower() for host in _names(env, ENV_GIT_ALLOWED_HOSTS)),
         git_allowed_ips=_allowed_ips(env),
+        run_folder_days=_run_folder_days(env),
     )

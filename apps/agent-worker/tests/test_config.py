@@ -205,6 +205,7 @@ def test_run_settings_have_defaults(private_dir, token_file):
     assert config.import_mcp_servers == ()
     assert config.git_allowed_hosts == frozenset()
     assert config.git_allowed_ips == ()
+    assert config.run_folder_days == 7
 
 
 def test_run_settings_are_read(private_dir, token_file):
@@ -216,6 +217,7 @@ def test_run_settings_are_read(private_dir, token_file):
             PLANE_AGENT_IMPORT_MCP_SERVERS=" archon, docs ,",
             AGENT_GIT_ALLOWED_HOSTS="Git.Internal.test, gitlab.lan",
             AGENT_GIT_ALLOWED_IPS="10.0.0.0/8, 192.168.1.5",
+            PLANE_AGENT_WORKER_RUN_FOLDER_DAYS="30",
         )
     )
 
@@ -223,11 +225,19 @@ def test_run_settings_are_read(private_dir, token_file):
     assert config.import_mcp_servers == ("archon", "docs")
     assert config.git_allowed_hosts == frozenset({"git.internal.test", "gitlab.lan"})
     assert [str(network) for network in config.git_allowed_ips] == ["10.0.0.0/8", "192.168.1.5/32"]
+    assert config.run_folder_days == 30
 
 
 @pytest.mark.parametrize(
     ("name", "value"),
-    [("PLANE_AGENT_MCP_PORT", "0"), ("PLANE_AGENT_MCP_PORT", "http"), ("AGENT_GIT_ALLOWED_IPS", "10.0.0.300")],
+    [
+        ("PLANE_AGENT_MCP_PORT", "0"),
+        ("PLANE_AGENT_MCP_PORT", "http"),
+        ("AGENT_GIT_ALLOWED_IPS", "10.0.0.300"),
+        ("PLANE_AGENT_WORKER_RUN_FOLDER_DAYS", "0"),
+        ("PLANE_AGENT_WORKER_RUN_FOLDER_DAYS", "1.5"),
+        ("PLANE_AGENT_WORKER_RUN_FOLDER_DAYS", "week"),
+    ],
 )
 def test_invalid_run_settings_are_rejected(private_dir, token_file, name, value):
     with pytest.raises(ConfigError, match=name):

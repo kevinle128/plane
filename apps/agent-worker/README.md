@@ -55,16 +55,17 @@ inside a Docker Sandbox microVM through the standalone `sbx` CLI.
    uv run python -m plane_agent_worker run
    ```
 
-| Variable                            | Required | Rule                                                                                       |
-| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| `HOME`                              | yes      | The Worker user's home directory; `~/.claude/settings.json` must exist there               |
-| `PLANE_AGENT_WORKER_API_ORIGIN`     | yes      | `http` or `https` origin on `localhost`, `127.0.0.1` or `[::1]`, without path or user info |
-| `PLANE_AGENT_WORKER_TOKEN_FILE`     | yes      | Absolute path, regular file, mode `0600`, owned by the Worker user, outside the Run root   |
-| `PLANE_AGENT_WORKER_RUN_ROOT`       | yes      | Absolute path, mode `0700`, outside the Plane checkout                                     |
-| `PLANE_AGENT_WORKER_PLANE_CHECKOUT` | no       | The Plane checkout; found automatically when the Worker runs from it                       |
-| `PLANE_AGENT_WORKER_SBX_BIN`        | no       | Path of the `sbx` command; default is `sbx` on `PATH`                                      |
-| `PLANE_AGENT_SANDBOX_MEMORY`        | no       | Memory of each sandbox, for example `8g` (default: the `sbx` default)                      |
-| `PLANE_AGENT_WORKER_POLL_SECONDS`   | no       | Poll interval, 1 to 60 seconds (default 2)                                                 |
+| Variable                             | Required | Rule                                                                                       |
+| ------------------------------------ | -------- | ------------------------------------------------------------------------------------------ |
+| `HOME`                               | yes      | The Worker user's home directory; `~/.claude/settings.json` must exist there               |
+| `PLANE_AGENT_WORKER_API_ORIGIN`      | yes      | `http` or `https` origin on `localhost`, `127.0.0.1` or `[::1]`, without path or user info |
+| `PLANE_AGENT_WORKER_TOKEN_FILE`      | yes      | Absolute path, regular file, mode `0600`, owned by the Worker user, outside the Run root   |
+| `PLANE_AGENT_WORKER_RUN_ROOT`        | yes      | Absolute path, mode `0700`, outside the Plane checkout                                     |
+| `PLANE_AGENT_WORKER_PLANE_CHECKOUT`  | no       | The Plane checkout; found automatically when the Worker runs from it                       |
+| `PLANE_AGENT_WORKER_SBX_BIN`         | no       | Path of the `sbx` command; default is `sbx` on `PATH`                                      |
+| `PLANE_AGENT_SANDBOX_MEMORY`         | no       | Memory of each sandbox, for example `8g` (default: the `sbx` default)                      |
+| `PLANE_AGENT_WORKER_POLL_SECONDS`    | no       | Poll interval, 1 to 60 seconds (default 2)                                                 |
+| `PLANE_AGENT_WORKER_RUN_FOLDER_DAYS` | no       | Days without activity after which a Run's clone and scratch folder are removed (default 7) |
 
 ## Security rules
 
@@ -189,8 +190,14 @@ The Worker claims a Run when a member mentions an Agent in a work-item comment
   command. The Worker has no maximum, keep-alive or removal logic.
 - Removing a sandbox loses its Claude session history; later turns rebuild their
   context from Plane.
-- Clones and scratch folders stay after a Run (later turns of the same Run use
-  them). Clean up by hand when needed:
+- A Run's clone (`sandboxes/<key>/clones/<run_id>`) and scratch folder
+  (`sandboxes/<key>/scratch/<run_id>`) stay after the Run, for its later turns.
+  At Worker start and then once a day, the Worker removes them for each Run with
+  no activity for `PLANE_AGENT_WORKER_RUN_FOLDER_DAYS` days (default 7). The
+  activity time is the modification time of these folders; the Worker sets it
+  when a Run ends. The Worker never removes the folders of a Run that it works
+  now. A later turn of a cleaned Run clones again.
+- Remove a sandbox by hand when needed:
 
   ```bash
   sbx ls && sbx df

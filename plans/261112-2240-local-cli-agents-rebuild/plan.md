@@ -217,6 +217,7 @@ Effort change (Phases 3-7, +4d net against 58.5d):
 42. Q42, MCP gateway reachability (user, 2026-11-14): accepted. The Docker MCP gateway stays reachable by raw HTTP inside a sandbox; with `--static-mcp none` it has no servers and Claude does not list it.
 43. Q43, conclusion notifications (user, 2026-11-14): the conclusion comment notifies the requester and fires webhooks; built in Phase 4.
 44. Q44, conclusion formatting (user, 2026-11-14): the conclusion comment renders Claude's Markdown as rich text like a normal comment; built in Phase 3.
+45. Q45, Run folder cleanup (user, 2026-11-14): the Worker removes the clone (`sandboxes/<key>/clones/<run_id>`) and the scratch folder (`scratch/<run_id>`) of Runs with no activity for more than 7 days (setting `PLANE_AGENT_WORKER_RUN_FOLDER_DAYS`, default 7). Cleanup runs at Worker start and once a day and never removes the folders of an active (leased) Run. A later follow-up of a cleaned Run clones again. Amends architecture-contracts §12 Cleanup (was: removed with the Run folder); built in Phase 3.
 
 No open questions remain (2026-11-14).
 

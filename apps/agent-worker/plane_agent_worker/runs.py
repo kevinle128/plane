@@ -22,6 +22,11 @@ Steps:
    the context snapshot, and an MCP config with the Plane server (per-turn handle)
    and the listed servers. Events go to Plane as they come.
 5. Post the result: the answer, or a failure code with a short reason.
+
+The clone and the scratch sub-folder stay after the Run for its later turns. The
+loop calls ``remove_stale_folders`` at Worker start and once a day; it removes them
+for Runs with no activity for ``run_folder_days`` and never for a Run this Worker
+is working. A later turn of a cleaned Run clones again.
 """
 
 import json
@@ -40,7 +45,7 @@ from plane_agent_worker.mcp_server import imported_allow_rules, turn_mcp_config
 from plane_agent_worker.plane_client import Conflict, PlaneClientError
 from plane_agent_worker.prompt import build_prompt
 from plane_agent_worker.sandbox import Mount, SandboxError, SandboxSpec, user_config_mounts
-from plane_agent_worker.workspace import run_layout
+from plane_agent_worker.workspace import run_folders, run_layout
 
 RENEW_SECONDS = 60
 # A Q&A turn ends at the latest after this time.
@@ -54,6 +59,7 @@ CREDENTIAL_MODES = frozenset({"host", "plane_token"})
 LEASE_CODES = frozenset({"lease_superseded", "run_finished"})
 # Waits before each new try of a result post; Plane applies a result only once, so a retry is safe.
 RESULT_RETRY_SECONDS = (2, 5, 10)
+DAY_SECONDS = 24 * 3600
 
 logger = logging.getLogger("plane_agent_worker.runs")
 
@@ -119,6 +125,7 @@ class RunExecutor:
         git_allowed_ips=(),
         clone=None,
         first_output_seconds=None,
+        run_folder_days=7,
     ):
         self.client = client
         self.drivers = dict(drivers)
@@ -133,6 +140,10 @@ class RunExecutor:
         self.clone = clone or git_transport.clone_repository
         self.first_output_seconds = first_output_seconds
         self.renew_seconds = RENEW_SECONDS
+        self.run_folder_days = run_folder_days
+        # Runs this Worker works now. The folder cleanup holds the same lock, so it never removes their folders.
+        self._active = set()
+        self._active_lock = threading.Lock()
 
     # Entry --------------------------------------------------------------------
 
@@ -149,6 +160,8 @@ class RunExecutor:
             logger.warning("Ignoring a Run claim this Worker cannot work")
             return
         run_id = run["id"]
+        with self._active_lock:
+            self._active.add(run_id)
         cancel = threading.Event()
         lease = {"lost": False}
         stop_renewal = threading.Event()
@@ -173,8 +186,33 @@ class RunExecutor:
             stop_renewal.set()
             renewer.join(timeout=5)
             shutil.rmtree(layout.host_dir, ignore_errors=True)
+            with self._active_lock:
+                layout.touch()
+                self._active.discard(run_id)
             if lease["lost"]:
                 logger.info("Run %s: the lease moved on; this Worker stopped it", run_id)
+
+    def remove_stale_folders(self, now=None):
+        """Remove the clone and scratch folders of Runs with no activity for ``run_folder_days``.
+
+        Returns the number of Runs whose folders were removed.
+        """
+        cutoff = (time.time() if now is None else now) - self.run_folder_days * DAY_SECONDS
+        removed = 0
+        with self._active_lock:
+            for run_id, folders in run_folders(self.run_root).items():
+                if run_id in self._active:
+                    continue
+                try:
+                    last_activity = max(folder.stat().st_mtime for folder in folders)
+                except OSError:
+                    continue
+                if last_activity >= cutoff:
+                    continue
+                for folder in folders:
+                    shutil.rmtree(folder, ignore_errors=True)
+                removed += 1
+        return removed
 
     def _renew(self, run_id, generation, stop, cancel, lease):
         while not stop.wait(self.renew_seconds):

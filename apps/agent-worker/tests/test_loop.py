@@ -239,14 +239,22 @@ class BlockingExecutor:
         self.started = []
         self.lock = threading.Lock()
 
+        self.cleanups = 0
+
     def execute(self, run):
         with self.lock:
             self.started.append(run["id"])
         self.release.wait(5)
 
+    def remove_stale_folders(self):
+        self.cleanups += 1
+        return 0
 
-def run_loop(private_dir, token_file, client, executor, max_runs=2):
+
+def run_loop(private_dir, token_file, client, executor, max_runs=2, clock=None):
+    extra = {"clock": clock} if clock else {}
     return WorkerLoop(
+        **extra,
         client=client,
         drivers={"claude_code": FakeDriver()},
         run_root=private_dir,
@@ -301,3 +309,31 @@ def test_loop_without_a_run_executor_claims_no_run(loop_for):
     loop.run_once()
 
     assert not [call for call in client.calls if call[0] == "claim_run"]
+
+
+def test_run_folders_are_cleaned_at_start_and_once_a_day(private_dir, token_file):
+    executor = BlockingExecutor()
+    now = [1000.0]
+    loop = run_loop(private_dir, token_file, RunClient(), executor, clock=lambda: now[0])
+
+    loop.run_once()
+    now[0] += 23 * 3600
+    loop.run_once()
+    assert executor.cleanups == 1
+
+    now[0] += 2 * 3600
+    loop.run_once()
+    assert executor.cleanups == 2
+
+
+def test_failed_cleanup_does_not_stop_the_poll_step(private_dir, token_file):
+    class FailingCleanup(BlockingExecutor):
+        def remove_stale_folders(self):
+            raise OSError("disk")
+
+    executor = FailingCleanup()
+    loop = run_loop(private_dir, token_file, RunClient(runs=[{"id": "r1"}]), executor)
+
+    assert loop.run_once() is True
+    executor.release.set()
+    loop.wait_for_runs(timeout=5)

@@ -14,9 +14,14 @@ scratch never cross workspaces. Under ``<run_root>/sandboxes/<key>/``:
   host after the sandbox exists (the mount is live). Claude starts in that clone.
 
 ``<run_root>/<run_id>/`` is host-only (the CA bundle of the clone); no sandbox mounts it.
+
+The modification time of ``clones/<run_id>`` and ``scratch/<run_id>`` is the last activity
+of the Run on this Worker: the Worker sets it when a Run ends, and removes both folders
+when it is older than the retention (``RunExecutor.remove_stale_folders``).
 """
 
 import hashlib
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +48,14 @@ class RunLayout:
         for folder in (self.scratch, self.clones, self.run_scratch, self.clone.parent, self.host_dir):
             folder.mkdir(mode=0o700, parents=True, exist_ok=True)
 
+    def touch(self):
+        """Record activity now on the Run's clone and scratch folders (when they exist)."""
+        for folder in (self.clone.parent, self.run_scratch):
+            try:
+                os.utime(folder)
+            except FileNotFoundError:
+                pass
+
 
 def run_layout(run_root, run):
     """The folders of ``run`` (a claim). The Run ID must be a UUID, so no path can leave the Run root."""
@@ -65,3 +78,13 @@ def run_layout(run_root, run):
         clone=root / "clones" / run_id / "clone",
         host_dir=Path(run_root) / run_id,
     )
+
+
+def run_folders(run_root):
+    """``{run_id: [folder, ...]}``: the clone and scratch folders of each Run under ``run_root``."""
+    folders = {}
+    for kind in ("clones", "scratch"):
+        for folder in Path(run_root).glob(f"sandboxes/*/{kind}/*"):
+            if RUN_ID_PATTERN.match(folder.name) and folder.is_dir() and not folder.is_symlink():
+                folders.setdefault(folder.name, []).append(folder)
+    return folders

@@ -74,6 +74,7 @@ def command_run(config, registry):
         imported_servers=imported,
         git_allowed_hosts=config.git_allowed_hosts,
         git_allowed_ips=config.git_allowed_ips,
+        run_folder_days=config.run_folder_days,
     )
     loop = WorkerLoop(
         client=client,

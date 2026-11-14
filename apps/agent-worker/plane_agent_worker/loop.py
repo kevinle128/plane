@@ -12,7 +12,8 @@ current and stops it when a newer Connect or a Disconnect replaced it. The repor
 carries the probe generation, so Plane also rejects a late report.
 
 With a Run executor, each poll also claims one Q&A Run while fewer than
-``max_runs`` Runs are active, and works it on its own thread.
+``max_runs`` Runs are active, and works it on its own thread. The first poll and
+then one poll a day remove the folders of Runs with no recent activity.
 """
 
 import logging
@@ -33,6 +34,7 @@ MIN_PROBE_SECONDS = 30
 PROBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 # Q&A Runs that one Worker works at the same time.
 MAX_RUNS = 4
+CLEANUP_SECONDS = 24 * 3600
 
 logger = logging.getLogger("plane_agent_worker.loop")
 
@@ -66,6 +68,7 @@ class WorkerLoop:
         self.max_runs = max_runs
         self._run_threads = []
         self._last_heartbeat = None
+        self._last_cleanup = None
 
     def _heartbeat_if_due(self):
         now = self.clock()
@@ -77,9 +80,25 @@ class WorkerLoop:
         except PlaneClientError as error:
             logger.warning("Heartbeat failed: status %s (%s)", error.status, error.code)
 
+    def _cleanup_if_due(self):
+        if self.run_executor is None:
+            return
+        now = self.clock()
+        if self._last_cleanup is not None and now - self._last_cleanup < CLEANUP_SECONDS:
+            return
+        self._last_cleanup = now
+        try:
+            removed = self.run_executor.remove_stale_folders()
+        except Exception:  # a failed cleanup must not stop the poll step; the next day tries again
+            logger.exception("Run folder cleanup failed")
+            return
+        if removed:
+            logger.info("Removed the clone and scratch folders of %d idle Run(s)", removed)
+
     def run_once(self):
         """One poll step. Returns True when a probe or a Run was claimed."""
         self._heartbeat_if_due()
+        self._cleanup_if_due()
         probe_claimed = self._probe_step()
         return self._run_step() or probe_claimed
 
