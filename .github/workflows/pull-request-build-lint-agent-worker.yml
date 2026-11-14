@@ -1,0 +1,50 @@
+name: Lint and test Agent Worker
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - "preview"
+    types:
+      - "opened"
+      - "synchronize"
+      - "ready_for_review"
+      - "review_requested"
+      - "reopened"
+    paths:
+      - "apps/agent-worker/**"
+      - ".github/workflows/pull-request-build-lint-agent-worker.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-agent-worker:
+    name: Lint and test Agent Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          # uv version comes from [tool.uv] required-version.
+          version-file: "apps/agent-worker/pyproject.toml"
+          python-version: "3.12.12"
+          enable-cache: true
+          cache-dependency-glob: "apps/agent-worker/uv.lock"
+      - name: Install Worker dependencies
+        working-directory: apps/agent-worker
+        run: uv sync --locked
+      # No --fix: fixable violations must fail the job, not be rewritten on the runner.
+      - name: Lint
+        working-directory: apps/agent-worker
+        run: uv run --no-sync ruff check . && uv run --no-sync ruff format --check .
+      # Native (real CLI, macOS sandbox) and Docker tests run on the Mini only.
+      - name: Unit tests
+        working-directory: apps/agent-worker
+        run: uv run --no-sync pytest -m "not native and not docker"

@@ -294,6 +294,10 @@ export const coreRoutes: RouteConfigEntry[] = [
             ":workspaceSlug/settings/integrations/gitlab",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/integrations/gitlab/page.tsx"
           ),
+          route(
+            ":workspaceSlug/settings/integrations/:harness",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/integrations/[harness]/page.tsx"
+          ),
         ]),
 
         // --------------------------------------------------------------------

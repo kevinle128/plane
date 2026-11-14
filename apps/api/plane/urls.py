@@ -16,6 +16,8 @@ from drf_spectacular.views import (
 handler404 = "plane.app.views.error_404.custom_404_view"
 
 urlpatterns = [
+    # Before the generic "api/" include, so no existing route changes.
+    path("api/agent-worker/v1/", include("plane.agent.worker_api.urls")),
     path("api/", include("plane.app.urls")),
     path("api/public/", include("plane.space.urls")),
     path("api/instances/", include("plane.license.urls")),

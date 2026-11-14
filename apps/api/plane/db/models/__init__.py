@@ -91,6 +91,8 @@ from .sticky import Sticky
 
 from .description import Description, DescriptionVersion
 
+from .agent import Agent, AgentConnection, AgentConnectionState, AgentHarness, AgentWorker
+
 from .agent_git import (
     AgentGitAccount,
     AgentGitAccountState,

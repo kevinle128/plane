@@ -223,5 +223,98 @@
         "expired": "The token expired on {date}. Create a new token and connect again."
       }
     }
+  },
+  "agent_settings": {
+    "integrations": {
+      "harnesses": "Harnesses",
+      "configure": "Configure",
+      "load_error": "The agents could not load. Retry to see their connection state.",
+      "blurbs": {
+        "claude_code": "Anthropic's coding agent, run from the CLI on the Mini.",
+        "codex": "OpenAI's coding agent, run from the CLI on the Mini.",
+        "omp": "Oh My Pi coding agent, run from the CLI on the Mini."
+      }
+    },
+    "status": {
+      "not_connected": "Not connected",
+      "connecting": "Connecting",
+      "connected": "Connected",
+      "failed": "Connection failed"
+    },
+    "detail": {
+      "description": "Connect the CLI installed on the Mini and set how members mention this agent.",
+      "selector_label": "Agents",
+      "back": "Integrations",
+      "on_the_mini": "{version} on the Mini",
+      "not_found": "This agent does not exist.",
+      "read_only": "Only workspace admins can change agent settings."
+    },
+    "connection": {
+      "label": "Connection",
+      "hint_not_connected": "Installed on your machine. Connect to verify it and read the models it offers.",
+      "hint_connecting": "Connecting and asking the agent for its model list.",
+      "hint_failed": "Plane reached the agent but could not verify it, so no models could be read.",
+      "hint_connected": "Verified. Runs go to this agent on your machine.",
+      "hint_unavailable": "The connection check for this agent is not available yet.",
+      "connect": "Connect",
+      "retry": "Retry",
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting",
+      "disconnect_confirm_title": "Disconnect {name}?",
+      "disconnect_confirm_content": "Members cannot start new runs with this agent until it is connected again. Existing runs stay readable.",
+      "connect_failed": "The connection check could not start.",
+      "disconnect_failed": "The agent could not be disconnected.",
+      "failure_detail_label": "Detail from the agent"
+    },
+    "missing_action": {
+      "worker_did_not_answer": "The Worker did not answer. Check that the Worker runs on the Mini, then retry.",
+      "harness_not_found": "The CLI is not installed on the Mini. Install it, then retry.",
+      "unsupported_version": "This CLI version is not supported. Install a supported version, then retry.",
+      "authentication": "The CLI is not signed in. Sign in on the Mini, then retry.",
+      "model_report": "The CLI reported no models. Check its account, then retry.",
+      "follow_up": "The CLI could not resume a conversation. Update the CLI, then retry.",
+      "progress": "The CLI sent no progress events. Update the CLI, then retry.",
+      "interruption": "The CLI could not be interrupted. Update the CLI, then retry.",
+      "permission": "The CLI did not ask before a write, or the read-only boundary did not hold. Check the CLI and the Worker, then retry.",
+      "recovery": "The CLI could not continue after its process stopped. Update the CLI, then retry.",
+      "generic": "The connection check did not pass. Retry."
+    },
+    "settings": {
+      "save": "Save",
+      "saving": "Saving",
+      "saved": "Agent settings saved.",
+      "save_failed": "The agent settings could not be saved.",
+      "name_label": "Name",
+      "name_hint": "Shown on the run card and in mention suggestions.",
+      "handle_label": "Handle",
+      "handle_hint": "Members type @handle in a comment to ask this agent. Unique in this workspace.",
+      "instructions_label": "Instructions",
+      "instructions_hint": "Added to every new run of this agent as its configuration, apart from the work item and the repository. Existing runs keep the instructions they started with.",
+      "instructions_placeholder": "For example: Answer in the language of the work item. Cite file paths for every claim.",
+      "mentionable_label": "Mentionable",
+      "mentionable_hint": "When on, members can start new runs by mentioning this agent. Turning it off keeps existing runs and their history."
+    },
+    "errors": {
+      "name_blank": "Enter a name.",
+      "name_required": "Enter a name.",
+      "name_max_length": "Use 64 characters or fewer.",
+      "name_invalid": "Use one line of text without control characters.",
+      "handle_blank": "Enter a handle.",
+      "handle_invalid": "Use 1 to 32 letters, digits, - or _, starting with a letter.",
+      "handle_taken": "An agent with this handle already exists in this workspace.",
+      "instructions_max_length": "Use 10,000 characters or fewer.",
+      "instructions_invalid": "Remove the NUL character.",
+      "mentionable_invalid": "Choose on or off.",
+      "selected_model_not_connected": "Connect the agent before you choose a model.",
+      "selected_model_not_reported": "Choose a model that the agent reported.",
+      "selected_model_max_length": "Choose a model that the agent reported."
+    },
+    "model": {
+      "label": "Model",
+      "hint": "Reported by the agent when it connects; picked per agent. New runs use it; started runs keep their model.",
+      "unavailable": "Available after connecting",
+      "placeholder": "Choose a model",
+      "not_reported": "Not reported by {harness}"
+    }
   }
 }

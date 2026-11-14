@@ -9,3 +9,8 @@ export * from "./git-errors";
 export * from "./repository-list";
 export * from "./token-expiry";
 export * from "./provider-terms";
+export * from "./connection-state";
+export * from "./agent-collection";
+export * from "./agent-polling";
+export * from "./settings-draft";
+export * from "./settings-errors";
