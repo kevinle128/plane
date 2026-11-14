@@ -12,20 +12,24 @@ a probe. Permission prompts come to the Worker over stdio
 (``--permission-prompt-tool stdio``) and the Worker denies them; the boundary
 denies writes without a prompt, so a prompt for a write means a rule is missing.
 
-Probe steps (verified with Claude Code 2.1.289):
-1. ``--version`` and ``auth status`` (JSON).
-2. A metadata session: ``initialize`` returns the model list. No prompt is sent.
-3. Session A: a turn with partial-message events (progress); a Write in the
+Quick check (each Connect): ``--version``, ``auth status`` (JSON) and a metadata
+session where ``initialize`` returns the model list. No prompt is sent.
+
+Behavior suite (once per CLI version, see ``conformance.ensure_verified``;
+verified with Claude Code 2.1.289):
+1. ``--version`` and the model list again, so the result belongs to one version.
+2. Session A: a turn with partial-message events (progress); a Write in the
    working directory that a permission rule must deny, and a Bash write there
    that the built-in sandbox must deny (permission); and a long turn that
    receives a queued message and then ``interrupt`` (interruption and the
    midturn input flag).
-4. Session B resumes the session and recalls a code word (follow-up, native resume).
-5. Session C resumes, is killed during a turn; session D resumes and recalls the
+3. Session B resumes the session and recalls a code word (follow-up, native resume).
+4. Session C resumes, is killed during a turn; session D resumes and recalls the
    code word again (recovery).
 """
 
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -41,13 +45,20 @@ from pathlib import Path
 
 from plane_agent_worker.drivers.base import (
     MAX_HINT_CHARS,
+    REQUIRED_CHECKS,
+    WAIT_SLICE_SECONDS,
     ProbeOutcome,
     ProbeTimeout,
+    ProbeWorkspace,
     bounded,
 )
-from plane_agent_worker.drivers.claude_boundary import write_boundary_settings
+from plane_agent_worker.drivers.claude_boundary import boundary_settings, write_boundary_settings
 
 HARNESS = "claude_code"
+# The version of the behavior suite. A passing suite result is cached per (Harness, CLI version,
+# suite version). Change it when the checks, the session flags or the boundary change; a unit test
+# pins ``suite_fingerprint()`` for each version.
+SUITE_VERSION = 1
 SUPPORTED_MAJOR_VERSION = 2
 VERSION_PATTERN = re.compile(r"^\s*(\d+)\.(\d+)\.(\d+)")
 MODEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$")
@@ -57,8 +68,6 @@ COMMAND_TIMEOUT_SECONDS = 20
 TURN_TIMEOUT_SECONDS = 45
 # The probe uses the fastest reported model when one of these is present.
 PROBE_MODEL_PREFERENCE = ("haiku",)
-# A queue wait wakes at least this often, so a cancelled deadline stops a probe soon.
-WAIT_SLICE_SECONDS = 0.5
 
 logger = logging.getLogger("plane_agent_worker.drivers.claude")
 
@@ -349,8 +358,33 @@ def read_turn(session, deadline, on_message=None):
             return turn
 
 
+def suite_fingerprint():
+    """A hash of what the behavior suite proves: the checks, the session flags and the boundary.
+
+    The boundary settings are built for fixed paths that do not exist, so the hash is the same
+    on every host.
+    """
+    root = Path("/plane-suite-fingerprint")
+    own_dir = root / "runs" / "probes" / "probe"
+    workspace = ProbeWorkspace(
+        run_root=root / "runs",
+        own_dir=own_dir,
+        cwd=own_dir / "workspace",
+        tmp=own_dir / "tmp",
+        token_file=root / "token",
+        plane_checkout=root / "plane",
+    )
+    document = {
+        "checks": list(REQUIRED_CHECKS),
+        "session_flags": list(SESSION_FLAGS),
+        "boundary": boundary_settings(workspace, root / "home" / ".claude", root / "home"),
+    }
+    return hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
+
+
 class ClaudeDriver:
     harness = HARNESS
+    suite_version = SUITE_VERSION
 
     def __init__(self, executable, registry, base_env=None, recorder=None):
         self.executable = executable
@@ -431,19 +465,31 @@ class ClaudeDriver:
         finally:
             shutil.rmtree(session_dir, ignore_errors=True)
 
-    def probe(self, workspace, deadline):
+    def quick_check(self, workspace, deadline):
+        """The Connect check: CLI version, login and model list. The behavior suite does not run."""
         outcome = ProbeOutcome()
         with self._harness_context(workspace, deadline, outcome) as context:
-            if context is not None and self.quick_check(context, outcome):
-                self.run_suite(context, outcome, workspace)
+            if (
+                context is not None
+                and self._check_version(context, outcome)
+                and self._check_authentication(context, outcome)
+            ):
+                self._discover_models(context, outcome)
         return outcome
 
-    def quick_check(self, context, outcome):
-        """CLI version, login and model list. Returns True when the behavior suite can run."""
-        if not (self._check_version(context, outcome) and self._check_authentication(context, outcome)):
-            return False
-        self._discover_models(context, outcome)
-        return True
+    def run_suite(self, workspace, deadline):
+        """The behavior suite of the installed version.
+
+        It reads the version and the model list itself, so its result belongs to the version it
+        ran on and proves a real model report. Then it runs the progress, permission,
+        interruption, follow-up and recovery sessions.
+        """
+        outcome = ProbeOutcome()
+        with self._harness_context(workspace, deadline, outcome) as context:
+            if context is not None and self._check_version(context, outcome):
+                self._discover_models(context, outcome)
+                self._run_sessions(context, outcome, workspace)
+        return outcome
 
     def _check_version(self, context, outcome):
         result = self._run([context["executable"], "--version"], context, "version")
@@ -507,8 +553,7 @@ class ClaudeDriver:
                 return ("--model", preferred)
         return ()
 
-    def run_suite(self, context, outcome, workspace):
-        """The behavior checks: progress, permission, interruption, follow-up and recovery."""
+    def _run_sessions(self, context, outcome, workspace):
         model_args = self._probe_model_args(outcome)
         code_word = f"PLANE-{secrets.token_hex(3).upper()}"
         session_id = self._session_a(context, outcome, workspace, code_word, model_args)

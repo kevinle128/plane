@@ -31,6 +31,8 @@ REQUIRED_CHECKS = (
 CAPABILITY_FLAGS = ("midturn_input", "native_resume", "permission_prompt")
 MAX_DETAIL_CHARS = 500
 MAX_HINT_CHARS = 1000
+# A wait wakes at least this often, so a cancelled deadline stops it soon.
+WAIT_SLICE_SECONDS = 0.5
 
 
 def bounded(text, limit):
@@ -58,6 +60,8 @@ class ProbeOutcome:
     capabilities: dict = field(default_factory=lambda: dict.fromkeys(CAPABILITY_FLAGS, False))
     failure_hint: str = ""
     blocking_issue: str | None = None
+    # The suite result applied to this outcome (``conformance.SuiteResult``), if the suite was consulted.
+    suite: object = None
 
 
 @dataclass(frozen=True)
@@ -103,5 +107,12 @@ class ProbeTimeout(Exception):
 
 class HarnessDriver(Protocol):
     harness: str
+    suite_version: int
 
-    def probe(self, workspace: ProbeWorkspace, deadline: Deadline) -> ProbeOutcome: ...
+    def quick_check(self, workspace: ProbeWorkspace, deadline: Deadline) -> ProbeOutcome:
+        """Version, authentication and model report of the installed CLI."""
+        ...
+
+    def run_suite(self, workspace: ProbeWorkspace, deadline: Deadline) -> ProbeOutcome:
+        """Every check except authentication, on the installed CLI version."""
+        ...

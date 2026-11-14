@@ -6,13 +6,14 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import pytest
 
 from plane_agent_worker.conformance import REPORT_VERSION, run_probe
 from plane_agent_worker.drivers.base import REQUIRED_CHECKS
-from plane_agent_worker.drivers.claude import ClaudeDriver, session_dir_name
+from plane_agent_worker.drivers.claude import SUITE_VERSION, ClaudeDriver
 from plane_agent_worker.process_registry import ProcessRegistry
 
 FAKE = Path(__file__).parent / "fakes" / "fake_claude.py"
@@ -106,15 +107,19 @@ def test_every_session_runs_with_the_worker_boundary_settings(private_dir, token
     probe(private_dir, token_file, home, fake_claude(private_dir))
 
     sessions = session_argv(private_dir)
-    assert len(sessions) == 5
+    # The model list of this Connect, then the suite: its own model list and sessions A to D.
+    assert len(sessions) == 6
     for args in sessions:
         for flag in ("--safe-mode", "--restricted", "--strict-mcp-config", "--disable-slash-commands"):
             assert flag in args
         assert args[args.index("--setting-sources") + 1] == ""
         assert args[args.index("--permission-prompt-tool") + 1] == "stdio"
-        assert args[args.index("--settings") + 1].endswith("/probes/probe-test/claude-settings.json")
-    # Only the first session has tools: Bash and Write, to prove the two denials.
-    assert sessions[1][sessions[1].index("--tools") + 1] == "Bash,Write"
+    settings_files = [args[args.index("--settings") + 1] for args in sessions]
+    assert settings_files[0].endswith("/probes/probe-test/claude-settings.json")
+    assert all(path.endswith("/probes/suite-claude_code-2.1.289/claude-settings.json") for path in settings_files[1:])
+    # Only the first suite session has tools: Bash and Write, to prove the two denials.
+    assert sessions[2][sessions[2].index("--tools") + 1] == "Bash,Write"
+    assert all("--tools" not in args for args in sessions[:2])
 
     cwd = str(probe_cwd(private_dir))
     real = os.path.realpath
@@ -273,29 +278,86 @@ def test_probe_leaves_no_process_record_probe_directory_or_session_directory(pri
     probe(private_dir, token_file, home, fake_claude(private_dir, scenario=scenario, write_tool="Bash"))
 
     assert list((private_dir / "runs" / ".processes").iterdir()) == []
-    assert not (private_dir / "runs" / "probes" / "probe-test").exists()
-    sessions = home / ".claude" / "projects" / session_dir_name(probe_cwd(private_dir))
+    assert list((private_dir / "runs" / "probes").iterdir()) == []
     assert (home / ".claude" / "projects").is_dir()
-    assert not sessions.exists()
+    assert list((home / ".claude" / "projects").iterdir()) == []
+
+
+def probe_calls(private_dir):
+    path = private_dir / "argv.jsonl"
+    calls = [json.loads(line) for line in path.read_text().splitlines()]
+    path.unlink()
+    return calls
+
+
+def test_second_probe_on_a_verified_version_runs_only_the_quick_check(private_dir, token_file, home):
+    executable = fake_claude(private_dir)
+    probe(private_dir, token_file, home, executable)
+    probe_calls(private_dir)
+
+    report = probe(private_dir, token_file, home, executable)
+
+    calls = probe_calls(private_dir)
+    assert calls[:2] == [["--version"], ["auth", "status"]]
+    # One more process: the model list. No suite session runs.
+    assert len(calls) == 3 and "-p" in calls[2] and "--tools" not in calls[2]
+    assert all(check["passed"] for check in report["checks"]), report["checks"]
+    assert report["capabilities"] == {"midturn_input": False, "native_resume": True, "permission_prompt": False}
+    record = json.loads((private_dir / "runs" / "state" / "conformance.json").read_text())
+    assert list(record["records"]) == ["claude_code/2.1.289/1"]
+
+
+def test_failed_suite_runs_again_on_the_next_probe(private_dir, token_file, home):
+    executable = fake_claude(private_dir, scenario="no_interrupt")
+    probe(private_dir, token_file, home, executable)
+    probe_calls(private_dir)
+
+    report = probe(private_dir, token_file, home, executable)
+
+    assert len([args for args in probe_calls(private_dir) if "-p" in args]) == 6
+    assert checks_of(report)["interruption"]["passed"] is False
+    assert not (private_dir / "runs" / "state" / "conformance.json").exists()
+
+
+def test_probe_on_a_new_cli_version_runs_the_suite_again(private_dir, token_file, home):
+    probe(private_dir, token_file, home, fake_claude(private_dir))
+    probe_calls(private_dir)
+
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, version="2.1.290"))
+
+    assert len([args for args in probe_calls(private_dir) if "-p" in args]) == 6
+    assert all(check["passed"] for check in report["checks"])
+    record = json.loads((private_dir / "runs" / "state" / "conformance.json").read_text())
+    assert sorted(record["records"]) == ["claude_code/2.1.289/1", "claude_code/2.1.290/1"]
 
 
 @pytest.mark.native
 @pytest.mark.skipif(sys.platform != "darwin" or not shutil.which("claude"), reason="needs macOS and the claude CLI")
-def test_real_claude_probe_passes_with_the_built_in_sandbox(private_dir, token_file):
+def test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite(private_dir, token_file):
     checkout = Path(__file__).resolve().parents[3]
     run_root = private_dir / "runs"
     run_root.mkdir(mode=0o700)
     driver = ClaudeDriver(executable=shutil.which("claude"), registry=ProcessRegistry(run_root / ".processes"))
 
-    report = run_probe(
-        driver,
-        run_root=run_root,
-        probe_key="native-probe",
-        token_file=token_file,
-        plane_checkout=checkout,
-    )
+    def connect(probe_key):
+        started = time.monotonic()
+        report = run_probe(
+            driver,
+            run_root=run_root,
+            probe_key=probe_key,
+            token_file=token_file,
+            plane_checkout=checkout,
+        )
+        return report, time.monotonic() - started
 
-    assert all(check["passed"] for check in report["checks"]), report["checks"]
-    assert report["models"]
-    assert report["capabilities"]["native_resume"] is True
-    assert not (run_root / "probes" / "native-probe").exists()
+    first, _ = connect("native-probe-1")
+    second, second_seconds = connect("native-probe-2")
+
+    for report in (first, second):
+        assert all(check["passed"] for check in report["checks"]), report["checks"]
+        assert report["models"]
+        assert report["capabilities"]["native_resume"] is True
+    assert second_seconds < 10
+    records = json.loads((run_root / "state" / "conformance.json").read_text())["records"]
+    assert list(records) == [f"claude_code/{first['harness_version']}/{SUITE_VERSION}"]
+    assert list((run_root / "probes").iterdir()) == []

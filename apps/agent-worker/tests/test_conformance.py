@@ -8,11 +8,16 @@ from plane_agent_worker.drivers.base import ProbeOutcome
 
 class RecordingDriver:
     harness = "claude_code"
+    suite_version = 1
 
     def __init__(self):
         self.calls = 0
 
-    def probe(self, workspace, deadline):
+    def quick_check(self, workspace, deadline):
+        self.calls += 1
+        return ProbeOutcome()
+
+    def run_suite(self, workspace, deadline):
         self.calls += 1
         return ProbeOutcome()
 
