@@ -210,7 +210,9 @@ Effort change (Phases 3-7, +4d net against 58.5d):
 
 <!-- 2026-11-14 --> Answered: Code-job sandbox (removed by Q36), skills (Q32 amendment), Codex login (Q37), Docker MCP gateway (Q38), auto-stop (Q39). Q38 also answers the MCP part of the host-config question: Codex MCP servers in the host `config.toml` do not load unless listed (Phase 6 task 0 checks how).
 
-1. Hooks from the host settings (from Q37): the mounted host `~/.claude/settings.json` carries every host hook, and Q32 says hooks come only when listed (default nothing). A read-only mount cannot be filtered without a copy, and hook scripts at host paths do not exist in the VM unless mounted. Proposal: all host hooks come with the settings, and `~/.claude/hooks` is mounted read-only at its host path when it exists; `PLANE_AGENT_IMPORT_HOOKS` is removed. Alternative: keep "only listed" and pass `--settings` a Worker-written copy with only the listed hooks (Q37 avoids copies). Which one?
+40. Q40, host hooks (user, 2026-11-14): all hooks from the mounted host `~/.claude/settings.json` come into the sandbox; `~/.claude/hooks` is mounted read-only so hook scripts exist in the VM. The hook list setting (`PLANE_AGENT_IMPORT_HOOKS`) is not built. This amends Q32 for hooks (skills: all, Q32 amendment; MCP servers: only listed plus Plane and Archon, Q38). A hook script stored outside `~/.claude/hooks` fails in the sandbox unless its folder is mounted too.
+
+No open questions remain (2026-11-14).
 
 ## Red Team Review
 
