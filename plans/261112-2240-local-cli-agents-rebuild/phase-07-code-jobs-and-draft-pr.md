@@ -9,6 +9,8 @@ dependencies: [1, 5, 6]
 
 # Phase 7: Code jobs and draft pull or merge request
 
+> **2026-11-14, decision Q27:** commands the agent runs in a Code job have network access (no deny rule, no host allowlist). Where this file proposes "deny all command network" or per-host grants, read it as Q27. Provider tokens still never reach the agent; only the Worker pushes.
+
 ## Goal
 
 A member asks an existing Run to implement or fix. Plane asks for one Code-job approval. After Allow, the Run becomes a Code job with its own Worktree and Run-unique branch, waits while the Worker is at its Code-job limit, and the Harness works inside its own CLI sandbox with writes allowed only in the Worktree. Plane asks again only before push and before opening the change request. The Worker commits and pushes; Plane opens a draft change request that a human merges: a pull request on GitHub, a merge request on GitLab. All provider calls go through `GitProviderClient` ([architecture-contracts.md §11](./architecture-contracts.md#11-git-provider-boundary-and-extension-trace)); the Worker uses `git_transport.py` for clone and push. One PR, one commit per story 3.1-3.9, then G6 and G7.

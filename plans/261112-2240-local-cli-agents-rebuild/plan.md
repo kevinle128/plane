@@ -133,12 +133,10 @@ The red-team gate has not run on the Q17-Q24 changes. Recommended before Phase 3
 
 25. Q25, Grok dropped (user, 2026-11-14): the Grok Harness is out of scope. Stories 2.23 (connect Grok CLI) and 2.24 (ask and converse with Grok) are removed. The Integrations page shows three Harnesses: Claude Code, Codex and Omp. Grok is removed from the mention list, the Harness cards, the Worker drivers, Phase 6 and the Phase 7 Code mode. Where Q1, Q18, Q22 and Q23 name Grok, read them without Grok. The research note about the Grok ACP route no longer applies. Spec effect: epics.md stories 2.23 and 2.24 removed; design handoff rows and scenes that show `@Grok` are not built. Phase 6 effort drops by about 2d.
 
-### Open questions from these decisions
+### Answers to the open questions (user, 2026-11-14)
 
-Earlier open questions 1-5 were decided as Q11-Q15, so these continue at 6.
-
-6. Q21 static fallback: do you accept the changed 2.1 AC 5 and 2.6 AC 3 (fallback list shown only when the Connect-time request fails after the version's suite proved a real model report, labeled "Not reported by Claude Code")? The alternative is no static fallback for Claude, which keeps both criteria as written.
-7. Q22 command network for Code jobs: do you confirm "deny all network for commands in the CLI sandbox" (the Claude and Codex processes still reach their model hosts)? Cost: a fresh clone has no installed dependencies, so `npm install`, `pip install` and tests that need them fail, and the agent reports "tests not run". Alternative: an operator-configured list of package registry hosts in the Worker config (Claude sandbox only; Codex has no host-level allowlist), never the Git provider hosts.
+26. Q26, Claude model fallback (was open question 6): accepted. When the single model-list request fails at Connect, the static list (`opus`, `sonnet`, `haiku`) is shown, marked by source and labelled "Not reported by Claude Code". The changes to 2.1 AC 5 and 2.6 AC 3 are accepted.
+27. Q27, command network in Code jobs (was open question 7): the network is NOT blocked for commands the agent runs in a Code job (the proposal "deny all command network" is rejected). Package installs and tests that need the network work. Provider tokens still never reach the agent or its commands (Q22 keeps the Worker as the only party that pushes, and Plane opens the change request), so network access does not give the agent push rights. Accepted risk: an agent command can send repository content to any host; this is accepted because the instance and its users are trusted (Q17, Tailscale only). Q&A Runs are unchanged by this answer. Q2 (hostname grants) is superseded, because there are no per-host network grants any more. Details: [Phase 7](./phase-07-code-jobs-and-draft-pr.md).
 
 ## Red Team Review
 
