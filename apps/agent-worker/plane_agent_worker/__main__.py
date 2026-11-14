@@ -20,21 +20,29 @@ from pathlib import Path
 
 from plane_agent_worker.config import ConfigError, load_config
 from plane_agent_worker.conformance import TranscriptRecorder, remove_stale_probes, run_probe
-from plane_agent_worker.drivers.claude import ClaudeDriver, claude_config_dir
+from plane_agent_worker.drivers.claude import ClaudeDriver
 from plane_agent_worker.loop import WorkerLoop
 from plane_agent_worker.plane_client import PlaneClient
 from plane_agent_worker.process_registry import ProcessRegistry
+from plane_agent_worker.sandbox import Sandboxes
 
 logger = logging.getLogger("plane_agent_worker")
 
 
+def build_sandboxes(config):
+    return Sandboxes(config.sbx_bin, config.home, memory=config.sandbox_memory)
+
+
 def build_drivers(config, registry, recorder=None):
-    return {"claude_code": ClaudeDriver(executable=config.claude_bin, registry=registry, recorder=recorder)}
+    driver = ClaudeDriver(
+        sandboxes=build_sandboxes(config), run_root=config.run_root, registry=registry, recorder=recorder
+    )
+    return {"claude_code": driver}
 
 
 def clean_up_previous_worker(config, registry):
     """Stop the Harness processes of a previous Worker and remove its probe and session folders."""
-    stopped = registry.reconcile(cleanup_roots=[claude_config_dir(os.environ) / "projects"])
+    stopped = registry.reconcile(cleanup_roots=[config.run_root])
     if stopped:
         logger.info("Stopped %d Harness process group(s) left by a previous Worker", len(stopped))
     removed = remove_stale_probes(config.run_root)

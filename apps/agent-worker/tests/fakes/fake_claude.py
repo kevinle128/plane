@@ -7,35 +7,28 @@
 It answers with message shapes taken from the recorded transcripts in
 ``tests/transcripts/claude`` and keeps a session file under
 ``$HOME/.claude/projects/<working directory name>`` so ``--resume`` works as in
-the real CLI. Like the real CLI, it reads the user settings file
-(``$HOME/.claude/settings.json``) unless ``--setting-sources`` leaves it out,
-puts the ``--settings`` file on top (lists merge, other keys take the
-``--settings`` value), removes the tools that a bare-name deny rule names from
-the ``--tools`` list in its ``init`` message, and fails a Bash write in the
-working directory when the sandbox is on and denies writes there.
-``FAKE_CLAUDE_SCENARIO`` selects a failure:
+the real CLI. Its ``init`` message reports the permission mode
+``bypassPermissions`` when ``--dangerously-skip-permissions`` is given, as the CLI
+does inside a sandbox. ``FAKE_CLAUDE_SCENARIO`` selects a failure:
 
-- ``ok``: every probe step behaves like Claude Code 2.1.289.
+- ``ok``: every probe step behaves like Claude Code inside a sandbox.
 - ``not_logged_in``: ``auth status`` reports no login.
 - ``no_models``: ``initialize`` reports an empty model list.
 - ``no_resume``: ``--resume`` finds no conversation.
 - ``no_interrupt``: an ``interrupt`` request is ignored and the turn completes.
 - ``crash_not_resumable``: a resumed session that is killed during a turn
   cannot be resumed again.
-- ``writes_despite_denial``: with ``FAKE_CLAUDE_WRITE_TOOL=Write`` the Write
-  tool stays offered although a deny rule names it; with ``Bash`` the Bash
-  write succeeds although the sandbox denies it.
-- ``prompts_for_bash``: the Bash write raises a permission prompt first, as
-  Claude Code 2.1.289 does for a write to a path the sandbox denies; after an
-  allow, the sandbox denies the write.
-- ``prompts_for_bash_unsandboxed``: like ``prompts_for_bash``, but after an
-  allow the write succeeds, as if the command ran outside the sandbox.
+- ``no_bypass``: the CLI ignores ``--dangerously-skip-permissions``: ``init``
+  reports the default mode and the Bash write raises a permission prompt.
+- ``prompts_for_bash``: ``init`` reports bypass mode, but the Bash write still
+  raises a permission prompt.
 - ``midturn_replay``: a user message sent during a turn is replayed at once,
   like a CLI that takes input during a turn.
 - ``init_after_eof``: ``initialize`` is answered only after stdin closes.
 - ``no_initialize_at_connect``: ``initialize`` gets no answer in a Connect
-  probe folder; the suite folder (``probes/suite-*``) gets the normal answer.
+  probe folder; the suite folder (``suite-*``) gets the normal answer.
 - ``no_initialize``: ``initialize`` never gets an answer.
+- ``auth_error``: every turn ends with an authentication error result.
 
 ``FAKE_CLAUDE_ARGV_LOG``, when set, names a file that gets one JSON line with
 the arguments of each call. ``FAKE_CLAUDE_MIDTURN_LOG``, when set, names a file
@@ -56,7 +49,6 @@ from pathlib import Path
 TRANSCRIPTS = Path(__file__).resolve().parents[1] / "transcripts" / "claude"
 SCENARIO = os.environ.get("FAKE_CLAUDE_SCENARIO", "ok")
 VERSION = os.environ.get("FAKE_CLAUDE_VERSION", "2.1.289")
-WRITE_TOOL = os.environ.get("FAKE_CLAUDE_WRITE_TOOL", "")
 COUNT_EVENT_SECONDS = 0.01
 
 
@@ -140,42 +132,6 @@ class Session:
         return self.directory / f"{self.id}.crashed"
 
 
-def merge_settings(lower, higher):
-    """Settings of two scopes, as Claude Code combines them: lists merge, other keys take the higher scope."""
-    merged = dict(lower)
-    for key, value in higher.items():
-        below = merged.get(key)
-        if isinstance(value, dict) and isinstance(below, dict):
-            merged[key] = merge_settings(below, value)
-        elif isinstance(value, list) and isinstance(below, list):
-            merged[key] = below + [item for item in value if item not in below]
-        else:
-            merged[key] = value
-    return merged
-
-
-def load_settings(args):
-    """User settings (unless ``--setting-sources`` leaves them out) with the ``--settings`` file on top."""
-    user = {}
-    sources = args[args.index("--setting-sources") + 1].split(",") if "--setting-sources" in args else ["user"]
-    user_file = Path(os.environ["HOME"]) / ".claude" / "settings.json"
-    if "user" in sources and "--restricted" not in args and user_file.exists():
-        user = json.loads(user_file.read_text())
-    worker = json.loads(Path(args[args.index("--settings") + 1]).read_text()) if "--settings" in args else {}
-    return merge_settings(user, worker)
-
-
-def denied_tools(settings):
-    """Tools that a bare-name deny rule removes."""
-    return {rule for rule in (settings.get("permissions") or {}).get("deny") or [] if "(" not in rule}
-
-
-def sandbox_denies_write(settings, cwd):
-    sandbox = settings.get("sandbox") or {}
-    deny_write = (sandbox.get("filesystem") or {}).get("denyWrite") or []
-    return sandbox.get("enabled") is True and os.path.realpath(cwd) in deny_write
-
-
 class FakeClaude:
     def __init__(self, args):
         self.args = args
@@ -185,11 +141,11 @@ class FakeClaude:
         resume = args[args.index("--resume") + 1] if "--resume" in args else None
         self.resumed = resume is not None
         self.session = Session(os.getcwd(), resume)
-        self.settings = load_settings(args)
         self.denials = []
         requested = args[args.index("--tools") + 1].split(",") if "--tools" in args else []
-        denied = denied_tools(self.settings) - ({"Write"} if self.forced_write("Write") else set())
-        self.tools = [tool for tool in requested if tool and tool not in denied]
+        self.tools = [tool for tool in requested if tool]
+        bypass = "--dangerously-skip-permissions" in args and SCENARIO != "no_bypass"
+        self.permission_mode = "bypassPermissions" if bypass else "default"
 
     def read_stdin(self):
         for line in sys.stdin:
@@ -208,7 +164,12 @@ class FakeClaude:
 
     def system_init(self):
         message = copy.deepcopy(SYSTEM_INIT)
-        message.update(session_id=self.session.id, cwd=self.session.cwd, tools=list(self.tools))
+        message.update(
+            session_id=self.session.id,
+            cwd=self.session.cwd,
+            tools=list(self.tools),
+            permissionMode=self.permission_mode,
+        )
         emit(message)
 
     def text_delta(self, text):
@@ -269,6 +230,16 @@ class FakeClaude:
             replay["message"] = message["message"]
             emit(replay)
         self.system_init()
+        if SCENARIO == "auth_error":
+            failure = copy.deepcopy(RESULT_SUCCESS)
+            failure.update(
+                result="API Error: 401 Authentication failed",
+                is_error=True,
+                session_id=self.session.id,
+                permission_denials=[],
+            )
+            emit(failure)
+            return
         remember = re.search(r"Remember the code word (\S+)\.", text)
         bash = re.search(r"Bash tool to run this command: echo probe > (\S+)", text)
         if remember:
@@ -285,22 +256,13 @@ class FakeClaude:
         else:
             self.answer("OK")
 
-    def forced_write(self, tool):
-        return SCENARIO == "writes_despite_denial" and WRITE_TOOL == tool
-
     def bash_turn(self, name):
         tool_input = {"command": f"echo probe > {name}", "description": "Write the probe file"}
         tool_id = self.tool_use("Bash", tool_input)
-        prompts = SCENARIO in ("prompts_for_bash", "prompts_for_bash_unsandboxed")
+        prompts = SCENARIO in ("prompts_for_bash", "no_bypass")
         if prompts and not self.ask_permission("Bash", tool_input):
             self.tool_result(tool_id, "The user denied this action.", True)
             self.denials.append({"tool_name": "Bash", "tool_use_id": tool_id, "tool_input": tool_input})
-        elif (
-            sandbox_denies_write(self.settings, self.session.cwd)
-            and not self.forced_write("Bash")
-            and SCENARIO != "prompts_for_bash_unsandboxed"
-        ):
-            self.tool_result(tool_id, f"Exit code 1\n(eval):1: operation not permitted: {name}", True)
         else:
             Path(self.session.cwd, name).write_text("probe\n")
             self.tool_result(tool_id, "", False)
@@ -359,7 +321,7 @@ class FakeClaude:
         self.result("400")
 
     def initialize_unanswered(self):
-        in_suite = "/probes/suite-" in os.path.realpath(self.session.cwd)
+        in_suite = "/suite-" in os.path.realpath(self.session.cwd)
         return SCENARIO == "no_initialize" or (SCENARIO == "no_initialize_at_connect" and not in_suite)
 
     def run(self):
@@ -397,7 +359,7 @@ def main(args):
     if args[:1] == ["--version"]:
         print(f"{VERSION} (Claude Code)")
         return 0
-    if args[:2] == ["auth", "status"]:
+    if args[-2:] == ["auth", "status"]:
         projects = str(Path(os.environ["HOME"]) / ".claude" / "projects")
         print(json.dumps({"loggedIn": SCENARIO != "not_logged_in", "projectsDirectory": projects}))
         return 0

@@ -12,12 +12,13 @@ from plane_agent_worker.conformance import SuiteCache, ensure_verified
 from plane_agent_worker.drivers.base import Deadline, ProbeOutcome
 from plane_agent_worker.drivers.claude import SUITE_VERSION, suite_fingerprint
 
-# A change to the required checks, the Claude session flags or the boundary settings changes the
+# A change to the required checks, the Claude session flags or the sandbox environment changes the
 # fingerprint. Then give the suite a new SUITE_VERSION and add its fingerprint here, so the
 # cached results of the old suite are not used.
 PINNED_FINGERPRINTS = {
     1: "640e1597a067716a3475644d454553730cf47815a5970da00f85d869e0f70885",
     2: "5e55f1dd152206bbee6dd80a1a10a46785f1155e54e35587a3249877c132bd53",
+    3: "9fc5248a95b17cc235a07264443e129fda5d1baad05164fb221a3497b074ab57",
 }
 
 
@@ -81,7 +82,7 @@ def test_unverified_version_runs_the_suite_and_stores_a_private_record(private_d
     stored = SuiteCache(path).get("claude_code", "2.1.289", 1)
     assert stored == result.record
     # The suite folder is removed after the suite.
-    assert list((private_dir / "runs" / "probes").iterdir()) == []
+    assert list((private_dir / "runs" / "sandboxes" / "probe-claude_code" / "scratch").iterdir()) == []
 
 
 def test_cached_version_does_not_run_the_suite_again(private_dir, token_file):

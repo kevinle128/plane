@@ -39,6 +39,7 @@ from plane_agent_worker.drivers.base import (
     ProbeWorkspace,
     bounded,
 )
+from plane_agent_worker.sandbox import probe_scratch
 
 REPORT_VERSION = 2
 # Plane reads a probe without a report after 120 s as failed; keep a margin for the report itself.
@@ -51,40 +52,39 @@ CACHE_FILE_VERSION = 1
 logger = logging.getLogger("plane_agent_worker.conformance")
 
 
-def prepare_workspace(run_root, probe_key, token_file, plane_checkout):
+def prepare_workspace(run_root, harness, probe_key, token_file, plane_checkout):
+    """A fresh probe folder in the scratch folder of the probe sandbox of ``harness``."""
     if not probe_key or "/" in probe_key or probe_key.startswith("."):
         raise ValueError("A probe key is a plain directory name.")
-    own_dir = run_root / "probes" / probe_key
+    scratch = probe_scratch(run_root, harness)
+    own_dir = scratch / probe_key
     if own_dir.exists():
         shutil.rmtree(own_dir)
-    (run_root / "probes").mkdir(mode=0o700, exist_ok=True)
+    scratch.mkdir(mode=0o700, parents=True, exist_ok=True)
     own_dir.mkdir(mode=0o700)
     cwd = own_dir / "workspace"
-    tmp = own_dir / "tmp"
     cwd.mkdir(mode=0o700)
-    tmp.mkdir(mode=0o700)
     return ProbeWorkspace(
         run_root=run_root,
         own_dir=own_dir,
         cwd=cwd,
-        tmp=tmp,
         token_file=token_file,
         plane_checkout=plane_checkout,
     )
 
 
 def remove_stale_probes(run_root):
-    """Remove the probe directories of a previous Worker. No probe continues after a Worker restart."""
-    probes = run_root / "probes"
-    if not probes.is_dir():
-        return 0
+    """Remove the probe folders of a previous Worker. No probe continues after a Worker restart."""
     removed = 0
-    for entry in probes.iterdir():
-        if entry.is_dir() and not entry.is_symlink():
-            shutil.rmtree(entry, ignore_errors=True)
-        else:
-            entry.unlink(missing_ok=True)
-        removed += 1
+    for scratch in (
+        sorted((run_root / "sandboxes").glob("probe-*/scratch")) if (run_root / "sandboxes").is_dir() else []
+    ):
+        for entry in scratch.iterdir():
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                entry.unlink(missing_ok=True)
+            removed += 1
     return removed
 
 
@@ -217,9 +217,9 @@ def _acquire(lock, deadline):
 
 def _run_suite(driver, cli_version, deadline, run_root, token_file, plane_checkout):
     probe_key = f"suite-{driver.harness}-{cli_version}"
-    own_dir = run_root / "probes" / probe_key
+    own_dir = probe_scratch(run_root, driver.harness) / probe_key
     try:
-        workspace = prepare_workspace(run_root, probe_key, token_file, plane_checkout)
+        workspace = prepare_workspace(run_root, driver.harness, probe_key, token_file, plane_checkout)
         return driver.run_suite(workspace, deadline)
     except Exception as error:  # a driver or disk defect must give a failed suite, never a crash
         logger.exception("Behavior suite of %s %s failed", driver.harness, cli_version)
@@ -346,10 +346,10 @@ def run_probe(
     cancel=None,
 ):
     """Run one probe. ``cancel`` (a ``threading.Event``) stops it early, for example when Plane replaced it."""
-    own_dir = run_root / "probes" / probe_key
+    own_dir = probe_scratch(run_root, driver.harness) / probe_key
     deadline = Deadline(budget_seconds, cancel)
     try:
-        workspace = prepare_workspace(run_root, probe_key, token_file, plane_checkout)
+        workspace = prepare_workspace(run_root, driver.harness, probe_key, token_file, plane_checkout)
         outcome = driver.quick_check(workspace, deadline)
         if outcome.blocking_issue is None and outcome.checks["authentication"].passed and not outcome.failure_hint:
             suite = ensure_verified(
