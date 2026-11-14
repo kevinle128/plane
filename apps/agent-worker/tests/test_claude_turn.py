@@ -16,7 +16,7 @@ from plane_agent_worker.conformance import suite_cache
 from plane_agent_worker.drivers.claude import SUITE_VERSION, ClaudeDriver
 from plane_agent_worker.git_transport import GitTransportError
 from plane_agent_worker.mcp_server import PlaneMcpServer
-from plane_agent_worker.plane_client import Conflict
+from plane_agent_worker.plane_client import Conflict, PlaneClientError
 from plane_agent_worker.process_registry import ProcessRegistry
 from plane_agent_worker.runs import RunExecutor
 from plane_agent_worker.sandbox import KIT_ALLOW_LIST, VM_SETTINGS, Sandboxes
@@ -68,6 +68,9 @@ class FakePlane:
         self.clones = []
         self.credentials = 0
         self.renew_conflict = False
+        self.credential_error = None
+        self.events_conflict_on = None
+        self.result_errors = []
         self.lock = threading.Lock()
 
     def renew_run(self, run_id, generation):
@@ -80,17 +83,23 @@ class FakePlane:
 
     def git_credential(self, run_id, generation):
         self.credentials += 1
+        if self.credential_error:
+            raise self.credential_error
         return "glpat-secret-0001"
 
     def run_context(self, run_id, generation):
         return {"version": 1, "payload": CONTEXT, "omitted_comment_count": 0}
 
     def post_events(self, run_id, generation, turn_index, events):
+        if self.events_conflict_on and any(event["kind"] == self.events_conflict_on for event in events):
+            raise Conflict(409, "lease_superseded")
         with self.lock:
             self.events.extend((run_id, event) for event in events)
         return []
 
     def post_result(self, run_id, generation, result):
+        if self.result_errors:
+            raise self.result_errors.pop(0)
         with self.lock:
             self.results.append((run_id, result))
         return {}
@@ -482,3 +491,82 @@ def test_claim_with_an_unsafe_run_id_is_refused(world):
     w.executor.execute({**claim(), "id": "../../etc"})
 
     assert w.plane.results == [] and w.clone_calls == []
+
+
+def clone_with_token(**kwargs):
+    kwargs["fetch_token"]()
+    kwargs["destination"].mkdir()
+
+
+@pytest.mark.parametrize("code", ["provider_reconnect_required", "provider_disconnected"])
+def test_refused_gitlab_credential_fails_the_run_with_the_provider_code(world, code):
+    w = world()
+    w.verify()
+    w.plane.credential_error = Conflict(409, code)
+    w.executor.clone = clone_with_token
+
+    w.executor.execute(claim(provider="gitlab", credential_mode="plane_token"))
+
+    [(run_id, result)] = w.plane.results
+    assert run_id == RUN_A
+    assert result["status"] == "failed"
+    assert result["failure_code"] == code
+    assert "GitLab" in result["failure_message"]
+    assert w.turn_calls() == []
+
+
+def test_superseded_lease_on_the_gitlab_credential_posts_no_result(world):
+    w = world()
+    w.verify()
+    w.plane.credential_error = Conflict(409, "lease_superseded")
+    w.executor.clone = clone_with_token
+
+    w.executor.execute(claim(provider="gitlab", credential_mode="plane_token"))
+
+    assert w.plane.results == []
+
+
+def test_lost_lease_during_the_turn_stops_claude_in_the_sandbox(world, fake_sbx):
+    w = world()
+    w.verify()
+    w.plane.events_conflict_on = "message"
+    pidfile = run_layout(w.run_root, claim()).run_scratch / "agent.pid"
+    try:
+        w.executor.execute(claim())
+
+        assert w.plane.results == []
+        assert list((w.run_root / ".processes").iterdir()) == []
+        kills = [call for call in fake_sbx.commands("exec") if "kill -KILL" in call[-1]]
+        assert kills and str(pidfile) in kills[0][-1]
+        with pytest.raises(ProcessLookupError):
+            os.kill(int(pidfile.read_text()), 0)
+    finally:
+        try:
+            os.kill(int(pidfile.read_text()), 9)
+        except (OSError, ValueError):
+            pass
+
+
+def test_transient_error_on_the_answer_is_retried(world, monkeypatch):
+    monkeypatch.setattr("plane_agent_worker.runs.RESULT_RETRY_SECONDS", (0, 0, 0))
+    w = world()
+    w.verify()
+    w.plane.result_errors = [PlaneClientError(502, "request failed"), PlaneClientError(None, "URLError")]
+
+    w.executor.execute(claim())
+
+    [(_, result)] = w.plane.results
+    assert result["status"] == "completed"
+    assert result["conclusion"] == "OK"
+
+
+def test_turn_sets_no_variable_in_the_sandbox(world, fake_sbx):
+    w = world()
+    w.verify()
+
+    w.executor.execute(claim())
+
+    turn_exec = next(call for call in fake_sbx.commands("exec") if "--mcp-config" in call)
+    assert "-e" not in turn_exec[: turn_exec.index("claude")]
+    names = set((w.private_dir / "harness-env.txt").read_text().split())
+    assert "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB" not in names

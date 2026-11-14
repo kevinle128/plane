@@ -515,6 +515,10 @@ class ClaudeDriver:
             outcome.no_output = not outcome.output_started
             session.kill()
             return outcome
+        except BaseException:
+            # The caller stops the turn (for example after a lost lease): Claude must not keep running in the VM.
+            session.kill()
+            raise
         finally:
             outcome.stderr_tail = session.stderr_tail
         session.close()

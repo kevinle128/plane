@@ -29,6 +29,7 @@ import logging
 import os
 import shutil
 import threading
+import time
 
 from plane_agent_worker import git_transport
 from plane_agent_worker.conformance import SUITE_CHECKS, ensure_verified, suite_cache
@@ -49,6 +50,10 @@ SUITE_BUDGET_SECONDS = 100
 EVENT_BATCH = 100
 MAX_MESSAGE_CHARS = 1000
 CREDENTIAL_MODES = frozenset({"host", "plane_token"})
+# The 409 codes of a lost lease. Any other 409 is a refusal of the request itself.
+LEASE_CODES = frozenset({"lease_superseded", "run_finished"})
+# Waits before each new try of a result post; Plane applies a result only once, so a retry is safe.
+RESULT_RETRY_SECONDS = (2, 5, 10)
 
 logger = logging.getLogger("plane_agent_worker.runs")
 
@@ -194,11 +199,24 @@ class RunExecutor:
                 "failure_message": failure.message,
                 **failure.extra,
             }
-            self.client.post_result(run_id, generation, result)
-        except (LeaseLost, Conflict):
+            self._post_result(run_id, generation, result)
+        except LeaseLost:
             lease["lost"] = True
         except PlaneClientError as error:
             logger.warning("Run %s: the failed result was not sent (status %s, %s)", run_id, error.status, error.code)
+
+    def _post_result(self, run_id, generation, result):
+        """Post the result. Retry a failed post a bounded number of times; a 409 means the lease is lost."""
+        for delay in (*RESULT_RETRY_SECONDS, None):
+            try:
+                return self.client.post_result(run_id, generation, result)
+            except Conflict as error:
+                raise LeaseLost(error.code) from None
+            except PlaneClientError as error:
+                if delay is None:
+                    raise
+                logger.warning("Run %s: result not sent (status %s, %s); retrying", run_id, error.status, error.code)
+                time.sleep(delay)
 
     # Steps --------------------------------------------------------------------
 
@@ -273,7 +291,13 @@ class RunExecutor:
             try:
                 return self.client.git_credential(run_id, generation)
             except Conflict as error:
-                raise LeaseLost(error.code) from None
+                if error.code in LEASE_CODES:
+                    raise LeaseLost(error.code) from None
+                raise RunFailure(
+                    error.code,
+                    f"Plane did not give the GitLab credential ({error.code}). "
+                    "Reconnect GitLab in the workspace settings, then mention the Agent again.",
+                ) from None
 
         try:
             self.clone(
@@ -330,10 +354,7 @@ class RunExecutor:
     def _finish(self, run_id, generation, outcome):
         if outcome.succeeded:
             result = {"status": "completed", "conclusion": outcome.text, "session_ref": outcome.session_id or ""}
-            try:
-                self.client.post_result(run_id, generation, result)
-            except Conflict as error:
-                raise LeaseLost(error.code) from None
+            self._post_result(run_id, generation, result)
             return
         if outcome.no_output:
             raise RunFailure(
