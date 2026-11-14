@@ -14,40 +14,40 @@ Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43. Plus 7 plan-level GitLab 
 | 1.6   | Set the draft pull-request default             | 520-540        | 1                                                                                             | I051                                             |
 | 1.7   | Set conclusion mirroring to pull requests      | 542-562        | 1                                                                                             | I052                                             |
 | 1.8   | Choose the Agent branch format                 | 564-588        | 1                                                                                             | I053                                             |
-| 2.1   | Connect Claude Code as a local Harness         | 595-627        | 2 (Q18: quick check plus per-version suite; Q21: AC 5 changed, pending confirmation)          | I046, I058, I063, I064, I065, I066, I078         |
+| 2.1   | Connect Claude Code as a local Harness         | 595-627        | 2 (Q18: quick check plus per-version suite; Q21: AC 5 changed, pending confirmation) <!-- 2026-11-14 --> (Q31: suite runs in the probe sandbox; AD-4 permission check reads as bypass mode) | I046, I058, I063, I064, I065, I066, I078         |
 | 2.2   | Rename a workspace Agent                       | 629-649        | 2                                                                                             | I060                                             |
 | 2.3   | Set a unique Agent mention handle              | 651-671        | 2                                                                                             | I060 (handle row)                                |
 | 2.4   | Set an Agent's workspace instructions          | 673-693        | 2                                                                                             | I061                                             |
 | 2.5   | Toggle whether an Agent is mentionable         | 695-715        | 2                                                                                             | I059                                             |
 | 2.6   | Select a model reported by a connected Harness | 717-741        | 2 (Q21: AC 3 changed, pending confirmation)                                                   | I062                                             |
-| 2.7   | Ask Claude Code about a work item              | 743-795        | 3                                                                                             | I010, I011, I013, I014, I035, I043, I074         |
+| 2.7   | Ask Claude Code about a work item              | 743-795        | 3 <!-- 2026-11-14 --> (Q31-Q35: runs in the Q&A sandbox; clone is a read-only mount (AC wording "OS boundary" reads "read-only mount of the microVM")) | I010, I011, I013, I014, I035, I043, I074         |
 | 2.8   | Inspect a durable Run timeline                 | 797-841        | 3                                                                                             | I015, I016, I017, I019, I020, I021, I022, I036   |
 | 2.9   | Resize the Run panel                           | 843-859        | 4                                                                                             | I018                                             |
 | 2.10  | Follow an Agent's plan                         | 861-881        | 4                                                                                             | I023, I024                                       |
 | 2.11  | Choose a repository for an unbound Run         | 883-907        | 4                                                                                             | I032, I033                                       |
 | 2.12  | Retrieve older authorized issue comments       | 909-929        | 4                                                                                             | none (context only)                              |
-| 2.13  | Send a follow-up in the same Run               | 931-955        | 4                                                                                             | I034                                             |
+| 2.13  | Send a follow-up in the same Run               | 931-955        | 4 <!-- 2026-11-14 --> (Q35: rebuild when the sandbox was recreated) | I034                                             |
 | 2.14  | Queue a message during active work             | 957-989        | 5                                                                                             | I025, I026, I029                                 |
 | 2.15  | Send a queued message now                      | 991-1015       | 5 (Q19: Claude uses AC 2 only)                                                                | I027                                             |
 | 2.16  | Remove an undelivered queued message           | 1017-1037      | 5                                                                                             | I028                                             |
-| 2.17  | Stop an active Run                             | 1039-1063      | 5                                                                                             | I030                                             |
-| 2.18  | Resume a stopped Run                           | 1065-1085      | 5                                                                                             | I031                                             |
-| 2.19  | Retry a stale Run safely                       | 1087-1111      | 5                                                                                             | I044                                             |
+| 2.17  | Stop an active Run                             | 1039-1063      | 5 <!-- 2026-11-14 --> (Q31: Stop kills the process inside the sandbox) | I030                                             |
+| 2.18  | Resume a stopped Run                           | 1065-1085      | 5 <!-- 2026-11-14 --> (Q31: sandbox health check before resume) | I031                                             |
+| 2.19  | Retry a stale Run safely                       | 1087-1111      | 5 <!-- 2026-11-14 --> (Q31: reconcile by in-sandbox pidfile) | I044                                             |
 | 2.20  | Mark a stale Run failed                        | 1113-1133      | 5                                                                                             | I044                                             |
-| 2.21  | Connect Codex CLI as a local Harness           | 1135-1155      | 6 (Q18, Q20, Q21, Q23)                                                                        | I063, I064 (Codex states)                        |
-| 2.22  | Ask and converse with Codex on a work item     | 1157-1177      | 6 (Q20, Q23)                                                                                  | I075                                             |
+| 2.21  | Connect Codex CLI as a local Harness           | 1135-1155      | 6 (Q18, Q20, Q21, Q23) <!-- 2026-11-14 --> (Q20, Q23 superseded by Q31; Codex sandbox; login path open) | I063, I064 (Codex states)                        |
+| 2.22  | Ask and converse with Codex on a work item     | 1157-1177      | 6 (Q20, Q23) <!-- 2026-11-14 --> (Q31: Codex sandbox) | I075                                             |
 | 2.23  | Connect Grok CLI as a local Harness            | 1179-1203      | 6 (Q18)                                                                                       | Grok idle detail state                           |
 | 2.24  | Ask and converse with Grok on a work item      | 1205-1229      | 6                                                                                             | none new                                         |
-| 2.25  | Connect Omp as a local Harness                 | 1231-1251      | 6 (Q18)                                                                                       | none new                                         |
-| 2.26  | Ask and converse with Omp on a work item       | 1253-1273      | 6                                                                                             | none new                                         |
-| 3.1   | Deliver a code change after one-time approval  | 1280-1349      | 7 (Q22: AC 2, 4, 6, 7, 8 changed; AC 5 removed)                                               | I037, I038, I039 (Code-job card), I041 ("Allow") |
+| 2.25  | Connect Omp as a local Harness                 | 1231-1251      | 6 (Q18) <!-- 2026-11-14 --> (Q31: Omp sandbox kit) | none new                                         |
+| 2.26  | Ask and converse with Omp on a work item       | 1253-1273      | 6 <!-- 2026-11-14 --> (Q31: Omp sandbox kit) | none new                                         |
+| 3.1   | Deliver a code change after one-time approval  | 1280-1349      | 7 (Q22: AC 2, 4, 6, 7, 8 changed; AC 5 removed) <!-- 2026-11-14 --> (Q31: Code sandbox per job; AC 7 memory limit returns) | I037, I038, I039 (Code-job card), I041 ("Allow") |
 | 3.2   | Grant a matching effect for the rest of a Run  | 1351-1371      | 7 (Q22: closes on the Code-job approval; AC 2, 3 changed)                                     | I040 removed by Q22                              |
 | 3.3   | Deny a proposed Agent effect                   | 1373-1393      | 7 (Q22: AC 2 wording)                                                                         | I042                                             |
-| 3.4   | Decide a Code job's network escalation         | 1395-1415      | 7 (Q22: AC 1-3 removed; closes on the Code-mode network check, proposal pending confirmation) | none (network variant of I039 removed)           |
-| 3.5   | Decide a Code job's path escalation            | 1417-1437      | 7 (Q22: AC 1-2 removed; AC 3 kept through the sandbox)                                        | none (path variant of I039 removed)              |
-| 3.6   | Wait for a Code-job capacity slot              | 1439-1463      | 7 (Q22: AC 1 wording, AC 2-3 changed)                                                         | I045 (waiting state, no Docker wording)          |
-| 3.7   | Stop a Code job and retain its Worktree        | 1465-1485      | 7 (Q22: AC 1, 3 wording)                                                                      | I030 (Code variant)                              |
-| 3.8   | Resume a stopped Code job in its Worktree      | 1487-1507      | 7 (Q22: wording)                                                                              | I031 (Code variant)                              |
+| 3.4   | Decide a Code job's network escalation         | 1395-1415      | 7 (Q22: AC 1-3 removed; closes on the Code-mode network check, proposal pending confirmation) <!-- 2026-11-14 --> (Q27: network open in the Code sandbox only) | none (network variant of I039 removed)           |
+| 3.5   | Decide a Code job's path escalation            | 1417-1437      | 7 (Q22: AC 1-2 removed; AC 3 kept through the sandbox) <!-- 2026-11-14 --> (Q31: AC 3 kept through the mounts) | none (path variant of I039 removed)              |
+| 3.6   | Wait for a Code-job capacity slot              | 1439-1463      | 7 (Q22: AC 1 wording, AC 2-3 changed) <!-- 2026-11-14 --> (Q31: no extra Code sandbox) | I045 (waiting state, no Docker wording)          |
+| 3.7   | Stop a Code job and retain its Worktree        | 1465-1485      | 7 (Q22: AC 1, 3 wording) <!-- 2026-11-14 --> (Q31: Code sandbox removed after Stop, Worktree kept) | I030 (Code variant)                              |
+| 3.8   | Resume a stopped Code job in its Worktree      | 1487-1507      | 7 (Q22: wording) <!-- 2026-11-14 --> (Q31: new Code sandbox, context rebuilt) | I031 (Code variant)                              |
 | 3.9   | Mirror a Run conclusion to its pull request    | 1509-1529      | 7                                                                                             | I052 (consumer)                                  |
 
 Phase totals (epics.md): 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 9 (sum 43).
@@ -63,7 +63,7 @@ epics.md has no GitLab story. These stories come from [gitlab-scope-decisions.md
 | G3    | Bind a GitLab repository while creating a project      | [phase-01 G3](./phase-01-github-connection-and-repository.md#g3-bind-a-gitlab-repository-while-creating-a-project)                 | 1                                       | I068-I071, I076       |
 | G4    | Disconnect GitLab (revoke-free)                        | [phase-01 G4](./phase-01-github-connection-and-repository.md#g4-disconnect-gitlab-revoke-free)                                     | 1 (AC2 change-request path closes in 7) | I048                  |
 | G5    | Set GitLab merge-request policy                        | [phase-01 G5](./phase-01-github-connection-and-repository.md#g5-set-gitlab-merge-request-policy)                                   | 1 (AC4 closes in 3 and 7)               | I051, I052, I053      |
-| G6    | Deliver a draft merge request from a Code job          | [phase-07 G6](./phase-07-code-jobs-and-draft-pr.md#g6-deliver-a-draft-merge-request-from-a-code-job) (Q22: AC1, AC6 changed)       | 7                                       | I037-I039, I041       |
+| G6    | Deliver a draft merge request from a Code job          | [phase-07 G6](./phase-07-code-jobs-and-draft-pr.md#g6-deliver-a-draft-merge-request-from-a-code-job) (Q22: AC1, AC6 changed) <!-- 2026-11-14 --> (Q31: AC6 "a command in the Harness sandbox" reads "a command in the Code sandbox") | 7                                       | I037-I039, I041       |
 | G7    | Mirror a Run conclusion to its merge request           | [phase-07 G7](./phase-07-code-jobs-and-draft-pr.md#g7-mirror-a-run-conclusion-to-its-merge-request)                                | 7                                       | I052 (consumer)       |
 
 Phase totals with GitLab: 1 = 13, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 11 (sum 50).
@@ -95,7 +95,18 @@ Row I070 shows clone progress at project creation. UX-DR16 (epics.md:309) forbid
 
 Decision Q22 ([plan.md](./plan.md#multica-comparison-decisions-2026-11-14)) keeps every Epic 3 story in Phase 7, so the totals above do not change. Some criteria change or are removed; the full per-criterion table is [Phase 7 spec deviations](./phase-07-code-jobs-and-draft-pr.md#spec-deviations-q22-2026-11-14).
 
-- 3.4 and 3.5 keep their rows, but their decision cards are gone. 3.4 closes on the Code-mode network check (command network denied; a proposal that needs user confirmation, plan.md open question 7). 3.5 closes on its AC 3 (epics.md:1435-1437) through the sandbox path checks.
+- 3.4 and 3.5 keep their rows, but their decision cards are gone. <!-- 2026-11-14 --> 3.4 closes with the command network open in the Code sandbox only (Q27, Q31). 3.5 closes on its AC 3 (epics.md:1435-1437) through the Code sandbox mounts.
 - 3.2 closes on the Code-job approval as the Run grant.
-- Mockup rows: I039 ("Write approval state") becomes the Code-job card; I041 ("Allow once") becomes "Allow"; I040 ("Allow for this run") is removed; I042 (Deny) is kept; I045 ("Docker capacity refusal state") becomes the Code waiting state with no Docker wording. The browser review counts 64 rows (65 minus I040).
+- Mockup rows: I039 ("Write approval state") becomes the Code-job card; I041 ("Allow once") becomes "Allow"; I040 ("Allow for this run") is removed; I042 (Deny) is kept; I045 ("Docker capacity refusal state") becomes the Code waiting state with no Docker wording. <!-- 2026-11-14 --> Q31 brings back a Docker Sandbox per Code job, but the slot pool stays dropped; I045 keeps the neutral wording "Waiting for a Code slot". The browser review counts 64 rows (65 minus I040).
 - Decisions Q18-Q21, Q23 and Q24 change no story assignment. Their criterion changes are marked in the rows above and in the owning phase files.
+
+## Q31-Q35 effect (Docker Sandboxes, 2026-11-14)
+
+Decisions Q31-Q35 ([plan.md](./plan.md#docker-sandboxes-decisions-2026-11-14)) move every Run into a Docker Sandbox. No story changes phase, and the totals above do not change. Criterion effects:
+
+- AD-4 permission check (2.1, 2.21, 2.25): under full permissions there is no deny to prove; the check proves bypass mode and no permission request. The read-only mount is proven by the Phase 3 `sbx` verification and by native tests. Spec deviation.
+- 2.7 (epics.md:763) "under an OS boundary that denies writes": met by the read-only clone mount inside the microVM. The agent can write inside the VM and its scratch folder, never to the clone or the host.
+- 3.1 AC 7 (epics.md:1315): memory limit returns through the sandbox memory setting; no process-count limit; network open (Q27). 3.5 AC 3: kept through the mounts. 3.6 and 3.7: Code sandbox wording (Phase 7 spec deviations).
+- Stories 2.17-2.19 and 3.7: no criterion change; the Stop and reconcile mechanism is the in-sandbox pidfile kill.
+- No mockup row changes. Connect error text for a missing Docker sign-in reuses the existing "missing action" row of the Harness detail (I063, I064).
+

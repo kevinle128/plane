@@ -3,9 +3,9 @@ title: "Local CLI Agents rebuild on current preview"
 description: "Rebuild all 43 Local CLI Agents stories, plus self-hosted GitLab parity, on current preview in seven PR-sized, test-first phases."
 status: in-progress
 priority: P1
-effort: "60.5d"
+effort: "62.5d"
 branch: feat/local-cli-agents
-tags: [feature, backend, frontend, worker, github, gitlab, security]
+tags: [feature, backend, frontend, worker, github, gitlab, security, docker-sandboxes]
 blockedBy: []
 blocks: []
 created: 2026-11-12
@@ -42,13 +42,15 @@ Rebuild the Git provider connection (GitHub and self-hosted GitLab), four local 
 | --- | -------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------- | ------ | ------- |
 | 1   | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5)     | none       | 11d    | Pending |
 | 2   | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md)                           | 2.1-2.6 (6)                | 1          | 8d     | Pending |
-| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)                | 1, 2       | 9d     | Pending |
-| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)               | 3          | 6d     | Pending |
-| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)              | 4          | 7.5d   | Pending |
+| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)                | 1, 2       | 12d    | Pending |
+| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)               | 3          | 6.5d   | Pending |
+| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)              | 4          | 8.5d   | Pending |
 | 6   | [Codex and Omp Harnesses (Grok dropped, Q25)](./phase-06-codex-grok-and-omp-harnesses.md)                            | 2.21, 2.22, 2.25, 2.26 (4) | 5          | 7d     | Pending |
-| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2)     | 1, 5, 6    | 10d    | Pending |
+| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2)     | 1, 5, 6    | 9.5d   | Pending |
 
-Effort (re-estimated 2026-11-14 after decisions Q17-Q24): 11d + 8d + 9d + 6d + 7.5d + 9d + 10d = 60.5d (was 67d).
+Effort (re-estimated 2026-11-14 after decisions Q31-Q35, Docker Sandboxes): 11d + 8d + 12d + 6.5d + 8.5d + 7d + 9.5d = 62.5d. The earlier total (60.5d, after Q17-Q24) still counted Phase 6 at 9d; with Q25 (Grok dropped) it was 58.5d, so Q31-Q35 add 4d net. Per-phase reasons: [Docker Sandboxes decisions](#docker-sandboxes-decisions-2026-11-14).
+
+Earlier re-estimate (after Q17-Q24, kept for history):
 
 - Phase 2: +2d (6d planned plus the remaining Q18/Q21 work in [Phase 2 remaining work](./phase-02-agent-settings-and-claude-connection.md#remaining-work-to-pr-readiness-2026-11-14)).
 - Phase 3: unchanged 9d. The Q18 Run-time version check and the Q24 MCP config replace the boundary work that Q16 moved into Phase 2.
@@ -57,7 +59,7 @@ Effort (re-estimated 2026-11-14 after decisions Q17-Q24): 11d + 8d + 9d + 6d + 7
 - Phase 7: -7d (Q22: no Docker sandbox, no slot pool, no per-effect cards, no file-publish path; the Code-job approval, the Code-mode boundary per Harness and the Worker commit add about 2d).
 - GitLab adds 5d to Phase 1, 1d to Phase 3 and 3d to Phase 7 compared with a GitHub-only plan.
 
-Order: 1, 2, 3, 4, 5, 6, 7. <!-- 2026-11-14 --> Phase 7 now depends on Phase 6: the Code mode of Codex, Grok and Omp uses their Phase 6 drivers and boundaries (Q22). Both phases also add keys to `packages/i18n/src/locales/*/agent.json`. Each phase branches from `preview` after the previous merge because each PR regenerates `apps/api/migrations_lockfile.txt`.
+Order: 1, 2, 3, 4, 5, 6, 7. <!-- 2026-11-14 --> Phase 7 now depends on Phase 6: the Code mode of Codex and Omp uses their Phase 6 drivers and sandbox kits (Q22, Q31). Both phases also add keys to `packages/i18n/src/locales/*/agent.json`. Each phase branches from `preview` after the previous merge because each PR regenerates `apps/api/migrations_lockfile.txt`.
 
 ## Delivery rules
 
@@ -69,8 +71,8 @@ One PR per phase to `preview`; one commit per story; no plan IDs in code, tests,
 - [ ] The provider contract suite (`test_agent_git_provider_contract.py`) passes for GitHub and GitLab with recorded responses; the GitLab live read-only check passes against git.oceanlabs.dev when `PLANE_TEST_GITLAB_TOKEN` is set.
 - [ ] The 65 changed mockup rows pass browser review in Light and Dark at 375, 768 and 1280 px. Exception (Q22, 2026-11-14): I040 ("Allow for this run" button) is removed; I039, I041 and I045 are reviewed in their Q22 form ([story-coverage.md](./story-coverage.md#q22-effect-on-epic-3-and-mockup-rows-2026-11-14)).
 - [ ] API, Worker, web, migration, copyright and i18n checks pass in every phase PR.
-- [ ] Q&A cannot write. A Code job writes only inside its Worktree and only after its Code-job approval. Push and change-request creation each need their own approval. A Worker never runs more Code turns at once than its configured limit. The Agent cannot push or merge to the default branch or a protected branch on either provider. (Changed 2026-11-14 by Q22.)
-- [ ] No provider token appears in an API response, Run context, log line, git argv, the environment of the Harness process or of a command in its sandbox, remote URL or `.git/config` (asserted by tests).
+- [ ] Q&A cannot write to the Run clone or to the Worker machine: the clone is a read-only mount of the Run's Docker Sandbox (Q31). A Code job writes only inside its Worktree, which is the only writable host folder of its Code sandbox, and only after its Code-job approval. Push and change-request creation each need their own approval. A Worker never runs more Code turns at once than its configured limit. The Agent cannot push or merge to the default branch or a protected branch on either provider. (Changed 2026-11-14 by Q22 and Q31.)
+- [ ] No provider token appears in an API response, Run context, log line, git argv, the environment of the Harness process or of a command in its sandbox, remote URL or `.git/config` (asserted by tests). The Claude gateway token is in the sandbox environment by design (Q30, Q31); it never appears in host argv or in a log.
 
 ## User decisions (2026-11-12)
 
@@ -105,7 +107,7 @@ The user accepted the recommended answers on 2026-11-12. The answer came through
 
 ## Claude sandbox decision (2026-11-13)
 
-16. Q16, Claude Q&A boundary: the user chose Claude Code's built-in sandbox instead of the outer OS sandbox around the whole `claude` process. This applies to the Claude Harness only; Codex, Grok and Omp keep decision Q1.
+16. <!-- 2026-11-14 --> (Superseded for Runs by Q31; the Phase 2 probe code keeps it until Phase 3 replaces it.) Q16, Claude Q&A boundary: the user chose Claude Code's built-in sandbox instead of the outer OS sandbox around the whole `claude` process. This applies to the Claude Harness only; Codex, Grok and Omp keep decision Q1.
     - Bash commands and their child processes run in Claude Code's built-in sandbox (OS-level, filesystem and network isolation). Writes are denied everywhere; reads of other Runs, the Worker token, credentials and other session folders are denied (`sandbox.filesystem.denyRead`).
     - Built-in file tools (Edit, Write, NotebookEdit) are denied by permission rules; Read is limited to the Run clone by permission rules. MCP servers and hooks are turned off for Runs (no MCP config, no hooks, restricted setting sources).
     - The `claude` process itself runs outside the boundary, so it writes its own session history normally and `--resume` works without an exception.
@@ -140,11 +142,56 @@ The red-team gate has not run on the Q17-Q24 changes. Recommended before Phase 3
 
 ### Claude installation parity (2026-11-14)
 
-28. Q28, run Claude as installed (user, 2026-11-14): the Worker runs `claude` the same way the machine runs it. It does NOT pass `--setting-sources ""` or `--restricted`, so Claude reads the normal setting sources, including `~/.claude/settings.json` (for example `env` with `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_BASE_URL`) and the Keychain login. Reason: the user runs Claude through an API key and gateway in user settings; a Worker that hides those settings cannot authenticate. The Q16 protections stay, set through the Worker's own `--settings` file, which has higher precedence than user settings: the built-in Bash sandbox with its `denyRead` list, deny rules for Edit, Write and NotebookEdit (deny always wins over allow), `disableAllHooks: true`, and `--strict-mcp-config` with only the Worker-supplied Plane MCP server. The probe must prove that user settings cannot widen the boundary (a user-level allow rule for Write and a user-level hook must have no effect). Amends Q16 (setting sources) and replaces the "restricted setting sources" part of Q16.
+28. <!-- 2026-11-14 --> (Superseded for Runs by Q31 and the Worker credential rule.) Q28, run Claude as installed (user, 2026-11-14): the Worker runs `claude` the same way the machine runs it. It does NOT pass `--setting-sources ""` or `--restricted`, so Claude reads the normal setting sources, including `~/.claude/settings.json` (for example `env` with `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_BASE_URL`) and the Keychain login. Reason: the user runs Claude through an API key and gateway in user settings; a Worker that hides those settings cannot authenticate. The Q16 protections stay, set through the Worker's own `--settings` file, which has higher precedence than user settings: the built-in Bash sandbox with its `denyRead` list, deny rules for Edit, Write and NotebookEdit (deny always wins over allow), `disableAllHooks: true`, and `--strict-mcp-config` with only the Worker-supplied Plane MCP server. The probe must prove that user settings cannot widen the boundary (a user-level allow rule for Write and a user-level hook must have no effect). Amends Q16 (setting sources) and replaces the "restricted setting sources" part of Q16.
 
-29. Q29, user hooks and MCP servers stay on (user, 2026-11-14): amends Q16, Q24 and Q28. The Worker does not disable the user's hooks (no `disableAllHooks`) and does not pass `--strict-mcp-config`; the user's own MCP servers load as installed, and the Worker adds the Plane MCP server with `--mcp-config`. Q&A Runs keep only two protections: no file writes (deny rules for Edit, Write and NotebookEdit, and the built-in Bash sandbox) and no reads of secrets (sandbox `denyRead`). Accepted risk: user hooks and user MCP servers run outside the sandbox and can write files or reach the network; the user installed them and accepts this. The probe proves only the write rules against user settings (a user allow rule for Write and a user `sandbox` override must not reopen writes). The secret-read rule (`denyRead`) is configured but not proven by the probe; a user `sandbox.filesystem.allowRead` entry can reopen a denied read path (accepted, Q30; the Docker Sandboxes spike before Phase 3 replaces this boundary).
+29. <!-- 2026-11-14 --> (Superseded for Runs by Q31 and Q32.) Q29, user hooks and MCP servers stay on (user, 2026-11-14): amends Q16, Q24 and Q28. The Worker does not disable the user's hooks (no `disableAllHooks`) and does not pass `--strict-mcp-config`; the user's own MCP servers load as installed, and the Worker adds the Plane MCP server with `--mcp-config`. Q&A Runs keep only two protections: no file writes (deny rules for Edit, Write and NotebookEdit, and the built-in Bash sandbox) and no reads of secrets (sandbox `denyRead`). Accepted risk: user hooks and user MCP servers run outside the sandbox and can write files or reach the network; the user installed them and accepts this. The probe proves only the write rules against user settings (a user allow rule for Write and a user `sandbox` override must not reopen writes). The secret-read rule (`denyRead`) is configured but not proven by the probe; a user `sandbox.filesystem.allowRead` entry can reopen a denied read path (accepted, Q30; the Docker Sandboxes spike before Phase 3 replaces this boundary).
 
 30. Q30, token exposure and next boundary (user, 2026-11-14): exposure of the Claude API token to the agent itself is a minor accepted risk; Phase 2 only sets `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` and adds no canary checks. Before Phase 3, run a one-day spike on Docker Sandboxes (`sbx run claude`): the agent runs with full permissions inside a microVM, and the microVM is the boundary instead of deny rules. The spike checks non-interactive stream-json through `sbx`, session resume, passing the API key and gateway into the sandbox, the network policy for the gateway, user hooks/MCP/skills import, microVM start time, and the `sbx` dependency on the Mini. If it passes, Phases 3-7 replace the Q16/Q28/Q29 rules with the sandbox; the open question about repository `.claude/settings.json` then falls away.
+
+## Docker Sandboxes decisions (2026-11-14)
+
+Source: [reports/spike-docker-sandbox-claude.md](./reports/spike-docker-sandbox-claude.md) (verdict GO with limits; all hands-on results used the Docker Desktop plugin `docker sandbox` v0.12.0). The user decided Q31-Q35 and the credential rule on 2026-11-14. `sbx` facts below were read from `sbx --help` of v0.53.0 on the development Mac on 2026-11-14; no `sbx` sandbox has run yet (sign-in pending). The shared contract is [architecture-contracts.md §12](./architecture-contracts.md#12-docker-sandboxes-for-runs).
+
+31. Q31, Runs execute inside a Docker Sandbox: every Run turn (Q&A and Code) runs the agent CLI inside a Docker Sandbox microVM with full permissions (Claude: `--dangerously-skip-permissions`). The microVM and its mounts are the only boundary. The Worker stays on the host and keeps everything that needs credentials: clone, fetch, commit, push and the Plane API. How earlier decisions map for Runs:
+
+    | Decision | Status for Runs | New reading |
+    | --- | --- | --- |
+    | Q16 Claude built-in Bash sandbox, `denyRead`, deny rules for Edit/Write/NotebookEdit, amendment 1 (temporary folder) | Superseded | No Claude sandbox settings and no deny rules. Writes to the clone fail at the read-only mount; host files outside the mounts do not exist in the VM. |
+    | Q16 amendment 2 and Q24 Plane MCP server | Kept, new transport | The Plane MCP server is always added. It becomes an HTTP endpoint of the Worker on the host, reached from the VM through one network allow rule (§12). |
+    | Q28 run Claude as installed on the host | Superseded | The VM has its own Claude install and settings. The Worker supplies the gateway URL and token from its own config (credential rule below). |
+    | Q29 host hooks and MCP servers load | Superseded by Q32 | Nothing from the host loads unless the operator lists it. |
+    | Q23 Codex `read-only` sandbox and `approval_policy = "never"` | Superseded | Codex runs in its sandbox with its own sandbox and approvals off; Q&A read-only comes from the mount. |
+    | Q20 per-Run `CODEX_HOME` with a link to `~/.codex/auth.json` | Superseded | Codex keeps its home inside the VM; the host login file cannot be linked into the VM (Phase 6). |
+    | Q1 disposable runtime folder and outer macOS profile (Codex, Omp) | Superseded | The VM file system is writable for runtime state; the mounts give the boundary. `sandbox_macos.py` is not restored. |
+    | Q7 hard-link probe | Superseded | Host files outside the mounts do not exist in the VM, so a hard link cannot reach them. |
+    | Q22 Code job: CLI sandbox in the Worktree, no Docker, Worker commits | Changed | The Code job runs in a Code sandbox whose only writable host folder is the Worktree; the Worker still commits and pushes; one approval per Code job stays. |
+    | Q27 Code-job command network open | Kept | The Code sandbox gets an allow-all network rule; Q&A sandboxes do not. |
+    | Q18 suite once per CLI version | Kept | The suite runs inside the probe sandbox; the CLI version is read inside the sandbox. |
+    | Q19, Q21, Q24, Q26 | Kept | No change. |
+
+    Phase 2 code (PR kevinle128/plane#5) stays as merged for now. The first Phase 3 increment, after the `sbx` verification, changes it: the Claude spawn runs through `sbx exec` (`drivers/claude.py:456-457`); `drivers/claude_boundary.py` and the boundary checks `file_tools_problem` and `bash_write_problem` (`drivers/claude.py:736,746`) are deleted; the suite runs inside the probe sandbox and `SUITE_VERSION` (`drivers/claude.py:71`) goes from 2 to 3 so that no host-verified record is reused; `harness_env` (`drivers/claude.py:134`) takes the gateway values from Worker config, not from the host environment; `StreamSession.kill` (`drivers/claude.py:273-276`) becomes an in-sandbox kill; `prepare_workspace` (`conformance.py:54`) prepares a scratch folder of the probe sandbox; `_check_home` (`config.py:135`) no longer requires the host Claude home. Details: [Phase 3](./phase-03-claude-qa-run-and-timeline.md#changes-to-phase-2-code).
+
+    Spec effect: AD-7 "read-only OS boundary" for Q&A is met by the read-only mount inside the microVM (closer to the spec than Q16 was). AD-4 permission check (2.1, 2.21, 2.25) changes reading: there is no permission deny to prove under full permissions; the check proves that the CLI runs in bypass mode and sends no permission request, and the read-only mount is proven once in the `sbx` verification and by native tests. 3.1 AC 7: memory limit returns through the sandbox memory setting; a process-count limit is still not available.
+32. Q32 (answer 1b), what the sandbox imports: the operator lists, in Worker config, which user skills, MCP servers and hooks the sandbox gets. Default: nothing. Skills are copied into the VM's `~/.claude/skills/`; MCP servers go into the generated `--mcp-config` file of each turn, and each HTTP server host gets a network allow rule; hooks are copied into the VM's `~/.claude/` only when listed. The Plane MCP server is always added. Verified mechanism note: `sbx skills import` copies every skill it finds (no name filter) into a store that is linked into every sandbox by default (`sbx skills --help`, `sbx skills import --help`, v0.53.0). To keep "only listed, default nothing", the plan creates sandboxes with `--skills=off` and copies each listed skill with `sbx cp` (Docker Sandboxes open question 2).
+33. Q33 (answer 2b), tool: the standalone `sbx` CLI, not the Docker Desktop plugin. Requirements on the Worker machine: Apple silicon, macOS 14 or later, Docker sign-in (`sbx login`), Worker in the user's login session (secrets are in the Keychain). The `sbx` path is not verified hands-on yet. The first Phase 3 task verifies it with explicit pass criteria and falls back to the plugin when `sbx` fails a criterion: [Phase 3 task 0](./phase-03-claude-qa-run-and-timeline.md#task-0-sbx-verification-first-task).
+34. Q34 (answer 3), sandbox layout: one long-lived Q&A sandbox per bound repository on the Worker; each Run is one command in it; each Run has its own scratch folder. Plan readings (§12): the sandbox key is (workspace, repository), so session history and scratch never cross workspaces; the primary mount is a scratch parent folder with one sub-folder per Run, and the read-only extra mount is a parent folder that holds the fresh Run-ID clone of each Run (created on the host after sandbox creation; the mount is live), so 2.7 "fresh Run-ID clone, Claude starts in that clone" stays true. Code jobs use a per-job Worktree mounted read-write; the Worker reads the diff and commits and pushes (Q22 unchanged: provider tokens never enter a sandbox). Mounts and per-sandbox network rules are fixed at create, so a Code job cannot use the Q&A sandbox: the plan gives each Code job its own Code sandbox (Docker Sandboxes open question 1). Disk is 9-17 GB per sandbox (spike): the Worker has a maximum number of Q&A sandboxes, stops idle sandboxes and removes the least recently used idle one at the limit; the README documents manual cleanup.
+35. Q35 (answer 4), session history: native session history lives inside the sandbox and is lost when the sandbox is removed. Accepted. A Run whose sandbox was removed or recreated rebuilds its context from the durable Run record (the existing Phase 4 rebuild path).
+
+Credential rule (user, 2026-11-14): the Worker supplies the Claude gateway URL and token to the sandbox from its own config (a base URL setting and a token file, mode 0600, outside the Run root), never from the host `~/.claude`. The token is visible inside the sandbox (accepted, Q30). It never appears in host argv or logs: `sbx exec` receives it as an environment variable name with the value in its own process environment, or through a 0600 env file, whichever the `sbx` verification proves.
+
+Effort change (Phases 3-7, +4d net against 58.5d):
+
+- Phase 3: 9d to 12d. +0.5d `sbx` verification, +2d sandbox manager (create, health check, exec spawn, pidfile, network rules, idle stop, cleanup, maximum), +0.5d Worker credential source, +1d Plane MCP over HTTP, +0.5d operator import list (Q32), -1.5d no Claude boundary proof and no hard-link probe.
+- Phase 4: 6d to 6.5d. Follow-up and repository choice through the sandbox key; rebuild after a lost sandbox.
+- Phase 5: 7.5d to 8.5d. Stop through stream-json `interrupt` and an in-sandbox pid kill; stale reconcile finds processes inside sandboxes.
+- Phase 6: 7d (unchanged after Q25). -2d no outer profile restore, no Q23 proofs, no `CODEX_HOME` link; +2d `sbx` check for Codex and Omp, Omp sandbox kit, Codex login inside the VM.
+- Phase 7: 10d to 9.5d. -1d no per-Harness Code-mode boundary and no Code-mode check; +0.5d Code sandbox per job (create, read-only git metadata mounts, allow-all network, removal).
+
+### Docker Sandboxes open questions
+
+1. Code-job sandbox (Q34 wording): Q34 says one long-lived sandbox per repository with a per-job Worktree mounted read-write. `sbx` fixes mounts and per-sandbox network rules at create, and Q27 (open network for Code) cannot hold in a Q&A sandbox with deny-all. Proposal in this plan: one Code sandbox per Code job, created at the first Code turn, removed when the Run is stopped or ends (about 19 s create and 9-17 GB while it exists; at most `PLANE_AGENT_MAX_CODE_JOBS` at once). Alternative: one long-lived Code sandbox per repository with a writable parent folder of all Worktrees of that repository (no create cost, but concurrent Code jobs on one repository can write each other's Worktrees). Keep the proposal?
+2. Skills mechanism (Q32 wording): `sbx skills import` imports all skills and shares them with every sandbox. Proposal: `--skills=off` plus `sbx cp` of each listed skill. Alternative: run `sbx skills import` once and give all sandboxes all imported skills (no per-skill choice). Keep the proposal?
+3. Codex login inside the sandbox (decides the Phase 6 shape): the host `~/.codex/auth.json` cannot be linked into the VM. Options: (a) Worker config supplies an OpenAI API key or gateway, like Claude; (b) `sbx secret set openai` so only the proxy holds the key; (c) a ChatGPT login inside each Codex sandbox (lost when the sandbox is removed). Which one?
 
 ## Red Team Review
 
