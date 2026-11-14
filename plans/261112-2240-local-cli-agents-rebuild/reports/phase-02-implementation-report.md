@@ -80,3 +80,62 @@ Branch `feat/local-cli-agents-phase-2` (worktree `plane-worktrees/local-cli-agen
 
 - Manual browser check (scene 11, Light and Dark, 375/768/1280 px, keyboard): NOT RUN, no browser driver in this session. Script: Integrations shows Essentials and a Harnesses group with four cards and text tags; Claude detail shows the Agent selector with tags, back link, Mentionable switch, Connection row in all four states (Connect, spinner, Connected with Disconnect confirm, failed with missing action, detail box and Retry), Name, Handle (collision message inline), Instructions, Model ("Available after connecting" or selector). Members see values and the read-only note, no actions. Check for nested interactive elements.
 - Run-level criteria of 2.2 AC 3, 2.3 AC 3, 2.4 AC 2-3, 2.5 AC 2-3 and 2.6 AC 2 (new Runs use the model) and 4: pending Phase 3, as the phase file states.
+
+## Review fixes and decisions (2026-11-14)
+
+### Fix commits per review finding
+
+| Finding                                                 | Commit                     | Note                                                                                                                                                           |
+| ------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend F1 (probe budget ignores the answer deadline)   | `8bb908ac99`, `c5278d9548` | Claim only while at least 60 of 120 s are left; the claim returns the seconds left and the Worker budget follows them                                          |
+| Backend F2 (any workspace admin uses the Mini's Claude) | none                       | Closed by Q17 as an accepted risk while the instance is reachable only through Tailscale; recorded in the Worker README (`de4a004c5f`)                         |
+| Backend F3 (no failing-path tests for three checks)     | `c5278d9548`               | Fakes `no_interrupt`, `crash_not_resumable`, `writes_despite_denial`, `prompts_for_write`                                                                      |
+| Backend F4 (throttle test proves nothing)               | `8bb908ac99`               | Exemption proven directly and with a strict throttle on every other view                                                                                       |
+| Backend F5, F6, F7, F8                                  | `c5278d9548`               | Folder error gives a failed report; restart removes stale probe and session folders; short commands in recorded process groups; `~` paths, CLI text in the log |
+| Backend F9 (Worker CI job on a stacked PR)              | open                       | Process item: the PR against `preview` runs the job (remaining item 11)                                                                                        |
+| Frontend C1 (polling never starts)                      | `a4b0641daa`               | Poll interval from the store Agents                                                                                                                            |
+| Frontend I1, M1, M2, M3                                 | `5d22cc9939`               | Draft baseline of server values; one busy state; field error clears on edit; no label target without a control                                                 |
+| Frontend I2 (tests miss the broken behavior)            | `a4b0641daa`, `5d22cc9939` | Pure poll, draft, error and store helpers with unit tests                                                                                                      |
+| Frontend M4 (dead code, coupling)                       | `a4b0641daa`               | Shared fetch and poll module; unused single-Agent fetch removed                                                                                                |
+| Frontend M5 (English text in non-English locales)       | none                       | Phase 1 convention                                                                                                                                             |
+
+### Q16 rewrite: deviations 1 and 2 are resolved
+
+- Deviation 1 (writable Claude session folder) is gone. `c5278d9548` replaced the outer macOS profile with Claude Code's built-in sandbox: the `claude` process runs outside the sandbox and writes its own session history, so no session-folder exception exists. Only Bash and its children run in the sandbox (`apps/agent-worker/plane_agent_worker/drivers/claude_boundary.py`).
+- Deviation 2 (`~/.claude/.oauth_refresh.lock` denied) is gone for the same reason: the token refresh happens in the unsandboxed `claude` process.
+- The outer-profile files were removed in `a4b0641daa` (pushed history is not rewritten): `git show --stat --format= a4b0641daa` lists `plane_agent_worker/sandbox/qa-readonly.sb` (-31), `plane_agent_worker/sandbox_macos.py` (-73) and `tests/test_sandbox_macos.py` (-120). Phase 6 restores an outer profile for Omp.
+
+### Q18: quick check on Connect, suite once per CLI version
+
+Commits `40f7d32e51` (split, no behavior change), `895e2063d7` (cache, lock, `ensure_verified`), `864f076e5f` (report version 2).
+
+- Split: `uv run pytest -m "not native and not docker"` -> `79 passed, 1 deselected` before and after the split, with no test changed.
+- Test first for the cache: `tests/test_suite_cache.py` -> `1 error during collection` (no `SuiteCache`); `tests/test_claude_probe.py` -> `4 failed, 19 passed`. After the change: `96 passed, 1 deselected`.
+- Pin: changing `autoAllowBashIfSandboxed` in `claude_boundary.py` makes `test_suite_fingerprint_is_pinned_to_the_suite_version` fail (`1 failed`); the file was restored.
+- Report version 2, test first in the API: `15 failed, 41 passed` in `test_agent_harness_probe.py` before the serializer change; after it, settings + probe + Worker auth + API token -> `141 passed`. Version 1 is refused (`{"version": 1}` in the malformed-report cases).
+- Live check: the cache was proven with the fake CLI only, because the live check could not run (below).
+
+### Q19: no midturn input for Claude
+
+Commit `4badce1d0f`. Test first: `test_interruption_sends_no_message_during_the_turn` and `test_midturn_input_is_not_reported_for_claude` -> `2 failed, 2 passed`. After the change: `98 passed, 1 deselected`. The recorded `session-a.jsonl` is older than this change; `tests/transcripts/claude/README.md` says how it differs. It was not recorded again, because the only Claude login on this Mac cannot run a turn (below).
+
+### Q21: one model request with a static fallback (accepted by the user on 2026-11-14)
+
+Commits `411db61c00` (Worker), `c8355601ed` (web and i18n).
+
+- Real CLI check before the change: one `initialize` request with stdin closed right after it -> `control_response success plane-init` with 5 models, exit 0 (Claude Code 2.1.289).
+- Worker, test first: `5 failed` (one-shot, fallback at Connect, cached model report, suite without a real report, `source` on reported models). After the change: `102 passed, 1 deselected`.
+- Blocks, test first: `getModelSourceNoteKey` test failed (no export); after the change `connection-state.test.ts` -> `6 passed`; whole package `46 files, 452 passed`.
+- i18n: `agent_settings.model.not_reported` ("Not reported by {harness}") in all 22 locales; `pnpm --filter=@plane/i18n check:sync` -> "All locales are in sync with English."
+
+### Q25: Grok removed
+
+Commit `899597a27f` (web: type, constants, the Grok blurb in 22 locales).
+
+### Live check on this Mac (remaining item 8): NOT RUN
+
+The check must use this Mac's own Claude login, not an environment token. With a clean environment (`env -i HOME USER PATH LANG`), `claude auth status` reports `loggedIn: true`, `authMethod: oauth_token`. But every model turn answers "Your account is on hold and can't use Claude Code. View details or appeal: https://claude.ai/restricted". A recorded local probe (`python -m plane_agent_worker probe --record`) showed this text for each turn of session A. The probe then fails its permission check ("Write was not attempted, so the permission rule was not proven"), so it correctly does not report Connected. The code before these changes (`40f7d32e51`) fails the same way, so this is not a regression. The session's environment token was not used. The first Connect and the cached second Connect times are therefore not recorded; the native test `test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite` asserts both (second Connect under 10 s) when a working login exists.
+
+### Browser check of scene 11 (remaining item 9): NOT RUN
+
+No browser tool is available in this session. The script in "Not done" above still applies, plus the fallback label "Not reported by Claude Code" in the model selector.
