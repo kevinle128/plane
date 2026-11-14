@@ -12,7 +12,9 @@ from plane_agent_worker.config import ConfigError, load_config
 def env_for(private_dir, token_file, **overrides):
     checkout = private_dir / "plane"
     checkout.mkdir(exist_ok=True)
+    (private_dir / "home").mkdir(exist_ok=True)
     env = {
+        "HOME": str(private_dir / "home"),
         "PLANE_AGENT_WORKER_API_ORIGIN": "http://localhost:8000",
         "PLANE_AGENT_WORKER_TOKEN_FILE": str(token_file),
         "PLANE_AGENT_WORKER_RUN_ROOT": str(private_dir / "runs"),
@@ -142,3 +144,16 @@ def test_missing_origin_is_rejected(private_dir, token_file):
 def test_poll_interval_out_of_range_is_rejected(private_dir, token_file, value):
     with pytest.raises(ConfigError, match="PLANE_AGENT_WORKER_POLL_SECONDS"):
         load_config(env_for(private_dir, token_file, PLANE_AGENT_WORKER_POLL_SECONDS=value))
+
+
+@pytest.mark.parametrize("home", [None, "", "relative/home", "/plane-worker-home-that-does-not-exist"])
+def test_missing_or_unusable_home_is_rejected(private_dir, token_file, home):
+    env = env_for(private_dir, token_file)
+    if home is None:
+        del env["HOME"]
+    else:
+        env["HOME"] = home
+
+    # Claude Code reads its login and settings from the home directory, so the Worker stops at start.
+    with pytest.raises(ConfigError, match="HOME"):
+        load_config(env)

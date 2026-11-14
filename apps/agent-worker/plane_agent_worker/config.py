@@ -132,7 +132,18 @@ def _poll_seconds(env):
     return value
 
 
+def _check_home(env):
+    """Claude Code reads its login and settings from the home directory, so it must be a real directory."""
+    home = (env.get("HOME") or "").strip()
+    if not home or not os.path.isabs(home) or not os.path.isdir(home):
+        raise ConfigError(
+            "HOME must be the absolute path of the Worker user's home directory, where Claude Code keeps its "
+            "login and settings."
+        )
+
+
 def load_config(env):
+    _check_home(env)
     origin = validate_origin((env.get(ENV_ORIGIN) or "").strip())
     run_root = _absolute(env, ENV_RUN_ROOT)
     token_file = _absolute(env, ENV_TOKEN_FILE)
