@@ -1,28 +1,27 @@
 # Claude Code probe transcripts
 
-Recorded from a native probe of Claude Code 2.1.289 with its built-in sandbox
-and the Worker permission rules:
+Recorded on 2026-11-14 from a native probe of Claude Code 2.1.289, run as it is
+installed on the Mini (its own settings, login, hooks and MCP servers), with the
+Worker boundary settings on top (built-in sandbox, bare-name deny rules for the
+file tools, credential scrub):
 
 ```bash
-python -m plane_agent_worker probe --record tests/transcripts/claude
+env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" PATH="$PATH" LANG=en_US.UTF-8 \
+  PLANE_AGENT_WORKER_API_ORIGIN=http://localhost:8000 \
+  PLANE_AGENT_WORKER_TOKEN_FILE=<token file> PLANE_AGENT_WORKER_RUN_ROOT=<run root> \
+  uv run python -m plane_agent_worker probe --record tests/transcripts/claude
 ```
 
 Each line is `{"direction": "in" | "out", "message": <stream-JSON message>}`.
-The recorder drops account data, signatures, usage, cost and machine listings,
-and replaces the home directory and the Run root with `<home>` and `<run_root>`.
-`tests/fakes/fake_claude.py` builds its answers from these message shapes. The
-tool-use, tool-result and `permission_denials` shapes of the permission turns
-follow the same recording.
-Record again when the supported Claude Code version changes.
+The recorder drops account data, signatures, usage, cost and machine listings
+(including the tool list of the `init` message, which names the user's MCP
+tools), and replaces the home directory and the Run root with `<home>` and
+`<run_root>`. `tests/fakes/fake_claude.py` builds its answers from these message
+shapes; it sets the tool list of its `init` message itself.
 
-The recording is older than two driver changes, and the fake follows the
-current driver:
+In `session-a.jsonl`, Claude Code asks for permission before the Bash write to
+the working directory (a path the sandbox denies). The Worker allows that call,
+and the sandbox denies the write (`operation not permitted`).
 
-- `session-a.jsonl` sends a queued user message during the counting turn,
-  before `interrupt`. The driver no longer does this: it interrupts the turn
-  and then sends the next message as a new turn, and reports `midturn_input`
-  as false. The out messages that the fake uses keep the same shapes.
-- `session-a.jsonl` has a permission prompt for the Write and no Bash turn
-  (it is from the outer-sandbox boundary). The fake builds the rule-denial and
-  sandbox-denial answers from the tool-use and tool-result shapes of the
-  recording, and uses the prompt shape only for the `prompts_for_write` case.
+Record again when the supported Claude Code version changes, and check that the
+recording holds no account data or local paths before you commit it.
