@@ -17,6 +17,7 @@ from plane.tests.agent_settings_fixtures import (
     failing_checks,
     make_worker,
     probe_report,
+    suite_record,
     worker_client_for,
 )
 
@@ -248,6 +249,45 @@ class TestProbeReport:
         assert agent["available_for_mentions"] is True
 
     @pytest.mark.django_db
+    def test_cached_suite_record_sets_connected_with_the_record_time(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        verified_at = timezone.now() - timedelta(days=3)
+        suite = suite_record(verified_at=verified_at.isoformat(), ran_now=False)
+        report = probe_report(probe["generation"], suite=suite)
+
+        response = worker_client.post(report_url(probe["id"]), report, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        connection = agent_state(session_client, workspace)["connection"]
+        assert connection["state"] == "connected"
+        assert connection["verified_at"] == verified_at
+
+    @pytest.mark.django_db
+    def test_failed_report_without_a_suite_record_sets_failed(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        report = probe_report(
+            probe["generation"], checks=failing_checks("interruption", "the turn was not interrupted"), suite=None
+        )
+
+        response = worker_client.post(report_url(probe["id"]), report, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        connection = agent_state(session_client, workspace)["connection"]
+        assert connection["state"] == "failed"
+        assert connection["missing_action"] == "interruption"
+        assert connection["verified_at"] is None
+
+    @pytest.mark.django_db
+    def test_report_without_the_suite_field_returns_400(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        report = probe_report(probe["generation"])
+        del report["suite"]
+
+        response = worker_client.post(report_url(probe["id"]), report, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
     def test_failed_check_sets_failed_with_the_missing_action(self, session_client, worker_client, workspace):
         probe = connect_and_claim(session_client, worker_client, workspace)
         report = probe_report(
@@ -381,7 +421,7 @@ class TestProbeReport:
     @pytest.mark.parametrize(
         "overrides",
         [
-            {"version": 2},
+            {"version": 1},
             {"generation": "one"},
             {"checks": [{"name": "teleport", "passed": True, "detail": ""}]},
             {"checks": [{"name": "progress", "passed": "yes", "detail": ""}]},
@@ -391,6 +431,13 @@ class TestProbeReport:
             {"capabilities": {"midturn_input": "maybe"}},
             {"failure_hint": "x" * 1001},
             {"blocking_issue": "something_else"},
+            # Every check passed, so the report must carry the passing suite record of this version.
+            {"suite": None},
+            {"suite": suite_record(cli_version="2.1.288")},
+            {"suite": suite_record(suite_version=0)},
+            {"suite": suite_record(ran_now="yes")},
+            {"suite": suite_record(verified_at="yesterday")},
+            {"suite": suite_record(verified_at=(timezone.now() + timedelta(hours=1)).isoformat())},
         ],
     )
     def test_malformed_report_returns_400_and_changes_nothing(

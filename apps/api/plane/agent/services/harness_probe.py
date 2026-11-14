@@ -5,7 +5,9 @@
 """Harness connection probes.
 
 Connect or Retry sets ``connecting`` and starts a new probe generation. A Worker
-claims the probe, runs it on the Mini and posts a versioned report. Plane fences
+claims the probe, runs it on the Mini and posts a versioned report. The behavior
+checks of the report come from a suite result that the Worker runs once per CLI
+version and caches; ``verified_at`` is the time of that suite. Plane fences
 the report by generation, claimant and answer deadline, and decides
 ``connected`` itself from the reported checks and models: the Worker sends
 evidence, not a verdict.
@@ -174,7 +176,8 @@ def apply_report(worker, probe_id, report):
         connection.failure_hint = report["failure_hint"]
         # Models are usable only from a verified Harness; a failed probe shows none.
         connection.reported_models = report["models"] if connected else []
-        connection.verified_at = timezone.now() if connected else None
+        # The behavior checks can come from a suite result cached on the Worker; its time is when they ran.
+        connection.verified_at = report["suite"]["verified_at"] if connected else None
         connection.save(disable_auto_set_user=True)
         if connected:
             # A model the Harness no longer reports cannot stay selected; new Runs then use the Harness default.

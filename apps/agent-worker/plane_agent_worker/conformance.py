@@ -14,7 +14,9 @@ result is stored, so a failed suite runs again at the next Connect. One lock per
 
 ``run_probe`` creates the private directories of one probe under the Run root,
 runs both parts within a time budget that ends before Plane's answer deadline,
-removes the directories and returns a report. The report is evidence only;
+removes the directories and returns a version 2 report: the checks, the models,
+the capabilities and the suite record the behavior checks come from. The report
+is evidence only;
 Plane decides whether the Harness is connected.
 """
 
@@ -38,7 +40,7 @@ from plane_agent_worker.drivers.base import (
     bounded,
 )
 
-REPORT_VERSION = 1
+REPORT_VERSION = 2
 # Plane reads a probe without a report after 120 s as failed; keep a margin for the report itself.
 PROBE_BUDGET_SECONDS = 100
 # The checks that the behavior suite proves. Authentication always comes from the current check.
@@ -311,6 +313,20 @@ def build_report(outcome):
         "capabilities": dict(outcome.capabilities),
         "failure_hint": bounded(hint, MAX_HINT_CHARS),
         "blocking_issue": outcome.blocking_issue,
+        "suite": suite_summary(outcome.suite),
+    }
+
+
+def suite_summary(suite):
+    """The passing suite record that the behavior checks come from, or ``None`` when there is none."""
+    if suite is None or suite.record is None:
+        return None
+    record = suite.record
+    return {
+        "suite_version": record["suite_version"],
+        "cli_version": record["cli_version"],
+        "verified_at": record["verified_at"],
+        "ran_now": suite.ran_now,
     }
 
 

@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,10 @@ def test_fake_claude_passes_every_check(private_dir, token_file, home):
     }
     # The boundary denies writes without asking, so no permission prompt arrives.
     assert report["capabilities"] == {"midturn_input": False, "native_resume": True, "permission_prompt": False}
+    assert report["suite"]["ran_now"] is True
+    assert report["suite"]["cli_version"] == "2.1.289"
+    assert report["suite"]["suite_version"] == SUITE_VERSION
+    assert datetime.fromisoformat(report["suite"]["verified_at"]).tzinfo is not None
 
 
 def test_every_session_runs_with_the_worker_boundary_settings(private_dir, token_file, home, monkeypatch):
@@ -210,6 +215,7 @@ def test_not_logged_in_fails_authentication_and_skips_the_rest(private_dir, toke
     assert all(not check["passed"] for check in report["checks"])
     assert report["models"] == []
     assert "not logged in" in report["failure_hint"]
+    assert report["suite"] is None
 
 
 def test_empty_model_list_fails_the_model_report(private_dir, token_file, home):
@@ -292,11 +298,12 @@ def probe_calls(private_dir):
 
 def test_second_probe_on_a_verified_version_runs_only_the_quick_check(private_dir, token_file, home):
     executable = fake_claude(private_dir)
-    probe(private_dir, token_file, home, executable)
+    first = probe(private_dir, token_file, home, executable)
     probe_calls(private_dir)
 
     report = probe(private_dir, token_file, home, executable)
 
+    assert report["suite"] == {**first["suite"], "ran_now": False}
     calls = probe_calls(private_dir)
     assert calls[:2] == [["--version"], ["auth", "status"]]
     # One more process: the model list. No suite session runs.
@@ -316,6 +323,7 @@ def test_failed_suite_runs_again_on_the_next_probe(private_dir, token_file, home
 
     assert len([args for args in probe_calls(private_dir) if "-p" in args]) == 6
     assert checks_of(report)["interruption"]["passed"] is False
+    assert report["suite"] is None
     assert not (private_dir / "runs" / "state" / "conformance.json").exists()
 
 
@@ -357,6 +365,8 @@ def test_real_claude_probe_passes_and_a_second_probe_uses_the_cached_suite(priva
         assert all(check["passed"] for check in report["checks"]), report["checks"]
         assert report["models"]
         assert report["capabilities"]["native_resume"] is True
+    assert first["suite"]["ran_now"] is True
+    assert second["suite"] == {**first["suite"], "ran_now": False}
     assert second_seconds < 10
     records = json.loads((run_root / "state" / "conformance.json").read_text())["records"]
     assert list(records) == [f"claude_code/{first['harness_version']}/{SUITE_VERSION}"]

@@ -6,8 +6,10 @@
 
 import hashlib
 import secrets
+from datetime import timedelta
 
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from plane.db.models import AgentWorker
@@ -66,10 +68,22 @@ def worker_client(agent_worker):
     return worker_client_for(token)
 
 
+def suite_record(**overrides):
+    """The suite part of a report: a passing suite result for Claude Code 2.1.289."""
+    suite = {
+        "suite_version": 1,
+        "cli_version": "2.1.289",
+        "verified_at": (timezone.now() - timedelta(minutes=1)).isoformat(),
+        "ran_now": True,
+    }
+    suite.update(overrides)
+    return suite
+
+
 def probe_report(generation, **overrides):
-    """A complete, passing version 1 probe report."""
+    """A complete, passing version 2 probe report."""
     report = {
-        "version": 1,
+        "version": 2,
         "generation": generation,
         "harness_version": "2.1.289",
         "location": "/opt/homebrew/bin/claude",
@@ -77,6 +91,7 @@ def probe_report(generation, **overrides):
         "models": REPORTED_MODELS,
         "capabilities": {"midturn_input": False, "native_resume": True, "permission_prompt": True},
         "failure_hint": "",
+        "suite": suite_record(),
     }
     report.update(overrides)
     return report

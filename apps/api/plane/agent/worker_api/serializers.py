@@ -4,6 +4,12 @@
 
 """Input validation for Worker requests. Every string and list has a bound."""
 
+# Python imports
+from datetime import timedelta
+
+# Django imports
+from django.utils import timezone
+
 # Third party imports
 from rest_framework import serializers
 
@@ -11,7 +17,9 @@ from rest_framework import serializers
 from plane.agent.services.harness_probe import BLOCKING_ISSUES, CAPABILITY_FLAGS, REQUIRED_CHECKS
 from plane.db.models import AgentHarness
 
-REPORT_VERSION = 1
+REPORT_VERSION = 2
+# The Worker and Plane run on one host; a suite time later than this after now is not a real time.
+MAX_CLOCK_SKEW = timedelta(minutes=5)
 MAX_MODELS = 50
 # Model IDs go to the Harness command line, so only a safe character set is accepted.
 MODEL_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$"
@@ -67,6 +75,26 @@ class ProbeCapabilitiesSerializer(serializers.Serializer):
         return flags
 
 
+class SuiteRecordSerializer(serializers.Serializer):
+    """The passing behavior-suite result that the checks of the report come from."""
+
+    suite_version = serializers.IntegerField(min_value=1)
+    cli_version = serializers.CharField(max_length=64)
+    verified_at = serializers.DateTimeField()
+    ran_now = serializers.BooleanField()
+
+    def to_internal_value(self, data):
+        # A string such as "yes" must not pass as a boolean.
+        if isinstance(data, dict) and not isinstance(data.get("ran_now"), bool):
+            raise serializers.ValidationError({"ran_now": "Must be a boolean."})
+        return super().to_internal_value(data)
+
+    def validate_verified_at(self, value):
+        if value > timezone.now() + MAX_CLOCK_SKEW:
+            raise serializers.ValidationError("The suite time is in the future.")
+        return value
+
+
 class ProbeReportSerializer(serializers.Serializer):
     version = serializers.IntegerField()
     generation = serializers.IntegerField(min_value=1)
@@ -77,6 +105,8 @@ class ProbeReportSerializer(serializers.Serializer):
     capabilities = ProbeCapabilitiesSerializer()
     failure_hint = serializers.CharField(max_length=1000, allow_blank=True, required=False, default="")
     blocking_issue = serializers.ChoiceField(choices=BLOCKING_ISSUES, required=False, allow_null=True, default=None)
+    # Required, and null only when no passing suite result exists for this version.
+    suite = SuiteRecordSerializer(allow_null=True)
 
     def validate_version(self, value):
         if value != REPORT_VERSION:
@@ -94,3 +124,12 @@ class ProbeReportSerializer(serializers.Serializer):
         if len(ids) != len(set(ids)):
             raise serializers.ValidationError("Each model can appear once.")
         return models
+
+    def validate(self, attrs):
+        suite = attrs["suite"]
+        if suite is not None and suite["cli_version"] != attrs["harness_version"]:
+            raise serializers.ValidationError({"suite": "The suite result is for another CLI version."})
+        passed = {check["name"] for check in attrs["checks"] if check["passed"]}
+        if suite is None and passed >= set(REQUIRED_CHECKS):
+            raise serializers.ValidationError({"suite": "Passing checks need the passing suite result."})
+        return attrs
