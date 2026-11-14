@@ -9,6 +9,8 @@ dependencies: [5]
 
 # Phase 6: Codex, Grok and Omp Harnesses
 
+> **2026-11-14, decision Q25:** Grok is dropped. Stories 2.23 and 2.24 and every Grok driver, fake, transcript, profile and test in this file are out of scope. Build only Codex (2.21, 2.22) and Omp (2.25, 2.26). Effort about 7d.
+
 ## Goal
 
 Codex CLI, Grok CLI and Omp each pass the AD-4 connection check and run read-only Q&A Runs with follow-up, queue, Send now, Stop and resume through their own verified control paths. One PR, one commit per story 2.21-2.26.

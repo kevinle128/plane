@@ -38,15 +38,15 @@ Rebuild the Git provider connection (GitHub and self-hosted GitLab), four local 
 
 ## Phases
 
-| #   | Phase                                                                                                                | Stories                | Depends on | Effort | Status  |
-| --- | -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------- | ------ | ------- |
-| 1   | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5) | none       | 11d    | Pending |
-| 2   | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md)                           | 2.1-2.6 (6)            | 1          | 8d     | Pending |
-| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)            | 1, 2       | 9d     | Pending |
-| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)           | 3          | 6d     | Pending |
-| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)          | 4          | 7.5d   | Pending |
-| 6   | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md)                                          | 2.21-2.26 (6)          | 5          | 9d     | Pending |
-| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2) | 1, 5, 6    | 10d    | Pending |
+| #   | Phase                                                                                                                | Stories                    | Depends on | Effort | Status  |
+| --- | -------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------- | ------ | ------- |
+| 1   | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5)     | none       | 11d    | Pending |
+| 2   | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md)                           | 2.1-2.6 (6)                | 1          | 8d     | Pending |
+| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)                | 1, 2       | 9d     | Pending |
+| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)               | 3          | 6d     | Pending |
+| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)              | 4          | 7.5d   | Pending |
+| 6   | [Codex and Omp Harnesses (Grok dropped, Q25)](./phase-06-codex-grok-and-omp-harnesses.md)                            | 2.21, 2.22, 2.25, 2.26 (4) | 5          | 7d     | Pending |
+| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2)     | 1, 5, 6    | 10d    | Pending |
 
 Effort (re-estimated 2026-11-14 after decisions Q17-Q24): 11d + 8d + 9d + 6d + 7.5d + 9d + 10d = 60.5d (was 67d).
 
@@ -130,6 +130,8 @@ Source: [reports/research-multica-agent-integration.md](./reports/research-multi
 Also from the research (F7, information only): Multica runs Grok through ACP (`grok agent stdio`), while the PRD says "No ACP". Phase 6 lists "re-check the Grok route before Phase 6" as a risk. No decision changes.
 
 The red-team gate has not run on the Q17-Q24 changes. Recommended before Phase 3 starts: a focused pass on the Q18 cache, the Q22 Code-mode boundary and the Q23 Codex read isolation.
+
+25. Q25, Grok dropped (user, 2026-11-14): the Grok Harness is out of scope. Stories 2.23 (connect Grok CLI) and 2.24 (ask and converse with Grok) are removed. The Integrations page shows three Harnesses: Claude Code, Codex and Omp. Grok is removed from the mention list, the Harness cards, the Worker drivers, Phase 6 and the Phase 7 Code mode. Where Q1, Q18, Q22 and Q23 name Grok, read them without Grok. The research note about the Grok ACP route no longer applies. Spec effect: epics.md stories 2.23 and 2.24 removed; design handoff rows and scenes that show `@Grok` are not built. Phase 6 effort drops by about 2d.
 
 ### Open questions from these decisions
 
