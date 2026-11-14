@@ -109,7 +109,7 @@ Then the Worker passes `-e ANTHROPIC_BASE_URL=<gateway-url>` and the placeholder
 | Phase | Change | Estimate |
 | --- | --- | --- |
 | 2 (done or in review) | Boundary code becomes dead code after the switch. | -0 now; removal goes with Phase 3 |
-| 3 | +0.5d: Worker-side credential source (gateway URL and token). +2d: sandbox manager (create, ensure-running, exec spawn, pidfile, policy, cleanup), sbx install and sign-in check in the connection probe. -1.5d: no boundary proof. | +0.5d |
+| 3 | +0.5d: Worker-side credential source (gateway URL and token). +2d: sandbox manager (create, ensure-running, exec spawn, pidfile, policy, cleanup), sbx install and sign-in check in the connection probe. -1.5d: no boundary proof. | +1d |
 | 4 | Read-only repository mount and scratch primary per sandbox. | +0.5d |
 | 5 | Stop through `interrupt` and pidfile kill; stale recovery must find orphan processes in the VM. | +1d |
 | 6 | Codex and Omp can use the same sandboxes (`sbx` has a Codex agent; Omp needs a shell sandbox or a custom template). Q1 outer profile and Q23 proofs may drop. | -1d to +1d (needs its own check) |
