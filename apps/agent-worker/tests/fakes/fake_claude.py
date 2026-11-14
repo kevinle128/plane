@@ -26,6 +26,10 @@ writes to it. Without that configuration, the write succeeds.
   denial (the deny rule is not in force).
 - ``midturn_replay``: a user message sent during a turn is replayed at once,
   like a CLI that takes input during a turn.
+- ``init_after_eof``: ``initialize`` is answered only after stdin closes.
+- ``no_initialize_at_connect``: ``initialize`` gets no answer in a Connect
+  probe folder; the suite folder (``probes/suite-*``) gets the normal answer.
+- ``no_initialize``: ``initialize`` never gets an answer.
 
 ``FAKE_CLAUDE_ARGV_LOG``, when set, names a file that gets one JSON line with
 the arguments of each call. ``FAKE_CLAUDE_MIDTURN_LOG``, when set, names a file
@@ -340,6 +344,10 @@ class FakeClaude:
         self.assistant("400")
         self.result("400")
 
+    def initialize_unanswered(self):
+        in_suite = "/probes/suite-" in os.path.realpath(self.session.cwd)
+        return SCENARIO == "no_initialize" or (SCENARIO == "no_initialize_at_connect" and not in_suite)
+
     def run(self):
         lost = SCENARIO == "crash_not_resumable" and self.session.crash_marker.exists()
         if "--resume" in self.args and (not self.session.exists() or lost):
@@ -352,11 +360,18 @@ class FakeClaude:
                 return 0
             kind = message.get("type")
             if kind == "control_request" and (message.get("request") or {}).get("subtype") == "initialize":
+                if self.initialize_unanswered():
+                    continue
+                if SCENARIO == "init_after_eof":
+                    while self.inbox.get() is not None:
+                        pass
                 response = copy.deepcopy(INIT_RESPONSE)
                 response["response"]["request_id"] = message.get("request_id")
                 if SCENARIO == "no_models":
                     response["response"]["response"]["models"] = []
                 emit(response)
+                if SCENARIO == "init_after_eof":
+                    return 0
             elif kind == "user":
                 self.turn(message)
 

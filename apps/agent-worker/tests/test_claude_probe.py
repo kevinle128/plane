@@ -92,7 +92,9 @@ def test_fake_claude_passes_every_check(private_dir, token_file, home):
         "id": "haiku",
         "label": "Haiku",
         "description": "Haiku 4.5 · Fastest for quick answers · $1/$5 per Mtok",
+        "source": "reported",
     }
+    assert {model["source"] for model in report["models"]} == {"reported"}
     # The boundary denies writes without asking, so no permission prompt arrives.
     assert report["capabilities"] == {"midturn_input": False, "native_resume": True, "permission_prompt": False}
     assert report["suite"]["ran_now"] is True
@@ -240,6 +242,46 @@ def test_empty_model_list_fails_the_model_report(private_dir, token_file, home):
 
     assert checks_of(report)["model_report"]["passed"] is False
     assert report["models"] == []
+
+
+FALLBACK_IDS = ["opus", "sonnet", "haiku"]
+
+
+def test_model_list_request_is_one_shot(private_dir, token_file, home):
+    # The CLI answers only after stdin closes, so the request must not wait with stdin open.
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="init_after_eof"))
+
+    assert checks_of(report)["model_report"]["passed"] is True
+    assert {model["source"] for model in report["models"]} == {"reported"}
+
+
+def test_failed_model_request_at_connect_gives_the_fallback_list_and_the_suite_result(private_dir, token_file, home):
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="no_initialize_at_connect"))
+
+    assert [model["id"] for model in report["models"]] == FALLBACK_IDS
+    assert {model["source"] for model in report["models"]} == {"fallback"}
+    assert all(check["passed"] for check in report["checks"]), report["checks"]
+    assert report["suite"]["ran_now"] is True
+
+
+def test_failed_model_request_on_a_verified_version_uses_the_cached_model_report(private_dir, token_file, home):
+    probe(private_dir, token_file, home, fake_claude(private_dir))
+
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="no_initialize"))
+
+    assert [model["id"] for model in report["models"]] == FALLBACK_IDS
+    assert checks_of(report)["model_report"]["passed"] is True
+    assert report["suite"]["ran_now"] is False
+
+
+def test_suite_without_a_real_model_report_fails_the_model_report(private_dir, token_file, home):
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="no_initialize"))
+
+    check = checks_of(report)["model_report"]
+    assert check["passed"] is False
+    assert "model" in check["detail"]
+    assert report["suite"] is None
+    assert not (private_dir / "runs" / "state" / "conformance.json").exists()
 
 
 def test_lost_session_fails_follow_up_and_recovery(private_dir, token_file, home):

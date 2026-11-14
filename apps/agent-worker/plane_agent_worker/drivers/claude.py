@@ -12,8 +12,11 @@ a probe. Permission prompts come to the Worker over stdio
 (``--permission-prompt-tool stdio``) and the Worker denies them; the boundary
 denies writes without a prompt, so a prompt for a write means a rule is missing.
 
-Quick check (each Connect): ``--version``, ``auth status`` (JSON) and a metadata
-session where ``initialize`` returns the model list. No prompt is sent.
+Quick check (each Connect): ``--version``, ``auth status`` (JSON) and one
+``initialize`` request in a one-shot process (stdin closes after the request)
+that returns the model list. No prompt is sent. When that request fails, the
+Connect reports the CLI aliases ``opus``, ``sonnet`` and ``haiku`` with source
+``fallback``; its model report check then comes from the suite.
 
 Behavior suite (once per CLI version, see ``conformance.ensure_verified``;
 verified with Claude Code 2.1.289):
@@ -64,6 +67,13 @@ SUPPORTED_MAJOR_VERSION = 2
 VERSION_PATTERN = re.compile(r"^\s*(\d+)\.(\d+)\.(\d+)")
 MODEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$")
 MAX_MODELS = 50
+# Shown at Connect only when the model list request fails; the suite always needs a real report.
+# They are CLI aliases, so the list does not age when new models come out.
+FALLBACK_MODELS = tuple(
+    {"id": model_id, "label": label, "description": "", "source": "fallback"}
+    for model_id, label in (("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku"))
+)
+MODEL_REQUEST_FAILED = "the CLI did not answer the model list request"
 MAX_LINE_CHARS = 2_000_000
 COMMAND_TIMEOUT_SECONDS = 20
 TURN_TIMEOUT_SECONDS = 45
@@ -159,6 +169,7 @@ def parse_models(raw_models):
                 "id": model_id,
                 "label": bounded(item.get("displayName") or model_id, 128),
                 "description": bounded(item.get("description") or "", 300),
+                "source": "reported",
             }
         )
         if len(models) == MAX_MODELS:
@@ -245,6 +256,13 @@ class StreamSession:
                 "uuid": message_uuid or str(uuid.uuid4()),
             }
         )
+
+    def close_input(self):
+        """End stdin; the CLI answers the requests it already has, then exits."""
+        try:
+            self.process.stdin.close()
+        except OSError:
+            pass
 
     def kill(self):
         """Kill the whole group at once, as a crash would."""
@@ -475,7 +493,7 @@ class ClaudeDriver:
                 and self._check_version(context, outcome)
                 and self._check_authentication(context, outcome)
             ):
-                self._discover_models(context, outcome)
+                self._discover_models(context, outcome, allow_fallback=True)
         return outcome
 
     def run_suite(self, workspace, deadline):
@@ -528,24 +546,41 @@ class ClaudeDriver:
                 other.set(False, "not run: authentication failed")
         return False
 
-    def _discover_models(self, context, outcome):
+    def _request_models(self, context):
+        """One ``initialize`` request in a one-shot process. Returns the parsed models, or ``None`` on failure."""
         session = self._session(context, "models")
         try:
             session.send({"type": "control_request", "request_id": "plane-init", "request": {"subtype": "initialize"}})
+            session.close_input()
             step = context["deadline"].within(COMMAND_TIMEOUT_SECONDS)
             while True:
-                message = session.next_message(step)
+                try:
+                    message = session.next_message(step)
+                except ProbeTimeout:
+                    if context["deadline"].expired:
+                        raise
+                    return None
                 if message is None:
-                    break
-                if message.get("type") == "control_response":
-                    response = message.get("response") or {}
-                    if response.get("request_id") == "plane-init":
-                        outcome.models = parse_models((response.get("response") or {}).get("models"))
-                        break
+                    return None
+                response = message.get("response") or {}
+                if message.get("type") == "control_response" and response.get("request_id") == "plane-init":
+                    if response.get("subtype") != "success":
+                        return None
+                    return parse_models((response.get("response") or {}).get("models"))
         finally:
             session.close()
+
+    def _discover_models(self, context, outcome, allow_fallback=False):
+        models = self._request_models(context)
         check = outcome.checks["model_report"]
-        check.set(bool(outcome.models), "" if outcome.models else "the CLI reported no usable model")
+        if models is None:
+            check.set(False, MODEL_REQUEST_FAILED)
+            if allow_fallback:
+                outcome.models = [dict(model) for model in FALLBACK_MODELS]
+                outcome.models_from_fallback = True
+            return
+        outcome.models = models
+        check.set(bool(models), "" if models else "the CLI reported no usable model")
 
     def _probe_model_args(self, outcome):
         ids = [model["id"] for model in outcome.models]

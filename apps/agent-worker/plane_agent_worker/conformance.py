@@ -286,11 +286,16 @@ def apply_suite(outcome, suite):
 
     The model report needs the model list of this Connect and, when the suite ran now, the suite's
     own model report too, so a report with every check passed always has a passing suite record.
+    When this Connect fell back to the static model list, the model report is the suite's: a real
+    report of the same CLI version.
     """
     for name, check in suite.checks.items():
         if name == "model_report":
-            if outcome.checks[name].passed and not check.passed:
-                outcome.checks[name].set(False, f"suite: {check.detail}")
+            own = outcome.checks[name]
+            if outcome.models_from_fallback:
+                own.set(check.passed, f"suite: {check.detail}" if check.detail else "")
+            elif own.passed and not check.passed:
+                own.set(False, f"suite: {check.detail}")
             continue
         outcome.checks[name] = check
     outcome.capabilities = dict(suite.capabilities)

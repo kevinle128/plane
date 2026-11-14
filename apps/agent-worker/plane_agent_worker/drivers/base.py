@@ -60,6 +60,8 @@ class ProbeOutcome:
     capabilities: dict = field(default_factory=lambda: dict.fromkeys(CAPABILITY_FLAGS, False))
     failure_hint: str = ""
     blocking_issue: str | None = None
+    # True when the model list request failed and ``models`` is the static fallback list.
+    models_from_fallback: bool = False
     # The suite result applied to this outcome (``conformance.SuiteResult``), if the suite was consulted.
     suite: object = None
 
