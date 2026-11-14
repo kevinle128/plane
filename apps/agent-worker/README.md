@@ -79,10 +79,43 @@ permission enforcement and recovery after a crash. Permission enforcement needs
 both denials: a Write in the working directory denied by the permission rule
 (no approval prompt), and a Bash write there denied by the built-in sandbox.
 
-The probe budget is 100 seconds or the time left before Plane's answer
-deadline, whichever is shorter. While a probe runs, the Worker asks Plane every
-5 seconds whether the probe is still current; it stops a probe that a new
-Connect or a Disconnect replaced, and does not report it.
+Each Connect or Retry runs a quick check: the CLI is found, `claude --version`,
+`claude auth status` and the model list (about 2 to 5 seconds). The other checks
+come from the behavior suite, which runs once for each Claude Code version (about
+25 to 35 seconds) and gives the report its `suite` record. The probe budget is
+100 seconds or the time left before Plane's answer deadline, whichever is
+shorter. While a probe runs, the Worker asks Plane every 5 seconds whether the
+probe is still current; it stops a probe that a new Connect or a Disconnect
+replaced, and does not report it.
+
+### Behavior suite cache
+
+- File: `<run root>/state/conformance.json`, mode `0600`, in a `0700` folder.
+  Only the Worker writes it; Harness commands cannot read the Run root.
+- Key: Harness, CLI version and suite version (`SUITE_VERSION` in the driver).
+  The Worker stores only a suite that passed. A failed suite is not stored, so
+  the next Connect or Retry runs it again.
+- A new CLI version (for example after a Claude Code auto-update) has no record,
+  so the next Connect runs the suite. One suite runs at a time for each Harness
+  and version; other callers wait for its result.
+- To force the suite on the installed version, stop the Worker, delete the file,
+  start the Worker, then select Retry:
+
+  ```bash
+  rm "$PLANE_AGENT_WORKER_RUN_ROOT/state/conformance.json"
+  ```
+
+  Do this when you think the CLI behavior changed without a version change.
+
+## Deployment assumption: trusted network only
+
+The Worker has no workspace allowlist, and Plane does not limit how often
+Connect or Retry runs. Any workspace admin of the instance can make the Worker
+use the Claude Code login of the Mini. This is accepted only while the instance
+is reachable through Tailscale, so only trusted people can sign up and create
+workspaces. Before the instance is exposed outside Tailscale, add an instance
+workspace allowlist that Connect and the probe claim both check, and a Connect
+limit for each workspace.
 
 ## Tests
 
