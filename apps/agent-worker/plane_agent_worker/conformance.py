@@ -397,6 +397,7 @@ RECORDING_DROP_KEYS = frozenset(
         "signature",
         "skills",
         "slash_commands",
+        "tools",
         "total_cost_usd",
         "usage",
         "user_output_styles_dir",

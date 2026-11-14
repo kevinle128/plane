@@ -4,13 +4,18 @@
 
 """Claude Code driver: connection probe over the stream-JSON control protocol.
 
-Every Claude process runs with the Worker boundary settings (see
-``claude_boundary``: built-in sandbox for Bash, permission deny rules for the
-file tools), safe mode, restricted mode, strict MCP settings and no setting
-sources, so user hooks, plugins, settings files and MCP servers do not run inside
-a probe. Permission prompts come to the Worker over stdio
-(``--permission-prompt-tool stdio``) and the Worker denies them; the boundary
-denies writes without a prompt, so a prompt for a write means a rule is missing.
+Claude runs as it is installed on the Mini: it reads its own settings (for
+example the login, an API key or a gateway in ``~/.claude/settings.json``) and
+loads the user's hooks and MCP servers. The Worker adds its boundary settings
+with ``--settings`` (see ``claude_boundary``: built-in sandbox for Bash,
+bare-name deny rules that remove the file tools). That file ranks above the
+user, project and local settings, and deny rules win over allow rules from any
+scope. The credential scrub keeps credentials out of the processes Claude
+starts. Permission prompts come to the Worker over stdio
+(``--permission-prompt-tool stdio``). The Worker denies them, except a prompt
+for the Bash write in the permission check: Claude Code 2.1.289 asks before a
+write to a path the sandbox denies, and the allowed command still runs in the
+sandbox, which must deny the write.
 
 Quick check (each Connect): ``--version``, ``auth status`` (JSON) and one
 ``initialize`` request in a one-shot process (stdin closes after the request)
@@ -21,9 +26,10 @@ Connect reports the CLI aliases ``opus``, ``sonnet`` and ``haiku`` with source
 Behavior suite (once per CLI version, see ``conformance.ensure_verified``;
 verified with Claude Code 2.1.289):
 1. ``--version`` and the model list again, so the result belongs to one version.
-2. Session A: a turn with partial-message events (progress); a Write in the
-   working directory that a permission rule must deny, and a Bash write there
-   that the built-in sandbox must deny (permission); and a long turn that
+2. Session A: a turn with partial-message events (progress), whose ``init``
+   message must not list Write, Edit or NotebookEdit although ``--tools`` asks
+   for Write, and a Bash write in the working directory that the built-in
+   sandbox must deny (permission); and a long turn that
    receives ``interrupt``, then a next turn in the same process (interruption).
    The driver reports ``midturn_input`` as False and does not measure it: Send
    now for Claude stops the turn and sends the message as the next turn.
@@ -62,7 +68,7 @@ HARNESS = "claude_code"
 # The version of the behavior suite. A passing suite result is cached per (Harness, CLI version,
 # suite version). Change it when the checks, the session flags or the boundary change; a unit test
 # pins ``suite_fingerprint()`` for each version.
-SUITE_VERSION = 1
+SUITE_VERSION = 2
 SUPPORTED_MAJOR_VERSION = 2
 VERSION_PATTERN = re.compile(r"^\s*(\d+)\.(\d+)\.(\d+)")
 MODEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$")
@@ -91,12 +97,7 @@ SESSION_FLAGS = (
     "--verbose",
     "--include-partial-messages",
     "--replay-user-messages",
-    "--safe-mode",
-    "--restricted",
-    "--strict-mcp-config",
     "--disable-slash-commands",
-    "--setting-sources",
-    "",
     "--permission-prompt-tool",
     "stdio",
 )
@@ -119,15 +120,20 @@ ENV_ALLOWLIST = (
     "CLAUDE_CONFIG_DIR",
 )
 
-WRITE_PROBE_FILE = "plane-permission-probe.txt"
 BASH_PROBE_FILE = "plane-sandbox-probe.txt"
 FILE_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
 SANDBOX_DENIAL = "operation not permitted"
 COUNT_PROMPT = "Count from 1 to 400, one number per line, with no other text."
 
 
+# Set for every Claude process. The scrub removes credentials from the environment of the processes
+# Claude starts (Bash commands, hooks, MCP servers); Claude keeps them for its own API calls.
+FIXED_ENV = {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
+
+
 def harness_env(base_env, tmp):
     env = {name: base_env[name] for name in ENV_ALLOWLIST if base_env.get(name)}
+    env.update(FIXED_ENV)
     env["TMPDIR"] = f"{tmp}/"
     # Claude Code keeps its own temporary files under this directory instead of the shared /tmp.
     env["CLAUDE_CODE_TMPDIR"] = str(tmp)
@@ -293,6 +299,8 @@ class Turn:
         self.tool_uses = {}
         self.tool_results = {}
         self.ended = False
+        # The tools that the ``init`` message of this turn lists; ``None`` when no ``init`` arrived.
+        self.tools = None
 
     @property
     def succeeded(self):
@@ -332,8 +340,11 @@ def _result_text(content):
     return ""
 
 
-def read_turn(session, deadline, on_message=None):
-    """Read messages until a ``result`` message. Permission prompts are denied unless ``on_message`` answers."""
+def read_turn(session, deadline, on_message=None, allow_tools=frozenset()):
+    """Read messages until a ``result`` message.
+
+    A permission prompt is allowed for a tool in ``allow_tools`` and denied for every other tool.
+    """
     turn = Turn()
     while True:
         message = session.next_message(deadline)
@@ -341,7 +352,9 @@ def read_turn(session, deadline, on_message=None):
             turn.ended = True
             return turn
         kind = message.get("type")
-        if kind == "stream_event":
+        if kind == "system" and message.get("subtype") == "init" and isinstance(message.get("tools"), list):
+            turn.tools = [tool for tool in message["tools"] if isinstance(tool, str)]
+        elif kind == "stream_event":
             turn.stream_events += 1
         elif kind == "user" and message.get("isReplay"):
             turn.replayed.append(message.get("uuid"))
@@ -360,14 +373,14 @@ def read_turn(session, deadline, on_message=None):
             request = message.get("request") or {}
             if request.get("subtype") == "can_use_tool":
                 turn.permission_prompts.append(request)
+                if request.get("tool_name") in allow_tools:
+                    answer = {"behavior": "allow", "updatedInput": request.get("input") or {}}
+                else:
+                    answer = {"behavior": "deny", "message": "Plane denies this action in a probe."}
                 session.send(
                     {
                         "type": "control_response",
-                        "response": {
-                            "subtype": "success",
-                            "request_id": message.get("request_id"),
-                            "response": {"behavior": "deny", "message": "Plane denies this action in a probe."},
-                        },
+                        "response": {"subtype": "success", "request_id": message.get("request_id"), "response": answer},
                     }
                 )
         if on_message:
@@ -378,7 +391,7 @@ def read_turn(session, deadline, on_message=None):
 
 
 def suite_fingerprint():
-    """A hash of what the behavior suite proves: the checks, the session flags and the boundary.
+    """A hash of what the behavior suite proves: the checks, the session flags, the environment and the boundary.
 
     The boundary settings are built for fixed paths that do not exist, so the hash is the same
     on every host.
@@ -396,6 +409,7 @@ def suite_fingerprint():
     document = {
         "checks": list(REQUIRED_CHECKS),
         "session_flags": list(SESSION_FLAGS),
+        "environment": {"allowlist": list(ENV_ALLOWLIST), "fixed": FIXED_ENV},
         "boundary": boundary_settings(workspace, root / "home" / ".claude", root / "home"),
     }
     return hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
@@ -602,6 +616,7 @@ class ClaudeDriver:
 
     def _session_a(self, context, outcome, workspace, code_word, model_args):
         deadline = context["deadline"]
+        # Write is asked for, so the check proves that the deny rule removes it.
         session = self._session(context, "session-a", ("--tools", "Bash,Write", *model_args))
         session_id = None
         prompted = False
@@ -616,19 +631,16 @@ class ClaudeDriver:
             if turn.result:
                 session_id = turn.result.get("session_id")
 
-            # Permission: a permission rule denies the file tool and the sandbox denies the Bash write.
-            session.send_user(
-                f"Use the Write tool to create the file {WRITE_PROBE_FILE} in the current directory "
-                "with the content probe. Do not ask questions."
-            )
-            file_turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS))
+            # Permission: the deny rules remove the file tools, and the sandbox denies the Bash write.
             session.send_user(
                 f"Use the Bash tool to run this command: echo probe > {BASH_PROBE_FILE}\n"
                 "Run it once, exactly as written. Do not ask questions."
             )
-            bash_turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS))
-            prompted = bool(file_turn.permission_prompts or bash_turn.permission_prompts)
-            problem = file_tool_problem(file_turn, workspace.cwd) or bash_write_problem(bash_turn, workspace.cwd)
+            # Claude Code asks before a write to a path that the sandbox denies. The Worker allows that
+            # Bash call: the command still runs in the sandbox, which must deny the write.
+            bash_turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS), allow_tools=frozenset({"Bash"}))
+            prompted = bool(bash_turn.permission_prompts)
+            problem = file_tools_problem(turn) or bash_write_problem(bash_turn, workspace.cwd)
             outcome.checks["permission"].set(problem is None, problem or "")
 
             self._check_interruption(session, outcome, deadline)
@@ -721,24 +733,18 @@ class ClaudeDriver:
         outcome.checks["recovery"].set(recovered, "" if recovered else "the session did not resume after a crash")
 
 
-def file_tool_problem(turn, cwd):
-    """Why the file-tool write was not proven denied by a permission rule, or ``None`` when it was."""
-    if turn.prompted_for(FILE_TOOLS):
-        return "Write asked for approval instead of being denied by a permission rule"
-    tool_ids = turn.tool_ids(FILE_TOOLS)
-    if not tool_ids:
-        return "Write was not attempted, so the permission rule was not proven"
-    if not all(tool_id in turn.denied_tool_ids for tool_id in tool_ids):
-        return "Write was not denied by a permission rule"
-    if (Path(cwd) / WRITE_PROBE_FILE).exists():
-        return "Write created the file although a permission rule denied it"
+def file_tools_problem(turn):
+    """Why the file tools were not proven removed by the deny rules, or ``None`` when they were."""
+    if turn.tools is None:
+        return "The CLI did not list its tools, so the file tools were not proven denied"
+    offered = sorted(FILE_TOOLS & set(turn.tools))
+    if offered:
+        return f"{', '.join(offered)} was offered although a permission rule denies it"
     return None
 
 
 def bash_write_problem(turn, cwd):
     """Why the Bash write was not proven denied by the built-in sandbox, or ``None`` when it was."""
-    if turn.prompted_for({"Bash"}):
-        return "Bash asked for approval, so the command did not run in the sandbox"
     tool_ids = turn.tool_ids({"Bash"})
     if not tool_ids:
         return "Bash was not attempted, so the sandbox was not proven"

@@ -31,14 +31,15 @@ installed CLIs and their macOS sandboxes.
    uv run python -m plane_agent_worker run
    ```
 
-| Variable                            | Required | Rule                                                                                       |
-| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| `PLANE_AGENT_WORKER_API_ORIGIN`     | yes      | `http` or `https` origin on `localhost`, `127.0.0.1` or `[::1]`, without path or user info |
-| `PLANE_AGENT_WORKER_TOKEN_FILE`     | yes      | Absolute path, regular file, mode `0600`, owned by the Worker user, outside the Run root   |
-| `PLANE_AGENT_WORKER_RUN_ROOT`       | yes      | Absolute path, mode `0700`, outside the Plane checkout                                     |
-| `PLANE_AGENT_WORKER_PLANE_CHECKOUT` | no       | The Plane checkout; found automatically when the Worker runs from it                       |
-| `PLANE_AGENT_WORKER_CLAUDE_BIN`     | no       | Path of the `claude` command; default is `claude` on `PATH`                                |
-| `PLANE_AGENT_WORKER_POLL_SECONDS`   | no       | Poll interval, 1 to 60 seconds (default 2)                                                 |
+| Variable                            | Required | Rule                                                                                                  |
+| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `HOME`                              | yes      | The Worker user's home directory (absolute, existing); Claude Code reads its login and settings there |
+| `PLANE_AGENT_WORKER_API_ORIGIN`     | yes      | `http` or `https` origin on `localhost`, `127.0.0.1` or `[::1]`, without path or user info            |
+| `PLANE_AGENT_WORKER_TOKEN_FILE`     | yes      | Absolute path, regular file, mode `0600`, owned by the Worker user, outside the Run root              |
+| `PLANE_AGENT_WORKER_RUN_ROOT`       | yes      | Absolute path, mode `0700`, outside the Plane checkout                                                |
+| `PLANE_AGENT_WORKER_PLANE_CHECKOUT` | no       | The Plane checkout; found automatically when the Worker runs from it                                  |
+| `PLANE_AGENT_WORKER_CLAUDE_BIN`     | no       | Path of the `claude` command; default is `claude` on `PATH`                                           |
+| `PLANE_AGENT_WORKER_POLL_SECONDS`   | no       | Poll interval, 1 to 60 seconds (default 2)                                                            |
 
 Keep the Run root path short (under about 150 characters): Claude Code names its
 session directory after the working directory, and it shortens long names.
@@ -49,22 +50,36 @@ session directory after the working directory, and it shortens long names.
 - The client follows no redirect and uses no proxy.
 - Harness processes get an allowlisted environment (no Worker variables, no
   outer agent session variables) and a private temporary directory.
-- Claude Code (user decision Q16) runs with its built-in sandbox and permission
-  rules, from a settings file that the Worker writes next to the working
-  directory (`claude-settings.json`, mode `0600`) and passes with `--settings`
-  and `--setting-sources ""`, so the user's own `~/.claude` settings cannot
-  widen it. See `plane_agent_worker/drivers/claude_boundary.py`:
+- The Worker runs `claude` as it is installed on the Mini: Claude reads its own
+  setting sources, so the login, an API key or a gateway in
+  `~/.claude/settings.json` work without any Worker configuration, and the
+  user's hooks and MCP servers load. The Worker needs no separate Claude token.
+- Claude Code runs with its built-in sandbox and permission rules, from a
+  settings file that the Worker writes next to the working directory
+  (`claude-settings.json`, mode `0600`) and passes with `--settings`. That file
+  ranks above the user, project and local settings files, and a deny rule wins
+  over an allow rule from any scope. See
+  `plane_agent_worker/drivers/claude_boundary.py`:
   - Bash runs in the sandbox, which must start and cannot be bypassed. It cannot
     write in the working directory or elsewhere on the Host (the one exception
     is Claude Code's per-user temporary directory, which the Bash tool needs),
     and cannot read other Runs, the token file, the Plane checkout, the Claude
     configuration directory (sessions, credentials) or the usual credential stores.
-  - Edit, Write and NotebookEdit are denied by a permission rule; Read and the
-    other file tools work only inside the working directory (`--restricted`).
-  - Hooks, MCP servers, plugins and slash commands are off.
+  - Bare-name deny rules remove Edit, Write and NotebookEdit, so a user allow
+    rule cannot bring them back. Read works only inside the working directory.
+  - `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` removes credentials from the
+    environment of the processes Claude starts (Bash, hooks, MCP servers);
+    Claude keeps them for its own API calls.
   - The `claude` process itself is outside the sandbox, so it keeps its session
     history and `--resume` works. It can also create a `.claude` folder in the
     working directory for its own records.
+- Not closed by the Worker: settings lists merge across scopes, and only managed
+  settings can lock them. A user `sandbox.filesystem.allowRead` entry re-opens a
+  narrower part of a denied read path, and user `sandbox.excludedCommands` run
+  outside the sandbox. Do not add such entries on the Mini.
+- The Mini needs no managed Claude policy. After any change to a managed policy
+  or to the Claude settings that affect the sandbox or permissions, delete the
+  suite cache (below) so the next Connect runs the suite again.
 - Each Harness process group is recorded under `<run root>/.processes`, with the
   Claude session folder of the probe. At start the Worker stops the groups a
   previous Worker left behind, removes those session folders and removes every

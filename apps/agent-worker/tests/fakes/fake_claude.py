@@ -7,10 +7,12 @@
 It answers with message shapes taken from the recorded transcripts in
 ``tests/transcripts/claude`` and keeps a session file under
 ``$HOME/.claude/projects/<working directory name>`` so ``--resume`` works as in
-the real CLI. Like the real CLI, it applies the boundary in the ``--settings``
-file: a Write in the working directory is denied when an ``Edit`` deny rule
-covers it, and a Bash write there fails when the sandbox is on and denies
-writes to it. Without that configuration, the write succeeds.
+the real CLI. Like the real CLI, it reads the user settings file
+(``$HOME/.claude/settings.json``) unless ``--setting-sources`` leaves it out,
+puts the ``--settings`` file on top (lists merge, other keys take the
+``--settings`` value), removes the tools that a bare-name deny rule names from
+the ``--tools`` list in its ``init`` message, and fails a Bash write in the
+working directory when the sandbox is on and denies writes there.
 ``FAKE_CLAUDE_SCENARIO`` selects a failure:
 
 - ``ok``: every probe step behaves like Claude Code 2.1.289.
@@ -20,10 +22,14 @@ writes to it. Without that configuration, the write succeeds.
 - ``no_interrupt``: an ``interrupt`` request is ignored and the turn completes.
 - ``crash_not_resumable``: a resumed session that is killed during a turn
   cannot be resumed again.
-- ``writes_despite_denial``: the tool named by ``FAKE_CLAUDE_WRITE_TOOL``
-  (``Write`` or ``Bash``) writes the file although the boundary denies it.
-- ``prompts_for_write``: a Write raises a permission prompt instead of a rule
-  denial (the deny rule is not in force).
+- ``writes_despite_denial``: with ``FAKE_CLAUDE_WRITE_TOOL=Write`` the Write
+  tool stays offered although a deny rule names it; with ``Bash`` the Bash
+  write succeeds although the sandbox denies it.
+- ``prompts_for_bash``: the Bash write raises a permission prompt first, as
+  Claude Code 2.1.289 does for a write to a path the sandbox denies; after an
+  allow, the sandbox denies the write.
+- ``prompts_for_bash_unsandboxed``: like ``prompts_for_bash``, but after an
+  allow the write succeeds, as if the command ran outside the sandbox.
 - ``midturn_replay``: a user message sent during a turn is replayed at once,
   like a CLI that takes input during a turn.
 - ``init_after_eof``: ``initialize`` is answered only after stdin closes.
@@ -51,7 +57,6 @@ TRANSCRIPTS = Path(__file__).resolve().parents[1] / "transcripts" / "claude"
 SCENARIO = os.environ.get("FAKE_CLAUDE_SCENARIO", "ok")
 VERSION = os.environ.get("FAKE_CLAUDE_VERSION", "2.1.289")
 WRITE_TOOL = os.environ.get("FAKE_CLAUDE_WRITE_TOOL", "")
-FILE_RULE_DENIAL = "<tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>"
 COUNT_EVENT_SECONDS = 0.01
 
 
@@ -135,15 +140,34 @@ class Session:
         return self.directory / f"{self.id}.crashed"
 
 
+def merge_settings(lower, higher):
+    """Settings of two scopes, as Claude Code combines them: lists merge, other keys take the higher scope."""
+    merged = dict(lower)
+    for key, value in higher.items():
+        below = merged.get(key)
+        if isinstance(value, dict) and isinstance(below, dict):
+            merged[key] = merge_settings(below, value)
+        elif isinstance(value, list) and isinstance(below, list):
+            merged[key] = below + [item for item in value if item not in below]
+        else:
+            merged[key] = value
+    return merged
+
+
 def load_settings(args):
-    if "--settings" not in args:
-        return {}
-    return json.loads(Path(args[args.index("--settings") + 1]).read_text())
+    """User settings (unless ``--setting-sources`` leaves them out) with the ``--settings`` file on top."""
+    user = {}
+    sources = args[args.index("--setting-sources") + 1].split(",") if "--setting-sources" in args else ["user"]
+    user_file = Path(os.environ["HOME"]) / ".claude" / "settings.json"
+    if "user" in sources and "--restricted" not in args and user_file.exists():
+        user = json.loads(user_file.read_text())
+    worker = json.loads(Path(args[args.index("--settings") + 1]).read_text()) if "--settings" in args else {}
+    return merge_settings(user, worker)
 
 
-def edit_denied(settings, cwd):
-    rule = f"Edit(/{os.path.realpath(cwd)}/**)"
-    return rule in ((settings.get("permissions") or {}).get("deny") or [])
+def denied_tools(settings):
+    """Tools that a bare-name deny rule removes."""
+    return {rule for rule in (settings.get("permissions") or {}).get("deny") or [] if "(" not in rule}
 
 
 def sandbox_denies_write(settings, cwd):
@@ -163,6 +187,9 @@ class FakeClaude:
         self.session = Session(os.getcwd(), resume)
         self.settings = load_settings(args)
         self.denials = []
+        requested = args[args.index("--tools") + 1].split(",") if "--tools" in args else []
+        denied = denied_tools(self.settings) - ({"Write"} if self.forced_write("Write") else set())
+        self.tools = [tool for tool in requested if tool and tool not in denied]
 
     def read_stdin(self):
         for line in sys.stdin:
@@ -181,7 +208,7 @@ class FakeClaude:
 
     def system_init(self):
         message = copy.deepcopy(SYSTEM_INIT)
-        message.update(session_id=self.session.id, cwd=self.session.cwd)
+        message.update(session_id=self.session.id, cwd=self.session.cwd, tools=list(self.tools))
         emit(message)
 
     def text_delta(self, text):
@@ -243,13 +270,10 @@ class FakeClaude:
             emit(replay)
         self.system_init()
         remember = re.search(r"Remember the code word (\S+)\.", text)
-        write = re.search(r"Write tool to create the file (\S+)", text)
         bash = re.search(r"Bash tool to run this command: echo probe > (\S+)", text)
         if remember:
             self.session.remember(code_word=remember.group(1))
             self.answer("READY")
-        elif write:
-            self.write_turn(write.group(1))
         elif bash:
             self.bash_turn(bash.group(1))
         elif text.startswith("Count from 1 to"):
@@ -264,28 +288,18 @@ class FakeClaude:
     def forced_write(self, tool):
         return SCENARIO == "writes_despite_denial" and WRITE_TOOL == tool
 
-    def write_turn(self, name):
-        target = Path(self.session.cwd, name)
-        tool_input = {"file_path": str(target), "content": "probe"}
-        tool_id = self.tool_use("Write", tool_input)
-        if SCENARIO == "prompts_for_write":
-            if self.ask_permission("Write", tool_input):
-                target.write_text("probe")
-                self.tool_result(tool_id, f"File created successfully at: {target}", False)
-            else:
-                self.tool_result(tool_id, "The user denied this action.", True)
-                self.denials.append({"tool_name": "Write", "tool_use_id": tool_id, "tool_input": tool_input})
-        elif edit_denied(self.settings, self.session.cwd) and not self.forced_write("Write"):
-            self.tool_result(tool_id, FILE_RULE_DENIAL, True)
-            self.denials.append({"tool_name": "Write", "tool_use_id": tool_id, "tool_input": tool_input})
-        else:
-            target.write_text("probe")
-            self.tool_result(tool_id, f"File created successfully at: {target}", False)
-        self.answer("Done.")
-
     def bash_turn(self, name):
-        tool_id = self.tool_use("Bash", {"command": f"echo probe > {name}", "description": "Write the probe file"})
-        if sandbox_denies_write(self.settings, self.session.cwd) and not self.forced_write("Bash"):
+        tool_input = {"command": f"echo probe > {name}", "description": "Write the probe file"}
+        tool_id = self.tool_use("Bash", tool_input)
+        prompts = SCENARIO in ("prompts_for_bash", "prompts_for_bash_unsandboxed")
+        if prompts and not self.ask_permission("Bash", tool_input):
+            self.tool_result(tool_id, "The user denied this action.", True)
+            self.denials.append({"tool_name": "Bash", "tool_use_id": tool_id, "tool_input": tool_input})
+        elif (
+            sandbox_denies_write(self.settings, self.session.cwd)
+            and not self.forced_write("Bash")
+            and SCENARIO != "prompts_for_bash_unsandboxed"
+        ):
             self.tool_result(tool_id, f"Exit code 1\n(eval):1: operation not permitted: {name}", True)
         else:
             Path(self.session.cwd, name).write_text("probe\n")

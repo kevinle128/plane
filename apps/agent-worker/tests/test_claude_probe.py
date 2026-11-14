@@ -14,7 +14,7 @@ import pytest
 
 from plane_agent_worker.conformance import REPORT_VERSION, run_probe
 from plane_agent_worker.drivers.base import REQUIRED_CHECKS
-from plane_agent_worker.drivers.claude import SUITE_VERSION, ClaudeDriver
+from plane_agent_worker.drivers.claude import SUITE_VERSION, ClaudeDriver, harness_env
 from plane_agent_worker.process_registry import ProcessRegistry
 
 FAKE = Path(__file__).parent / "fakes" / "fake_claude.py"
@@ -118,14 +118,15 @@ def test_every_session_runs_with_the_worker_boundary_settings(private_dir, token
     # The model list of this Connect, then the suite: its own model list and sessions A to D.
     assert len(sessions) == 6
     for args in sessions:
-        for flag in ("--safe-mode", "--restricted", "--strict-mcp-config", "--disable-slash-commands"):
-            assert flag in args
-        assert args[args.index("--setting-sources") + 1] == ""
+        assert "--disable-slash-commands" in args
         assert args[args.index("--permission-prompt-tool") + 1] == "stdio"
+        # Claude runs as installed: its own settings, hooks and MCP servers load.
+        for flag in ("--safe-mode", "--restricted", "--strict-mcp-config", "--setting-sources"):
+            assert flag not in args
     settings_files = [args[args.index("--settings") + 1] for args in sessions]
     assert settings_files[0].endswith("/probes/probe-test/claude-settings.json")
     assert all(path.endswith("/probes/suite-claude_code-2.1.289/claude-settings.json") for path in settings_files[1:])
-    # Only the first suite session has tools: Bash and Write, to prove the two denials.
+    # Only the first suite session has tools: Bash, and Write, which the deny rule must remove.
     assert sessions[2][sessions[2].index("--tools") + 1] == "Bash,Write"
     assert all("--tools" not in args for args in sessions[:2])
 
@@ -148,12 +149,12 @@ def test_every_session_runs_with_the_worker_boundary_settings(private_dir, token
     } <= deny_read
     assert sandbox["filesystem"]["allowRead"] == [str(Path(cwd).parent)]
     permissions = settings["permissions"]
-    assert f"Edit(/{cwd}/**)" in permissions["deny"]
+    assert {"Edit", "Write", "NotebookEdit"} <= set(permissions["deny"])
     assert f"Read(/{token_file})" in permissions["deny"]
     assert f"Read(/{real(home / '.claude')}/**)" in permissions["deny"]
     assert permissions["blockReadsOutsideWorkingDirectories"] is True
     assert permissions["disableBypassPermissionsMode"] == "disable"
-    assert settings["disableAllHooks"] is True
+    assert "disableAllHooks" not in settings
 
 
 def test_settings_file_is_private_and_outside_the_working_directory(private_dir, token_file, home, monkeypatch):
@@ -173,25 +174,55 @@ def test_settings_file_is_private_and_outside_the_working_directory(private_dir,
     assert seen["parent"] == probe_cwd(private_dir).parent
 
 
-@pytest.mark.parametrize("tool", ["Write", "Bash"])
-def test_write_despite_the_denial_fails_the_permission_check(private_dir, token_file, home, tool):
+@pytest.mark.parametrize(
+    ("tool", "detail"),
+    [("Write", "Write was offered although a permission rule denies it"), ("Bash", "Bash wrote")],
+)
+def test_write_despite_the_denial_fails_the_permission_check(private_dir, token_file, home, tool, detail):
     executable = fake_claude(private_dir, scenario="writes_despite_denial", write_tool=tool)
 
     report = probe(private_dir, token_file, home, executable)
 
     checks = checks_of(report)
     assert checks["permission"]["passed"] is False
-    assert tool in checks["permission"]["detail"]
+    assert detail in checks["permission"]["detail"]
     assert all(check["passed"] for name, check in checks.items() if name != "permission")
 
 
-def test_permission_prompt_instead_of_a_rule_denial_fails_the_permission_check(private_dir, token_file, home):
-    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="prompts_for_write"))
+def test_prompt_for_the_bash_write_is_allowed_and_the_sandbox_still_denies_it(private_dir, token_file, home):
+    # Claude Code asks before a write to a path the sandbox denies. The Worker allows that Bash call,
+    # because the command still runs in the sandbox, which must deny the write.
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="prompts_for_bash"))
 
-    checks = checks_of(report)
-    assert checks["permission"]["passed"] is False
-    assert "permission rule" in checks["permission"]["detail"]
+    assert all(check["passed"] for check in report["checks"]), report["checks"]
     assert report["capabilities"]["permission_prompt"] is True
+
+
+def test_allowed_bash_write_outside_the_sandbox_fails_the_permission_check(private_dir, token_file, home):
+    executable = fake_claude(private_dir, scenario="prompts_for_bash_unsandboxed")
+
+    report = probe(private_dir, token_file, home, executable)
+
+    check = checks_of(report)["permission"]
+    assert check["passed"] is False
+    assert "Bash wrote" in check["detail"]
+
+
+def test_user_settings_cannot_widen_the_boundary(private_dir, token_file, home):
+    suite_cwd = Path(os.path.realpath(private_dir / "runs")) / "probes" / "suite-claude_code-2.1.289" / "workspace"
+    user_settings = {
+        "permissions": {"allow": ["Write", "Edit", "Bash(*)"], "deny": []},
+        "sandbox": {
+            "enabled": False,
+            "filesystem": {"denyRead": [], "denyWrite": [], "allowWrite": [str(suite_cwd)]},
+        },
+    }
+    (home / ".claude" / "settings.json").write_text(json.dumps(user_settings))
+
+    report = probe(private_dir, token_file, home, fake_claude(private_dir))
+
+    assert all(check["passed"] for check in report["checks"]), report["checks"]
+    assert report["suite"]["ran_now"] is True
 
 
 def test_ignored_interrupt_fails_the_interruption_check(private_dir, token_file, home):
@@ -321,6 +352,14 @@ def test_location_shows_the_home_directory_as_a_tilde(private_dir, token_file, h
     assert report["location"] == "~/.local/bin/claude"
 
 
+def test_harness_scrubs_credentials_from_its_subprocesses(private_dir):
+    env = harness_env({"HOME": "/home/worker", "PATH": "/usr/bin", "ANTHROPIC_API_KEY": "operator-key"}, private_dir)
+
+    # Claude keeps its credentials for its own API calls and removes them from Bash, hooks and MCP servers.
+    assert env["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] == "1"
+    assert env["ANTHROPIC_API_KEY"] == "operator-key"
+
+
 def test_harness_gets_an_allowlisted_environment(private_dir, token_file, home):
     secret_env = {
         "PLANE_AGENT_WORKER_TOKEN_FILE": str(token_file),
@@ -333,7 +372,14 @@ def test_harness_gets_an_allowlisted_environment(private_dir, token_file, home):
     probe(private_dir, token_file, home, fake_claude(private_dir), extra_env=secret_env)
 
     names = set((private_dir / "harness-env.txt").read_text().split())
-    assert {"HOME", "PATH", "TMPDIR", "CLAUDE_CODE_TMPDIR", "ANTHROPIC_API_KEY"} <= names
+    assert {
+        "HOME",
+        "PATH",
+        "TMPDIR",
+        "CLAUDE_CODE_TMPDIR",
+        "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB",
+        "ANTHROPIC_API_KEY",
+    } <= names
     forbidden = {"PLANE_AGENT_WORKER_TOKEN_FILE", "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "AWS_SECRET_ACCESS_KEY"}
     assert not names & forbidden
 
@@ -370,7 +416,7 @@ def test_second_probe_on_a_verified_version_runs_only_the_quick_check(private_di
     assert all(check["passed"] for check in report["checks"]), report["checks"]
     assert report["capabilities"] == {"midturn_input": False, "native_resume": True, "permission_prompt": False}
     record = json.loads((private_dir / "runs" / "state" / "conformance.json").read_text())
-    assert list(record["records"]) == ["claude_code/2.1.289/1"]
+    assert list(record["records"]) == [f"claude_code/2.1.289/{SUITE_VERSION}"]
 
 
 def test_failed_suite_runs_again_on_the_next_probe(private_dir, token_file, home):
@@ -395,7 +441,7 @@ def test_probe_on_a_new_cli_version_runs_the_suite_again(private_dir, token_file
     assert len([args for args in probe_calls(private_dir) if "-p" in args]) == 6
     assert all(check["passed"] for check in report["checks"])
     record = json.loads((private_dir / "runs" / "state" / "conformance.json").read_text())
-    assert sorted(record["records"]) == ["claude_code/2.1.289/1", "claude_code/2.1.290/1"]
+    assert sorted(record["records"]) == [f"claude_code/2.1.289/{SUITE_VERSION}", f"claude_code/2.1.290/{SUITE_VERSION}"]
 
 
 @pytest.mark.native

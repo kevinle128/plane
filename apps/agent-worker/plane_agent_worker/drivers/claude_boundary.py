@@ -5,11 +5,13 @@
 """Q&A boundary for Claude Code: its built-in sandbox and permission rules.
 
 The ``claude`` process itself runs without an outer OS sandbox, so it writes its
-own session history and ``--resume`` works. The boundary is in a settings file
-that the Worker writes for each probe or Run, next to the working directory and
-not inside it (mode 0600). Claude gets it with ``--settings`` and
-``--setting-sources ""``, so no user, project or local settings file can add to
-it. The settings:
+own session history and ``--resume`` works. Claude reads its own setting sources
+as installed (user settings, hooks and MCP servers included). The boundary is in
+a settings file that the Worker writes for each probe or Run, next to the
+working directory and not inside it (mode 0600), and passes with ``--settings``.
+That file ranks above the user, project and local settings files. Lists such as
+``permissions.deny`` merge across scopes, and a deny rule wins over an allow
+rule from any scope. The settings:
 
 - Bash and its child processes run in the built-in sandbox (Seatbelt on macOS).
   The sandbox must start (``failIfUnavailable``) and a command cannot retry
@@ -21,15 +23,17 @@ it. The settings:
   token, the Plane checkout, the Claude configuration directory (sessions and
   credentials) and the usual credential stores. Only this probe or Run directory
   is readable inside the Run root.
-- An ``Edit`` deny rule covers the working directory, so Edit, Write and
-  NotebookEdit are denied there; ``--restricted`` refuses file tools outside the
-  working directory, and Read is limited to it. ``Read`` deny rules repeat the
-  secret paths, because a symbolic link in the working directory can point at them.
-- Hooks are off and bypass mode is refused.
+- Bare-name deny rules remove Edit, Write and NotebookEdit, so no file tool can
+  write anywhere, and a user allow rule cannot bring them back. A bare name adds
+  no path to the sandbox write denials, so Bash keeps its temporary directory
+  (checked with Claude Code 2.1.289). Read is limited to the working directory;
+  ``Read`` deny rules repeat the secret paths, because a symbolic link in the
+  working directory can point at them.
+- Bypass mode is refused.
 
-Do not make the ``Edit`` rule wider than the working directory: Claude Code adds
-``Edit`` deny paths to the sandbox write denials, and a rule such as ``Edit(//**)``
-also denies its temporary directory, so every Bash command fails.
+Not closed by this file: a user ``sandbox.filesystem.allowRead`` entry re-opens
+a narrower part of a denied read path, and user ``sandbox.excludedCommands`` run
+outside the sandbox. Only managed settings can lock those lists.
 """
 
 import json
@@ -37,6 +41,8 @@ import os
 from pathlib import Path
 
 SETTINGS_FILE = "claude-settings.json"
+# Bare tool names: each deny rule removes the tool from the session.
+FILE_TOOLS = ("Edit", "Write", "NotebookEdit")
 
 # Credential stores under the home directory that no Harness command may read.
 CREDENTIAL_DIRECTORIES = (".ssh", ".aws", ".config/gh", ".gnupg", ".docker", ".kube")
@@ -77,11 +83,10 @@ def boundary_settings(workspace, config_dir, home):
             },
         },
         "permissions": {
-            "deny": [f"Edit(/{cwd}/**)", *read_rules],
+            "deny": [*FILE_TOOLS, *read_rules],
             "disableBypassPermissionsMode": "disable",
             "blockReadsOutsideWorkingDirectories": True,
         },
-        "disableAllHooks": True,
     }
 
 

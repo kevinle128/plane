@@ -17,6 +17,7 @@ from plane_agent_worker.drivers.claude import SUITE_VERSION, suite_fingerprint
 # cached results of the old suite are not used.
 PINNED_FINGERPRINTS = {
     1: "640e1597a067716a3475644d454553730cf47815a5970da00f85d869e0f70885",
+    2: "5e55f1dd152206bbee6dd80a1a10a46785f1155e54e35587a3249877c132bd53",
 }
 
 
@@ -187,6 +188,17 @@ def test_cancelled_wait_for_a_running_suite_returns_without_a_record(private_dir
     assert not any(check.passed for check in result.checks.values())
     runner.join(timeout=5)
     assert driver.suite_runs == 1
+
+
+def test_record_with_a_failed_check_is_not_used(private_dir, token_file):
+    driver = SuiteDriver()
+    record = verify(driver, private_dir, token_file).record
+    cache = SuiteCache(private_dir / "runs" / "state" / "conformance.json")
+    record["checks"][0] = {**record["checks"][0], "passed": False}
+    path = private_dir / "runs" / "state" / "conformance.json"
+    path.write_text(json.dumps({"version": 1, "records": {"claude_code/2.1.289/1": record}}))
+
+    assert cache.get("claude_code", "2.1.289", 1) is None
 
 
 @pytest.mark.parametrize(
