@@ -208,7 +208,7 @@ def test_allowed_bash_write_outside_the_sandbox_fails_the_permission_check(priva
     assert "Bash wrote" in check["detail"]
 
 
-def test_user_settings_cannot_widen_the_boundary(private_dir, token_file, home):
+def test_user_settings_cannot_reopen_file_writes(private_dir, token_file, home):
     suite_cwd = Path(os.path.realpath(private_dir / "runs")) / "probes" / "suite-claude_code-2.1.289" / "workspace"
     user_settings = {
         "permissions": {"allow": ["Write", "Edit", "Bash(*)"], "deny": []},
