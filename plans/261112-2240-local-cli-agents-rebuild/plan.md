@@ -144,6 +144,8 @@ The red-team gate has not run on the Q17-Q24 changes. Recommended before Phase 3
 
 29. Q29, user hooks and MCP servers stay on (user, 2026-11-14): amends Q16, Q24 and Q28. The Worker does not disable the user's hooks (no `disableAllHooks`) and does not pass `--strict-mcp-config`; the user's own MCP servers load as installed, and the Worker adds the Plane MCP server with `--mcp-config`. Q&A Runs keep only two protections: no file writes (deny rules for Edit, Write and NotebookEdit, and the built-in Bash sandbox) and no reads of secrets (sandbox `denyRead`). Accepted risk: user hooks and user MCP servers run outside the sandbox and can write files or reach the network; the user installed them and accepts this. The probe check "user settings cannot widen the boundary" now covers only the write and secret-read rules.
 
+30. Q30, token exposure and next boundary (user, 2026-11-14): exposure of the Claude API token to the agent itself is a minor accepted risk; Phase 2 only sets `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` and adds no canary checks. Before Phase 3, run a one-day spike on Docker Sandboxes (`sbx run claude`): the agent runs with full permissions inside a microVM, and the microVM is the boundary instead of deny rules. The spike checks non-interactive stream-json through `sbx`, session resume, passing the API key and gateway into the sandbox, the network policy for the gateway, user hooks/MCP/skills import, microVM start time, and the `sbx` dependency on the Mini. If it passes, Phases 3-7 replace the Q16/Q28/Q29 rules with the sandbox; the open question about repository `.claude/settings.json` then falls away.
+
 ## Red Team Review
 
 ### Session — 2026-11-12
