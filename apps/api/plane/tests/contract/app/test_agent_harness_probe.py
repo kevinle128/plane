@@ -81,7 +81,7 @@ class TestConnect:
         assert agent_state(session_client, workspace)["connection"]["state"] == "not_connected"
 
     @pytest.mark.django_db
-    @pytest.mark.parametrize("harness", ["codex", "grok", "omp"])
+    @pytest.mark.parametrize("harness", ["codex", "omp"])
     def test_harness_without_a_probe_cannot_connect_yet(self, session_client, workspace, harness):
         response = connect(session_client, workspace, harness)
 

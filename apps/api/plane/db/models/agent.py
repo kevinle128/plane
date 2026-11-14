@@ -23,7 +23,6 @@ from .base import BaseModel
 class AgentHarness(models.TextChoices):
     CLAUDE_CODE = "claude_code", "Claude Code"
     CODEX = "codex", "Codex CLI"
-    GROK = "grok", "Grok CLI"
     OMP = "omp", "Omp"
 
 

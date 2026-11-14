@@ -18,33 +18,43 @@ from plane.tests.agent_settings_fixtures import (
     worker_client_for,
 )
 
-HARNESS_ORDER = ["claude_code", "codex", "grok", "omp"]
+HARNESS_ORDER = ["claude_code", "codex", "omp"]
 
 
 @pytest.mark.contract
 class TestWorkspaceAgents:
     @pytest.mark.django_db
-    def test_first_read_creates_four_agents_with_bot_users(self, session_client, workspace):
+    def test_first_read_creates_three_agents_with_bot_users(self, session_client, workspace):
         response = session_client.get(agents_url(workspace.slug))
 
         assert response.status_code == status.HTTP_200_OK
         assert [agent["harness"] for agent in response.data] == HARNESS_ORDER
-        assert [agent["name"] for agent in response.data] == ["Claude Code", "Codex CLI", "Grok CLI", "Omp"]
-        assert [agent["handle"] for agent in response.data] == ["Claude", "Codex", "Grok", "Omp"]
+        assert [agent["name"] for agent in response.data] == ["Claude Code", "Codex CLI", "Omp"]
+        assert [agent["handle"] for agent in response.data] == ["Claude", "Codex", "Omp"]
         for agent in response.data:
             assert agent["connection"]["state"] == "not_connected"
             assert agent["connection"]["models"] == []
             assert agent["mentionable"] is True
             assert agent["available_for_mentions"] is False
         agents = Agent.objects.filter(workspace=workspace).select_related("bot_user")
-        assert agents.count() == 4
+        assert agents.count() == 3
         for agent in agents:
             assert agent.bot_user.is_bot is True
             assert agent.bot_user.bot_type == "AGENT"
             assert agent.bot_user.display_name == agent.name
             assert not agent.bot_user.has_usable_password()
             assert not workspace.workspace_member.filter(member=agent.bot_user).exists()
-        assert AgentConnection.objects.filter(agent__workspace=workspace).count() == 4
+        assert AgentConnection.objects.filter(agent__workspace=workspace).count() == 3
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("action", [None, "connect", "disconnect"])
+    def test_grok_is_not_a_harness(self, session_client, workspace, action):
+        url = agents_url(workspace.slug, "grok", action)
+
+        response = session_client.post(url, {}, format="json") if action else session_client.get(url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert not Agent.objects.filter(workspace=workspace, harness="grok").exists()
 
     @pytest.mark.django_db
     def test_second_read_creates_nothing(self, session_client, workspace):
@@ -54,7 +64,7 @@ class TestWorkspaceAgents:
         response = session_client.get(agents_url(workspace.slug))
 
         assert response.status_code == status.HTTP_200_OK
-        assert Agent.objects.filter(workspace=workspace).count() == 4
+        assert Agent.objects.filter(workspace=workspace).count() == 3
         assert User.objects.count() == users_before
 
     @pytest.mark.django_db
@@ -62,7 +72,7 @@ class TestWorkspaceAgents:
         response = member_client.get(agents_url(workspace.slug))
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 4
+        assert len(response.data) == 3
 
     @pytest.mark.django_db
     def test_guest_cannot_read_agents(self, guest_client, workspace):
@@ -117,9 +127,9 @@ class TestConcurrentFirstRead:
         assert not errors, errors
         assert [code for code, _ in results] == [200, 200]
         assert results[0][1] == results[1][1]
-        assert Agent.objects.filter(workspace=workspace).count() == 4
-        assert AgentConnection.objects.filter(agent__workspace=workspace).count() == 4
-        assert User.objects.filter(is_bot=True, bot_type="AGENT").count() == 4
+        assert Agent.objects.filter(workspace=workspace).count() == 3
+        assert AgentConnection.objects.filter(agent__workspace=workspace).count() == 3
+        assert User.objects.filter(is_bot=True, bot_type="AGENT").count() == 3
 
 
 def patch_agent(client, workspace, payload, harness="claude_code"):
@@ -244,11 +254,11 @@ class TestAgentHandle:
         WorkspaceMember.objects.create(workspace=other, member=create_user, role=20)
         session_client.get(agents_url(other.slug))
 
-        response = patch_agent(session_client, workspace, {"handle": "Codex"}, harness="grok")
+        response = patch_agent(session_client, workspace, {"handle": "Codex"}, harness="omp")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        other_response = session_client.patch(agents_url(other.slug, "grok"), {"handle": "Helper"}, format="json")
-        mine = patch_agent(session_client, workspace, {"handle": "Helper"}, harness="grok")
+        other_response = session_client.patch(agents_url(other.slug, "omp"), {"handle": "Helper"}, format="json")
+        mine = patch_agent(session_client, workspace, {"handle": "Helper"}, harness="omp")
         assert other_response.status_code == status.HTTP_200_OK
         assert mine.status_code == status.HTTP_200_OK
 
@@ -279,7 +289,7 @@ class TestConcurrentHandleChange:
             finally:
                 db_connection.close()
 
-        threads = [threading.Thread(target=take, args=(harness,)) for harness in ("grok", "omp")]
+        threads = [threading.Thread(target=take, args=(harness,)) for harness in ("codex", "omp")]
         for thread in threads:
             thread.start()
         for thread in threads:

@@ -4,7 +4,7 @@
 
 """Workspace Agents: lazy creation, derived connection state and availability.
 
-Four Agents exist per workspace, one per Harness. They are created on the first
+One Agent exists per workspace and Harness. They are created on the first
 read. A concurrent first read hits the unique constraints (deterministic bot
 username, unique workspace and Harness) and re-reads the row, so two reads never
 create two Agents or two bot users.
@@ -25,12 +25,11 @@ from plane.db.models import Agent, AgentConnection, AgentConnectionState, AgentH
 PROBE_ANSWER_SECONDS = 120
 WORKER_DID_NOT_ANSWER = "worker_did_not_answer"
 
-HARNESS_ORDER = (AgentHarness.CLAUDE_CODE, AgentHarness.CODEX, AgentHarness.GROK, AgentHarness.OMP)
+HARNESS_ORDER = (AgentHarness.CLAUDE_CODE, AgentHarness.CODEX, AgentHarness.OMP)
 
 HARNESS_DEFAULTS = {
     AgentHarness.CLAUDE_CODE: {"name": "Claude Code", "handle": "Claude"},
     AgentHarness.CODEX: {"name": "Codex CLI", "handle": "Codex"},
-    AgentHarness.GROK: {"name": "Grok CLI", "handle": "Grok"},
     AgentHarness.OMP: {"name": "Omp", "handle": "Omp"},
 }
 
@@ -75,7 +74,7 @@ def _create_agent(workspace, harness):
 
 
 def ensure_workspace_agents(workspace):
-    """Return the four Agents of the workspace in Harness order, creating missing ones."""
+    """Return the Agents of the workspace in Harness order, creating missing ones."""
     agents = {agent.harness: agent for agent in Agent.objects.filter(workspace=workspace).select_related("connection")}
     for harness in HARNESS_ORDER:
         if harness not in agents:
