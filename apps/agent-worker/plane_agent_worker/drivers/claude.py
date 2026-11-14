@@ -25,6 +25,7 @@ Probe steps (verified with Claude Code 2.1.289):
    code word again (recovery).
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -394,20 +395,26 @@ class ClaudeDriver:
 
     # Probe --------------------------------------------------------------------
 
-    def probe(self, workspace, deadline):
-        outcome = ProbeOutcome()
+    @contextlib.contextmanager
+    def _harness_context(self, workspace, deadline, outcome):
+        """The command context of one probe step in ``workspace``, or ``None`` when the CLI is missing.
+
+        A deadline or start failure ends the step with a failure hint. The Claude session folder of the
+        working directory is removed when the step ends.
+        """
         executable = self._resolve_executable()
         if executable is None:
             outcome.blocking_issue = "harness_not_found"
             outcome.failure_hint = "The claude command was not found on the Mini."
-            return outcome
+            yield None
+            return
         env = harness_env(self.base_env, workspace.tmp)
         outcome.location = display_path(executable, env.get("HOME"))
 
         config_dir = claude_config_dir(env)
         session_dir = config_dir / "projects" / session_dir_name(os.path.realpath(workspace.cwd))
         try:
-            context = {
+            yield {
                 "executable": executable,
                 "env": env,
                 "cwd": str(workspace.cwd),
@@ -417,15 +424,26 @@ class ClaudeDriver:
                 # A Worker that stops during the probe removes this folder at its next start.
                 "cleanup_paths": [str(session_dir)],
             }
-            if self._check_version(context, outcome) and self._check_authentication(context, outcome):
-                self._check_sessions(context, outcome, workspace)
         except (ProbeTimeout, subprocess.TimeoutExpired):
             outcome.failure_hint = outcome.failure_hint or "The probe did not finish before its deadline."
         except OSError as error:
             outcome.failure_hint = f"The claude command could not run ({type(error).__name__})."
         finally:
             shutil.rmtree(session_dir, ignore_errors=True)
+
+    def probe(self, workspace, deadline):
+        outcome = ProbeOutcome()
+        with self._harness_context(workspace, deadline, outcome) as context:
+            if context is not None and self.quick_check(context, outcome):
+                self.run_suite(context, outcome, workspace)
         return outcome
+
+    def quick_check(self, context, outcome):
+        """CLI version, login and model list. Returns True when the behavior suite can run."""
+        if not (self._check_version(context, outcome) and self._check_authentication(context, outcome)):
+            return False
+        self._discover_models(context, outcome)
+        return True
 
     def _check_version(self, context, outcome):
         result = self._run([context["executable"], "--version"], context, "version")
@@ -489,8 +507,8 @@ class ClaudeDriver:
                 return ("--model", preferred)
         return ()
 
-    def _check_sessions(self, context, outcome, workspace):
-        self._discover_models(context, outcome)
+    def run_suite(self, context, outcome, workspace):
+        """The behavior checks: progress, permission, interruption, follow-up and recovery."""
         model_args = self._probe_model_args(outcome)
         code_word = f"PLANE-{secrets.token_hex(3).upper()}"
         session_id = self._session_a(context, outcome, workspace, code_word, model_args)
