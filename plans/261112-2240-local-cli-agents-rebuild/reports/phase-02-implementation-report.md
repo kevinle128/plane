@@ -121,16 +121,20 @@ Commit `4badce1d0f`. Test first: `test_interruption_sends_no_message_during_the_
 
 ### Q21: one model request with a static fallback (accepted by the user on 2026-11-14)
 
-Commits `411db61c00` (Worker), `c8355601ed` (web and i18n).
+Commits `411db61c00` (Worker), `c8355601ed` (web and i18n), `e7042d02d1` (API: each model needs `source`, `reported` or `fallback`).
 
 - Real CLI check before the change: one `initialize` request with stdin closed right after it -> `control_response success plane-init` with 5 models, exit 0 (Claude Code 2.1.289).
 - Worker, test first: `5 failed` (one-shot, fallback at Connect, cached model report, suite without a real report, `source` on reported models). After the change: `102 passed, 1 deselected`.
 - Blocks, test first: `getModelSourceNoteKey` test failed (no export); after the change `connection-state.test.ts` -> `6 passed`; whole package `46 files, 452 passed`.
+- API, test first: with the serializer of the previous commit, `test_agent_harness_probe.py` -> `4 failed, 54 passed` (fallback models stored with their source; a model without `source` or with an unknown one refused). With the change: settings + probe + Worker auth + API token + `plane/tests/unit/db` -> `161 passed`.
 - i18n: `agent_settings.model.not_reported` ("Not reported by {harness}") in all 22 locales; `pnpm --filter=@plane/i18n check:sync` -> "All locales are in sync with English."
 
 ### Q25: Grok removed
 
-Commit `899597a27f` (web: type, constants, the Grok blurb in 22 locales).
+Commits `899597a27f` (web: type, constants, the Grok blurb in 22 locales) and `effc64ac56` (API).
+
+- API, test first: the list of exactly three Harnesses, the 404 for `grok` and the migration tests failed before the change (`6 failed, 100 passed`, and a collection error for the missing migration). After it: settings + probe + `plane/tests/unit/db` -> `121 passed`; `makemigrations --check --dry-run` -> "No changes detected".
+- Migration `0131_remove_grok_harness` first deletes the Grok Agents that earlier builds of this branch created (with their connections and bot users, soft-deleted rows included), then changes the choices. It is needed because such a hidden Agent would keep the "Grok" handle in its workspace. On a database that never ran this branch it does nothing.
 
 ### Live check on this Mac (remaining item 8): NOT RUN
 
@@ -162,6 +166,25 @@ Proposal (not implemented; it needs a decision on the matching rule and it touch
 2. On a match, stop the suite: set every suite check to "not run: Claude Code refused to run a turn for this login", and set the failure hint to "Claude Code is signed in, but the account cannot run turns. Sign in on the Mini with a working account, then retry." Keep the CLI text in the Worker log only. The suite result is not cached, because it did not pass.
 3. Plane needs no change: the missing action stays the first failed check. An optional follow-up is a separate missing action `account_unusable` with its own message, which needs a new code in `harness_probe.py` and the blocks `KNOWN_MISSING_ACTIONS`.
 4. Tests first: a fake scenario `account_on_hold` that answers every turn with the hold text; the report must name the account in its failure hint and must not blame the permission rule.
+
+### Final gates (2026-11-14, branch head `e7042d02d1`)
+
+| Command                                                                                                                         | Result                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `docker compose -f docker-compose-test.yml run --rm --build api-tests pytest` settings, probe, Worker auth, API token           | 146 passed                                                                                      |
+| `... pytest plane/tests/contract/app plane/tests/unit -k "agent or api_token or project_app or url_security"`                   | 546 passed, 1166 deselected                                                                     |
+| `... python manage.py makemigrations --check --dry-run`                                                                         | No changes detected                                                                             |
+| `... ruff check .` (test image)                                                                                                 | All checks passed                                                                               |
+| Worker on macOS: `uv run pytest -m "not native and not docker"`, `ruff check .`, `ruff format --check .` (uv 0.12.21 via `uvx`) | 102 passed; clean; 22 files formatted                                                           |
+| Worker on Linux: `python:3.12-slim` with `procps`, uv 0.12.21, non-root user, same three commands                               | 102 passed; clean; 22 files formatted                                                           |
+| Worker native on this Mac: `uv run pytest -m native` (clean environment)                                                        | 1 failed: the keychain login is the account on hold (see the live check above)                  |
+| `pnpm --filter=@plane/blocks test`                                                                                              | 46 files, 452 passed                                                                            |
+| `pnpm turbo run check:types --filter=web --filter=@plane/blocks --filter=@plane/types --filter=@plane/constants`                | 13/13                                                                                           |
+| `pnpm check:lint`, `pnpm check:format`                                                                                          | exit 0                                                                                          |
+| `pnpm --filter=@plane/i18n check:sync`                                                                                          | All locales are in sync with English                                                            |
+| COPYRIGHT header on new `.py/.ts/.tsx` (manual; migrations are skipped by the check)                                            | present on `tests/test_suite_cache.py` and `tests/unit/db/test_remove_grok_agents_migration.py` |
+
+Note on the Linux run: `python:3.12-slim` has no `ps`, which `process_registry.py:40` uses to record process start times, so without `procps` 31 tests fail with `FileNotFoundError: 'ps'`. The code before these changes (`f9ecdea65c`) fails the same way (22 failed). `ubuntu-latest` (the Worker CI runner) and macOS have `ps`, so this is a gap of the slim image, not a code defect. The earlier Linux result in this report (61 passed) does not record how its image was set up.
 
 ### Browser check of scene 11 (remaining item 9): NOT RUN
 
