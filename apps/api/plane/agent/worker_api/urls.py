@@ -8,6 +8,13 @@ from plane.agent.worker_api.views import (
     WorkerHeartbeatEndpoint,
     WorkerProbeClaimEndpoint,
     WorkerProbeReportEndpoint,
+    WorkerRunClaimEndpoint,
+    WorkerRunCloneEndpoint,
+    WorkerRunContextEndpoint,
+    WorkerRunEventsEndpoint,
+    WorkerRunGitCredentialEndpoint,
+    WorkerRunRenewEndpoint,
+    WorkerRunResultEndpoint,
 )
 
 urlpatterns = [
@@ -18,4 +25,15 @@ urlpatterns = [
         WorkerProbeReportEndpoint.as_view(),
         name="agent-worker-probe-report",
     ),
+    path("runs/claim/", WorkerRunClaimEndpoint.as_view(), name="agent-worker-run-claim"),
+    path("runs/<uuid:run_id>/renew/", WorkerRunRenewEndpoint.as_view(), name="agent-worker-run-renew"),
+    path("runs/<uuid:run_id>/clone/", WorkerRunCloneEndpoint.as_view(), name="agent-worker-run-clone"),
+    path(
+        "runs/<uuid:run_id>/git-credential/",
+        WorkerRunGitCredentialEndpoint.as_view(),
+        name="agent-worker-run-git-credential",
+    ),
+    path("runs/<uuid:run_id>/context/", WorkerRunContextEndpoint.as_view(), name="agent-worker-run-context"),
+    path("runs/<uuid:run_id>/events/", WorkerRunEventsEndpoint.as_view(), name="agent-worker-run-events"),
+    path("runs/<uuid:run_id>/result/", WorkerRunResultEndpoint.as_view(), name="agent-worker-run-result"),
 ]

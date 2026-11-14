@@ -5,6 +5,7 @@
 """Input validation for Worker requests. Every string and list has a bound."""
 
 # Python imports
+import json
 from datetime import timedelta
 
 # Django imports
@@ -15,7 +16,7 @@ from rest_framework import serializers
 
 # Module imports
 from plane.agent.services.harness_probe import BLOCKING_ISSUES, CAPABILITY_FLAGS, REQUIRED_CHECKS
-from plane.db.models import AgentHarness
+from plane.db.models import AgentHarness, AgentRunEventKind, AgentRunStatus
 
 REPORT_VERSION = 2
 # The Worker and Plane run on one host; a suite time later than this after now is not a real time.
@@ -135,4 +136,90 @@ class ProbeReportSerializer(serializers.Serializer):
         passed = {check["name"] for check in attrs["checks"] if check["passed"]}
         if suite is None and passed >= set(REQUIRED_CHECKS):
             raise serializers.ValidationError({"suite": "Passing checks need the passing suite result."})
+        return attrs
+
+
+# Runs
+
+GIT_ERROR_CODES = (
+    "git_dns_failed",
+    "git_unreachable",
+    "git_tls_failed",
+    "git_auth_failed",
+    "git_not_found",
+    "git_failed",
+)
+MAX_EVENTS_PER_BATCH = 100
+MAX_EVENT_PAYLOAD_BYTES = 64 * 1024
+# The Worker sends every kind except the conclusion, which only the Run result writes.
+WORKER_EVENT_KINDS = [kind for kind in AgentRunEventKind.values if kind != AgentRunEventKind.CONCLUSION]
+
+
+class RunClaimSerializer(serializers.Serializer):
+    harnesses = serializers.ListField(
+        child=serializers.ChoiceField(choices=AgentHarness.choices), allow_empty=True, max_length=10
+    )
+
+
+class LeaseSerializer(serializers.Serializer):
+    lease_generation = serializers.IntegerField(min_value=1)
+
+
+class CloneReportSerializer(LeaseSerializer):
+    ok = serializers.BooleanField()
+    clone_path = serializers.CharField(max_length=1024, required=False, allow_blank=False)
+    error_code = serializers.ChoiceField(choices=GIT_ERROR_CODES, required=False)
+    error_detail = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
+
+    def to_internal_value(self, data):
+        # A string such as "yes" must not pass as a boolean.
+        if isinstance(data, dict) and not isinstance(data.get("ok"), bool):
+            raise serializers.ValidationError({"ok": "Must be a boolean."})
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        if attrs["ok"]:
+            if not attrs.get("clone_path", "").startswith("/"):
+                raise serializers.ValidationError({"clone_path": "An absolute path is required."})
+        elif "error_code" not in attrs:
+            raise serializers.ValidationError({"error_code": "Required when ok is false."})
+        return attrs
+
+
+class GitCredentialSerializer(LeaseSerializer):
+    purpose = serializers.ChoiceField(choices=("fetch",))
+
+
+class RunEventSerializer(serializers.Serializer):
+    source_key = serializers.CharField(max_length=128)
+    kind = serializers.ChoiceField(choices=WORKER_EVENT_KINDS)
+    payload = serializers.JSONField()
+
+    def validate_payload(self, payload):
+        if not isinstance(payload, dict):
+            raise serializers.ValidationError("Must be an object.")
+        if len(json.dumps(payload).encode()) > MAX_EVENT_PAYLOAD_BYTES:
+            raise serializers.ValidationError("The payload is larger than 64 KiB.")
+        return payload
+
+
+class RunEventBatchSerializer(LeaseSerializer):
+    turn_index = serializers.IntegerField(min_value=0)
+    events = RunEventSerializer(many=True, min_length=1, max_length=MAX_EVENTS_PER_BATCH)
+
+
+class RunResultSerializer(LeaseSerializer):
+    status = serializers.ChoiceField(choices=(AgentRunStatus.COMPLETED, AgentRunStatus.FAILED))
+    conclusion = serializers.CharField(max_length=100_000, allow_blank=True, default="", trim_whitespace=False)
+    failure_code = serializers.CharField(max_length=64, allow_blank=True, default="")
+    failure_message = serializers.CharField(max_length=2000, allow_blank=True, default="")
+    session_ref = serializers.CharField(max_length=128, allow_blank=True, default="")
+    harness_version = serializers.CharField(max_length=64, allow_blank=True, default="")
+    failed_check = serializers.CharField(max_length=64, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        if attrs["status"] == AgentRunStatus.COMPLETED and not attrs["conclusion"].strip():
+            raise serializers.ValidationError({"conclusion": "A completed Run needs a conclusion."})
+        if attrs["status"] == AgentRunStatus.FAILED and not attrs["failure_code"]:
+            raise serializers.ValidationError({"failure_code": "A failed Run needs a failure code."})
         return attrs

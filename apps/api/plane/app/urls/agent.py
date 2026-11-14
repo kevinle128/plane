@@ -10,6 +10,7 @@ from plane.app.views.agent.settings import (
     AgentDisconnectEndpoint,
     AgentsEndpoint,
 )
+from plane.app.views.agent.runs import IssueRunDetailEndpoint, IssueRunsEndpoint
 from plane.app.views.agent.git import (
     AgentGitAccountAttachEndpoint,
     AgentGitAccountDetailEndpoint,
@@ -26,6 +27,7 @@ from plane.app.views.agent.git import (
 
 AGENT_GIT = "workspaces/<str:slug>/agent-git"
 AGENTS = "workspaces/<str:slug>/agents"
+ISSUE_RUNS = "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/agent-runs"
 
 urlpatterns = [
     path(f"{AGENTS}/", AgentsEndpoint.as_view(), name="agents"),
@@ -67,4 +69,6 @@ urlpatterns = [
     ),
     path(f"{AGENT_GIT}/<str:provider>/policy/", AgentGitPolicyEndpoint.as_view(), name="agent-git-policy"),
     path(f"{AGENT_GIT}/repositories/", AgentGitRepositoriesEndpoint.as_view(), name="agent-git-repositories"),
+    path(f"{ISSUE_RUNS}/", IssueRunsEndpoint.as_view(), name="issue-agent-runs"),
+    path(f"{ISSUE_RUNS}/<uuid:run_id>/", IssueRunDetailEndpoint.as_view(), name="issue-agent-run-detail"),
 ]

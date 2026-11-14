@@ -19,11 +19,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 # Module imports
-from plane.agent.services import harness_probe
+from plane.agent.git_providers.base import ProviderError
+from plane.agent.services import conclusion, harness_probe, lease, run_events
 from plane.agent.worker_api.authentication import IsAgentWorker, WorkerTokenAuthentication
 from plane.agent.services.agent_settings import probe_answer_deadline
-from plane.agent.worker_api.serializers import HeartbeatSerializer, ProbeClaimSerializer, ProbeReportSerializer
-from plane.db.models import AgentConnection, AgentWorker
+from plane.agent.worker_api.serializers import (
+    CloneReportSerializer,
+    GitCredentialSerializer,
+    HeartbeatSerializer,
+    LeaseSerializer,
+    ProbeClaimSerializer,
+    ProbeReportSerializer,
+    RunClaimSerializer,
+    RunEventBatchSerializer,
+    RunResultSerializer,
+)
+from plane.db.models import AgentConnection, AgentRun, AgentWorker
 
 
 class WorkerAPIView(APIView):
@@ -87,3 +98,155 @@ class WorkerProbeReportEndpoint(WorkerAPIView):
         return Response(
             {"state": connection.state, "missing_action": connection.missing_action}, status=status.HTTP_200_OK
         )
+
+
+# Runs
+
+
+def run_not_found():
+    return Response({"error": "run_not_found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+def lease_conflict(conflict):
+    return Response({"error": conflict.code}, status=status.HTTP_409_CONFLICT)
+
+
+class WorkerRunClaimEndpoint(WorkerAPIView):
+    def post(self, request):
+        serializer = RunClaimSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        run = lease.claim_run(self.worker, serializer.validated_data["harnesses"])
+        if run is None:
+            return Response({"run": None}, status=status.HTTP_200_OK)
+        run = AgentRun.objects.select_related("workspace", "project", "issue").get(pk=run.pk)
+        return Response(
+            {
+                "run": {
+                    "id": str(run.id),
+                    "short_id": run.short_id,
+                    "harness": run.harness,
+                    "lease_generation": run.lease_generation,
+                    "lease_expires_at": run.lease_expires_at,
+                    "lease_seconds": lease.LEASE_SECONDS,
+                    "model": run.model,
+                    "instructions": run.instructions,
+                    "agent": {"id": str(run.agent_id), "name": run.agent_name, "handle": run.agent_handle},
+                    "workspace": {"id": str(run.workspace_id), "slug": run.workspace.slug},
+                    "issue": {
+                        "id": str(run.issue_id),
+                        "identifier": f"{run.project.identifier}-{run.issue.sequence_id}",
+                    },
+                    "repository": lease.clone_spec(run),
+                    "turn": {"index": 0},
+                }
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class WorkerRunRenewEndpoint(WorkerAPIView):
+    def post(self, request, run_id):
+        serializer = LeaseSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            run = lease.renew(self.worker, run_id, serializer.validated_data["lease_generation"])
+        except AgentRun.DoesNotExist:
+            return run_not_found()
+        except lease.LeaseConflict as conflict:
+            return lease_conflict(conflict)
+        return Response({"lease_expires_at": run.lease_expires_at}, status=status.HTTP_200_OK)
+
+
+class WorkerRunCloneEndpoint(WorkerAPIView):
+    def post(self, request, run_id):
+        serializer = CloneReportSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+        try:
+            lease.report_clone(self.worker, run_id, data["lease_generation"], data)
+        except AgentRun.DoesNotExist:
+            return run_not_found()
+        except lease.LeaseConflict as conflict:
+            return lease_conflict(conflict)
+        return Response({}, status=status.HTTP_200_OK)
+
+
+class WorkerRunGitCredentialEndpoint(WorkerAPIView):
+    """Hands out a GitLab token. The response carries a secret: never log it."""
+
+    def post(self, request, run_id):
+        serializer = GitCredentialSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            credential = lease.fetch_credential(self.worker, run_id, serializer.validated_data["lease_generation"])
+        except AgentRun.DoesNotExist:
+            return run_not_found()
+        except lease.LeaseConflict as conflict:
+            return lease_conflict(conflict)
+        except ProviderError as error:
+            return Response({"error": error.code}, status=error.http_status)
+        return Response(credential, status=status.HTTP_200_OK)
+
+
+class WorkerRunContextEndpoint(WorkerAPIView):
+    def get(self, request, run_id):
+        serializer = LeaseSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            run = lease.leased_run(self.worker, run_id, serializer.validated_data["lease_generation"])
+        except AgentRun.DoesNotExist:
+            return run_not_found()
+        except lease.LeaseConflict as conflict:
+            return lease_conflict(conflict)
+        snapshot = run.context_snapshots.order_by("-version").first()
+        if snapshot is None:
+            return Response({"error": "context_not_found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "version": snapshot.version,
+                "payload": snapshot.payload,
+                "omitted_comment_count": snapshot.omitted_comment_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class WorkerRunEventsEndpoint(WorkerAPIView):
+    def post(self, request, run_id):
+        serializer = RunEventBatchSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+        try:
+            events = run_events.append_from_worker(
+                self.worker, run_id, data["lease_generation"], data["turn_index"], data["events"]
+            )
+        except AgentRun.DoesNotExist:
+            return run_not_found()
+        except lease.LeaseConflict as conflict:
+            return lease_conflict(conflict)
+        except run_events.TurnNotFound:
+            return Response({"error": "turn_not_found"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"events": [{"id": str(event.id), "seq": event.seq, "source_key": event.source_key} for event in events]},
+            status=status.HTTP_200_OK,
+        )
+
+
+class WorkerRunResultEndpoint(WorkerAPIView):
+    def post(self, request, run_id):
+        serializer = RunResultSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            body = conclusion.apply_result(self.worker, run_id, serializer.validated_data)
+        except AgentRun.DoesNotExist:
+            return run_not_found()
+        except lease.LeaseConflict as conflict:
+            return lease_conflict(conflict)
+        return Response(body, status=status.HTTP_200_OK)
