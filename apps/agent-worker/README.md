@@ -8,7 +8,8 @@ inside a Docker Sandbox microVM through the standalone `sbx` CLI.
 ## Setup
 
 1. Install Docker Sandboxes and sign in, in the Worker user's login session
-   (Apple silicon, macOS 14 or later). Values come from stdin, never from the
+   (Apple silicon, macOS 14 or later; git 2.37 or later on the host, because the
+   Worker pins the clone host with `http.curloptResolve`). Values come from stdin, never from the
    command line:
 
    ```bash
@@ -143,6 +144,60 @@ or a Disconnect replaced, and does not report it.
 
   Do this when you think the CLI behavior changed without a version change.
 
+## Q&A Runs
+
+The Worker claims a Run when a member mentions an Agent in a work-item comment
+(at most 4 Runs at a time). For each Run it:
+
+1. clones the bound repository on the host into
+   `<run root>/sandboxes/<key>/clones/<run id>/clone` (`git_transport.py`: GitHub
+   with the Mini's own Git credentials, GitLab with a fetch token that Plane gives
+   only to the clone; no provider token enters a sandbox);
+2. makes sure the Q&A sandbox `plane-qa-<key>` of that repository exists and runs.
+   `<key>` is a hash of the workspace, provider, host and repository, so session
+   history never crosses workspaces. Its writable primary mount is
+   `<key>/scratch` (one sub-folder per Run); `<key>/clones` is mounted read-only,
+   so Claude cannot write to any clone;
+3. reads `claude --version` in the sandbox; a version without a passing suite
+   record runs the suite first (the Run shows "Checking Claude Code <version>"),
+   and a failed suite fails the Run with `harness_version_unverified`;
+4. runs one Claude turn in the clone with full permissions, all host skills
+   (`--add-dir /opt/user-claude`) and an MCP config with only the Plane server and
+   the listed servers (`--strict-mcp-config`). Events stream to Plane; the answer
+   becomes the Run's conclusion comment. A turn with no model output in 30 s
+   fails with a gateway hint (a wrong token makes Claude retry for minutes).
+
+### Plane MCP server and listed MCP servers
+
+- The Worker serves the Plane tools (`plane_issue_context`) over HTTP on
+  `127.0.0.1:<PLANE_AGENT_MCP_PORT>`. The VM reaches it at
+  `http://host.docker.internal:<port>/mcp` through the sandbox allow rule
+  `localhost:<port>`. Each turn gets a random handle; it maps to one Run turn and
+  is dropped when the turn ends.
+- `PLANE_AGENT_IMPORT_MCP_SERVERS` lists more servers by name (for example the
+  Archon server, which makes code changes outside Plane). An unknown name stops
+  the Worker at start. Each listed HTTP server gets a sandbox allow rule for its
+  host before the first turn (Claude caches a blocked server as `needs-auth`). A
+  stdio server runs inside the VM and must be Python or a binary: the `claude`
+  kit has no Node.js. Definitions are copied into each turn's MCP config in the
+  scratch folder, so the agent can read them.
+
+### Sandbox limits and cleanup
+
+- A sandbox costs about 75 MB of disk plus one shared 1.5 GB image, and 0.9 to
+  1.2 GB of host memory while it runs. `sbx` stops it 30 s after its last
+  command. The Worker has no maximum, keep-alive or removal logic.
+- Removing a sandbox loses its Claude session history; later turns rebuild their
+  context from Plane.
+- Clones and scratch folders stay after a Run (later turns of the same Run use
+  them). Clean up by hand when needed:
+
+  ```bash
+  sbx ls && sbx df
+  sbx rm --force plane-qa-<key>                                 # one sandbox
+  rm -rf "$PLANE_AGENT_WORKER_RUN_ROOT/sandboxes/<key>"         # its clones and scratch, after the rm
+  ```
+
 ## Deployment assumption: trusted network only
 
 The Worker has no workspace allowlist, and Plane does not limit how often
@@ -157,7 +212,7 @@ limit for each workspace.
 
 ```bash
 uv run pytest -m "not native and not docker"   # unit tests, any OS
-uv run pytest -m native                        # real Claude in a real sandbox (signed in to sbx, deny-all); removes its plane-test-* sandboxes
+uv run pytest -m native                        # real Claude in real sandboxes (signed in to sbx, deny-all); removes its plane-test-* sandboxes
 uv run ruff check . && uv run ruff format --check .
 ```
 

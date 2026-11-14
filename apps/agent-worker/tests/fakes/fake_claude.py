@@ -29,6 +29,8 @@ does inside a sandbox. ``FAKE_CLAUDE_SCENARIO`` selects a failure:
   probe folder; the suite folder (``suite-*``) gets the normal answer.
 - ``no_initialize``: ``initialize`` never gets an answer.
 - ``auth_error``: every turn ends with an authentication error result.
+- ``no_answer``: a turn sends ``init`` and then nothing, like a CLI that retries a
+  gateway that refuses its token.
 
 ``FAKE_CLAUDE_ARGV_LOG``, when set, names a file that gets one JSON line with
 the arguments of each call. ``FAKE_CLAUDE_MIDTURN_LOG``, when set, names a file
@@ -230,6 +232,10 @@ class FakeClaude:
             replay["message"] = message["message"]
             emit(replay)
         self.system_init()
+        if SCENARIO == "no_answer":
+            while self.inbox.get() is not None:
+                pass
+            return
         if SCENARIO == "auth_error":
             failure = copy.deepcopy(RESULT_SUCCESS)
             failure.update(

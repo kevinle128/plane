@@ -46,6 +46,7 @@ import logging
 import os
 import shlex
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -183,10 +184,15 @@ class Sandboxes:
         self.home = Path(home)
         self.memory = memory
         base_env = dict(os.environ if base_env is None else base_env)
+        self._locks = {}
+        self._locks_guard = threading.Lock()
         self.client_env = {name: base_env[name] for name in CLIENT_ENV_ALLOWLIST if base_env.get(name)}
 
     def probe_name(self, harness):
         return f"{self.prefix}probe-{harness.replace('_', '-')}"
+
+    def qa_name(self, key):
+        return f"{self.prefix}qa-{key}"
 
     # Commands -----------------------------------------------------------------
 
@@ -227,8 +233,14 @@ class Sandboxes:
     def ensure(self, spec):
         """Make sure the sandbox of ``spec`` exists with the current mounts and is running.
 
-        Returns True when the sandbox was created now.
+        Returns True when the sandbox was created now. Concurrent callers for one sandbox wait for each other.
         """
+        with self._locks_guard:
+            lock = self._locks.setdefault(spec.name, threading.Lock())
+        with lock:
+            return self._ensure(spec)
+
+    def _ensure(self, spec):
         state_file = Path(spec.primary).parent / "sandbox.json"
         wanted = {"create": self.create_args(spec), "rules": self.rules(spec)}
         try:

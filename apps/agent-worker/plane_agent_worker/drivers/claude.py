@@ -58,6 +58,7 @@ from plane_agent_worker.drivers.base import (
 from plane_agent_worker.sandbox import (
     SANDBOX_ENV,
     VM_SETTINGS,
+    VM_USER_CLAUDE,
     SandboxError,
     SandboxSpec,
     probe_scratch,
@@ -105,7 +106,20 @@ SESSION_FLAGS = (
 # Every probe process: full permissions inside the sandbox, the host settings from the read-only
 # mount, and no MCP server.
 PROBE_FLAGS = ("--dangerously-skip-permissions", "--settings", VM_SETTINGS, "--strict-mcp-config")
+# A Run turn also loads all host skills and the turn's MCP config, and nothing else.
+RUN_FLAGS = (
+    "--dangerously-skip-permissions",
+    "--settings",
+    VM_SETTINGS,
+    "--add-dir",
+    VM_USER_CLAUDE,
+    "--strict-mcp-config",
+)
 BYPASS_MODE = "bypassPermissions"
+# A wrong gateway token makes Claude retry for about 3 minutes before it reports 401, so a turn that
+# sends no model output within this time fails with a gateway hint.
+FIRST_OUTPUT_SECONDS = 30
+OUTPUT_TYPES = frozenset({"stream_event", "assistant", "result"})
 BASH_PROBE_FILE = "plane-sandbox-probe.txt"
 COUNT_PROMPT = "Count from 1 to 400, one number per line, with no other text."
 
@@ -243,6 +257,28 @@ class StreamSession:
             if self.stop_inside:
                 self.stop_inside()
         self.registry.release(self.key, self.process)
+
+
+class TurnOutcome:
+    """How a Run turn ended."""
+
+    def __init__(self):
+        self.result = None
+        self.session_id = ""
+        self.output_started = False
+        self.timed_out = False
+        self.no_output = False
+        self.ended = False
+        self.stderr_tail = ""
+
+    @property
+    def succeeded(self):
+        return bool(self.result) and self.result.get("subtype") == "success" and not self.result.get("is_error")
+
+    @property
+    def text(self):
+        value = (self.result or {}).get("result")
+        return value if isinstance(value, str) else ""
 
 
 class Turn:
@@ -406,6 +442,83 @@ class ClaudeDriver:
             self.recorder,
             stop_inside=lambda: self.sandboxes.kill(sandbox, pidfile),
         )
+
+    # Run turns ----------------------------------------------------------------
+
+    def cli_version(self, key, sandbox, cwd, deadline):
+        """``claude --version`` inside ``sandbox``, or ``None`` when it does not report one."""
+        context = {"sandbox": sandbox, "cwd": str(cwd), "deadline": deadline, "key_prefix": key}
+        result = self._run(["--version"], context, "version")
+        match = VERSION_PATTERN.match(result.stdout or "")
+        if result.returncode != 0 or not match:
+            logger.warning("claude --version failed in %s: %s", sandbox, bounded(result.stderr, MAX_HINT_CHARS))
+            return None
+        return ".".join(match.groups())
+
+    def run_turn(
+        self,
+        *,
+        key,
+        sandbox,
+        cwd,
+        host_dir,
+        pidfile,
+        prompt,
+        mcp_config,
+        model,
+        deadline,
+        on_message,
+        first_output_seconds=FIRST_OUTPUT_SECONDS,
+    ):
+        """Run one Q&A turn in ``sandbox`` with ``cwd`` as working directory. Returns a ``TurnOutcome``.
+
+        ``on_message`` gets every stream message. The turn ends at its ``result`` message, when the
+        process ends, when no model output arrives in ``FIRST_OUTPUT_SECONDS`` or at ``deadline``.
+        """
+        command = ["claude", *SESSION_FLAGS, *RUN_FLAGS, "--mcp-config", str(mcp_config)]
+        if model:
+            command += ["--model", model]
+        argv = self.sandboxes.exec_argv(sandbox, cwd, command, pidfile=pidfile)
+        session = StreamSession(
+            self.registry,
+            key,
+            argv,
+            self.sandboxes.client_env,
+            str(host_dir),
+            self.recorder,
+            stop_inside=lambda: self.sandboxes.kill(sandbox, pidfile),
+        )
+        outcome = TurnOutcome()
+        try:
+            session.send_user(prompt)
+            first = deadline.within(first_output_seconds)
+            while outcome.result is None:
+                message = session.next_message(deadline if outcome.output_started else first)
+                if message is None:
+                    outcome.ended = True
+                    break
+                kind = message.get("type")
+                if kind in OUTPUT_TYPES:
+                    outcome.output_started = True
+                if kind == "system" and message.get("subtype") == "init":
+                    outcome.session_id = message.get("session_id") or outcome.session_id
+                if kind == "control_request" and (message.get("request") or {}).get("subtype") == "can_use_tool":
+                    # Full permissions: a permission request is not expected; deny it.
+                    answer = {"behavior": "deny", "message": "Plane runs this turn with full permissions only."}
+                    response = {"subtype": "success", "request_id": message.get("request_id"), "response": answer}
+                    session.send({"type": "control_response", "response": response})
+                on_message(message)
+                if kind == "result":
+                    outcome.result = message
+        except ProbeTimeout:
+            outcome.timed_out = True
+            outcome.no_output = not outcome.output_started
+            session.kill()
+            return outcome
+        finally:
+            outcome.stderr_tail = session.stderr_tail
+        session.close()
+        return outcome
 
     # Probe --------------------------------------------------------------------
 

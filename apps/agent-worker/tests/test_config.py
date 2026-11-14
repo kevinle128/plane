@@ -196,3 +196,39 @@ def test_sbx_path_defaults_to_the_path_lookup(private_dir, token_file):
 def test_invalid_sandbox_memory_is_rejected(private_dir, token_file, value):
     with pytest.raises(ConfigError, match="PLANE_AGENT_SANDBOX_MEMORY"):
         load_config(env_for(private_dir, token_file, PLANE_AGENT_SANDBOX_MEMORY=value))
+
+
+def test_run_settings_have_defaults(private_dir, token_file):
+    config = load_config(env_for(private_dir, token_file))
+
+    assert config.mcp_port == 7450
+    assert config.import_mcp_servers == ()
+    assert config.git_allowed_hosts == frozenset()
+    assert config.git_allowed_ips == ()
+
+
+def test_run_settings_are_read(private_dir, token_file):
+    config = load_config(
+        env_for(
+            private_dir,
+            token_file,
+            PLANE_AGENT_MCP_PORT="7999",
+            PLANE_AGENT_IMPORT_MCP_SERVERS=" archon, docs ,",
+            AGENT_GIT_ALLOWED_HOSTS="Git.Internal.test, gitlab.lan",
+            AGENT_GIT_ALLOWED_IPS="10.0.0.0/8, 192.168.1.5",
+        )
+    )
+
+    assert config.mcp_port == 7999
+    assert config.import_mcp_servers == ("archon", "docs")
+    assert config.git_allowed_hosts == frozenset({"git.internal.test", "gitlab.lan"})
+    assert [str(network) for network in config.git_allowed_ips] == ["10.0.0.0/8", "192.168.1.5/32"]
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [("PLANE_AGENT_MCP_PORT", "0"), ("PLANE_AGENT_MCP_PORT", "http"), ("AGENT_GIT_ALLOWED_IPS", "10.0.0.300")],
+)
+def test_invalid_run_settings_are_rejected(private_dir, token_file, name, value):
+    with pytest.raises(ConfigError, match=name):
+        load_config(env_for(private_dir, token_file, **{name: value}))

@@ -12,6 +12,7 @@ Rules:
 - The host ``~/.claude/settings.json`` exists: every sandbox mounts it read-only.
 """
 
+import ipaddress
 import os
 import re
 import shutil
@@ -32,6 +33,12 @@ ENV_SBX_BIN = "PLANE_AGENT_WORKER_SBX_BIN"
 ENV_POLL_SECONDS = "PLANE_AGENT_WORKER_POLL_SECONDS"
 ENV_SANDBOX_MEMORY = "PLANE_AGENT_SANDBOX_MEMORY"
 MEMORY_PATTERN = re.compile(r"^[1-9][0-9]*[mMgG]$")
+ENV_MCP_PORT = "PLANE_AGENT_MCP_PORT"
+ENV_IMPORT_MCP_SERVERS = "PLANE_AGENT_IMPORT_MCP_SERVERS"
+# The same names as the Plane API setting, so one value serves both.
+ENV_GIT_ALLOWED_HOSTS = "AGENT_GIT_ALLOWED_HOSTS"
+ENV_GIT_ALLOWED_IPS = "AGENT_GIT_ALLOWED_IPS"
+DEFAULT_MCP_PORT = 7450
 
 
 class ConfigError(Exception):
@@ -48,6 +55,10 @@ class WorkerConfig:
     sbx_bin: str | None = None
     sandbox_memory: str | None = None
     poll_seconds: float = DEFAULT_POLL_SECONDS
+    mcp_port: int = DEFAULT_MCP_PORT
+    import_mcp_servers: tuple = ()
+    git_allowed_hosts: frozenset = frozenset()
+    git_allowed_ips: tuple = ()
 
     def read_token(self):
         """Read the token again, with the same file checks as at start."""
@@ -161,6 +172,28 @@ def _sandbox_memory(env):
     return value or None
 
 
+def _mcp_port(env):
+    raw = (env.get(ENV_MCP_PORT) or "").strip()
+    if not raw:
+        return DEFAULT_MCP_PORT
+    if not raw.isdigit() or not 1 <= int(raw) <= 65535:
+        raise ConfigError(f"{ENV_MCP_PORT} must be a TCP port from 1 to 65535.")
+    return int(raw)
+
+
+def _names(env, name):
+    return tuple(item.strip() for item in (env.get(name) or "").split(",") if item.strip())
+
+
+def _allowed_ips(env):
+    try:
+        return tuple(ipaddress.ip_network(item, strict=False) for item in _names(env, ENV_GIT_ALLOWED_IPS))
+    except ValueError as error:
+        raise ConfigError(
+            f"{ENV_GIT_ALLOWED_IPS} must be a comma-separated list of IP addresses or networks."
+        ) from error
+
+
 def load_config(env):
     home = _check_home(env)
     origin = validate_origin((env.get(ENV_ORIGIN) or "").strip())
@@ -192,4 +225,8 @@ def load_config(env):
         sbx_bin=sbx_bin,
         sandbox_memory=_sandbox_memory(env),
         poll_seconds=_poll_seconds(env),
+        mcp_port=_mcp_port(env),
+        import_mcp_servers=_names(env, ENV_IMPORT_MCP_SERVERS),
+        git_allowed_hosts=frozenset(host.lower() for host in _names(env, ENV_GIT_ALLOWED_HOSTS)),
+        git_allowed_ips=_allowed_ips(env),
     )

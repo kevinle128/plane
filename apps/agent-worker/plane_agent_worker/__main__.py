@@ -22,8 +22,10 @@ from plane_agent_worker.config import ConfigError, load_config
 from plane_agent_worker.conformance import TranscriptRecorder, remove_stale_probes, run_probe
 from plane_agent_worker.drivers.claude import ClaudeDriver
 from plane_agent_worker.loop import WorkerLoop
+from plane_agent_worker.mcp_server import PlaneMcpServer, load_imported_servers
 from plane_agent_worker.plane_client import PlaneClient
 from plane_agent_worker.process_registry import ProcessRegistry
+from plane_agent_worker.runs import RunExecutor
 from plane_agent_worker.sandbox import Sandboxes
 
 logger = logging.getLogger("plane_agent_worker")
@@ -52,18 +54,43 @@ def clean_up_previous_worker(config, registry):
 
 def command_run(config, registry):
     clean_up_previous_worker(config, registry)
-    loop = WorkerLoop(
-        client=PlaneClient(config.api_origin, config.read_token()),
-        drivers=build_drivers(config, registry),
+    try:
+        imported = load_imported_servers(config.import_mcp_servers, config.home)
+    except ConfigError as error:
+        print(f"Configuration error: {error}", file=sys.stderr)
+        return 2
+    client = PlaneClient(config.api_origin, config.read_token())
+    drivers = build_drivers(config, registry)
+    mcp = PlaneMcpServer(port=config.mcp_port)
+    mcp.start()
+    executor = RunExecutor(
+        client=client,
+        drivers=drivers,
+        sandboxes=next(iter(drivers.values())).sandboxes,
+        mcp=mcp,
         run_root=config.run_root,
         token_file=config.token_file,
         plane_checkout=config.plane_checkout,
+        imported_servers=imported,
+        git_allowed_hosts=config.git_allowed_hosts,
+        git_allowed_ips=config.git_allowed_ips,
+    )
+    loop = WorkerLoop(
+        client=client,
+        drivers=drivers,
+        run_root=config.run_root,
+        token_file=config.token_file,
+        plane_checkout=config.plane_checkout,
+        run_executor=executor,
     )
     stop_event = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda *_: stop_event.set())
-    logger.info("Worker started; polling %s", config.api_origin)
-    loop.run_forever(stop_event, config.poll_seconds)
+    logger.info("Worker started; polling %s; Plane MCP on 127.0.0.1:%s", config.api_origin, mcp.port)
+    try:
+        loop.run_forever(stop_event, config.poll_seconds)
+    finally:
+        mcp.stop()
     return 0
 
 

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Worker poll loop: heartbeat, claim a pending probe, run it and report it.
+"""Worker poll loop: heartbeat, claim a pending probe, run it and report it; claim Q&A Runs.
 
 A failed or rejected request is logged and the loop continues; it never stops on
 a Plane error or on an unexpected error in one step. The claim gives the seconds
@@ -10,6 +10,9 @@ left before Plane's answer deadline; the probe budget ends before it. While a
 probe runs, the Worker asks Plane every few seconds whether the probe is still
 current and stops it when a newer Connect or a Disconnect replaced it. The report
 carries the probe generation, so Plane also rejects a late report.
+
+With a Run executor, each poll also claims one Q&A Run while fewer than
+``max_runs`` Runs are active, and works it on its own thread.
 """
 
 import logging
@@ -28,6 +31,8 @@ REPORT_MARGIN_SECONDS = 10
 # A probe with less time than this cannot finish; the Worker does not start it.
 MIN_PROBE_SECONDS = 30
 PROBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+# Q&A Runs that one Worker works at the same time.
+MAX_RUNS = 4
 
 logger = logging.getLogger("plane_agent_worker.loop")
 
@@ -45,6 +50,8 @@ class WorkerLoop:
         heartbeat_seconds=HEARTBEAT_SECONDS,
         probe_check_seconds=PROBE_CHECK_SECONDS,
         clock=time.monotonic,
+        run_executor=None,
+        max_runs=MAX_RUNS,
     ):
         self.client = client
         self.drivers = dict(drivers)
@@ -55,6 +62,9 @@ class WorkerLoop:
         self.heartbeat_seconds = heartbeat_seconds
         self.probe_check_seconds = probe_check_seconds
         self.clock = clock
+        self.run_executor = run_executor
+        self.max_runs = max_runs
+        self._run_threads = []
         self._last_heartbeat = None
 
     def _heartbeat_if_due(self):
@@ -68,8 +78,37 @@ class WorkerLoop:
             logger.warning("Heartbeat failed: status %s (%s)", error.status, error.code)
 
     def run_once(self):
-        """One poll step. Returns True when a probe was claimed."""
+        """One poll step. Returns True when a probe or a Run was claimed."""
         self._heartbeat_if_due()
+        probe_claimed = self._probe_step()
+        return self._run_step() or probe_claimed
+
+    def _run_step(self):
+        """Claim one Run when there is capacity, and work it on its own thread. Returns True when claimed."""
+        if self.run_executor is None:
+            return False
+        self._run_threads = [thread for thread in self._run_threads if thread.is_alive()]
+        if len(self._run_threads) >= self.max_runs:
+            return False
+        try:
+            run = self.client.claim_run(sorted(self.drivers))
+        except PlaneClientError as error:
+            logger.warning("Run claim failed: status %s (%s)", error.status, error.code)
+            return False
+        if not run:
+            return False
+        logger.info("Claimed Run %s", run.get("id"))
+        thread = threading.Thread(target=self.run_executor.execute, args=(run,), daemon=True)
+        thread.start()
+        self._run_threads.append(thread)
+        return True
+
+    def wait_for_runs(self, timeout=None):
+        """Wait until the active Runs end (for shutdown and tests)."""
+        for thread in list(self._run_threads):
+            thread.join(timeout)
+
+    def _probe_step(self):
         try:
             probe = self.client.claim_probe(sorted(self.drivers))
         except PlaneClientError as error:

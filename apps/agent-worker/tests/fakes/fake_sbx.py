@@ -38,8 +38,11 @@ def load(name):
 
 
 def save(name, record):
+    """Write the record atomically: Runs on several threads call the fake at the same time."""
     SANDBOXES.mkdir(parents=True, exist_ok=True)
-    (SANDBOXES / f"{name}.json").write_text(json.dumps(record))
+    temporary = SANDBOXES / f".{name}.{os.getpid()}.tmp"
+    temporary.write_text(json.dumps(record))
+    os.replace(temporary, SANDBOXES / f"{name}.json")
 
 
 def fail(message, code):

@@ -9,7 +9,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from plane_agent_worker.plane_client import MAX_RESPONSE_BYTES, PlaneClient, PlaneClientError, ProbeRejected
+from plane_agent_worker.plane_client import (
+    MAX_RESPONSE_BYTES,
+    Conflict,
+    PlaneClient,
+    PlaneClientError,
+    ProbeRejected,
+)
 
 TOKEN = "plane_aw_client-test-token-0001"
 
@@ -25,10 +31,15 @@ class Recorder:
 
 def start_server(recorder):
     class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.do_POST()
+
         def do_POST(self):
             length = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(length) if length else b""
-            recorder.requests.append({"path": self.path, "headers": dict(self.headers), "body": body})
+            recorder.requests.append(
+                {"method": self.command, "path": self.path, "headers": dict(self.headers), "body": body}
+            )
             status, payload, headers = recorder.responses.get(self.path, (200, {}, {}))
             raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
             self.send_response(status)
@@ -149,3 +160,72 @@ def test_oversized_response_is_rejected(plane):
 def test_unreachable_plane_raises_a_client_error():
     with pytest.raises(PlaneClientError):
         PlaneClient("http://127.0.0.1:9", TOKEN, timeout=2).heartbeat()
+
+
+RUN = "4b0b9e1e-0000-4000-8000-000000000001"
+
+
+def test_run_claim_sends_the_harnesses_and_returns_the_run(plane):
+    plane.respond("/api/agent-worker/v1/runs/claim/", 200, {"run": {"id": RUN, "lease_generation": 1}})
+
+    run = PlaneClient(plane.origin, TOKEN).claim_run(["claude_code"])
+
+    assert run == {"id": RUN, "lease_generation": 1}
+    assert json.loads(plane.requests[0]["body"]) == {"harnesses": ["claude_code"]}
+
+
+def test_no_run_to_claim_is_none(plane):
+    plane.respond("/api/agent-worker/v1/runs/claim/", 200, {"run": None})
+
+    assert PlaneClient(plane.origin, TOKEN).claim_run(["claude_code"]) is None
+
+
+def test_run_calls_carry_the_lease_generation(plane):
+    client = PlaneClient(plane.origin, TOKEN)
+    base = f"/api/agent-worker/v1/runs/{RUN}"
+    plane.respond(f"{base}/context/?lease_generation=4", 200, {"version": 1, "payload": {"a": 1}})
+    plane.respond(f"{base}/events/", 200, {"events": [{"id": "e", "seq": 2, "source_key": "k"}]})
+
+    client.renew_run(RUN, 4)
+    client.report_clone(RUN, 4, ok=True, clone_path="/runs/clone")
+    client.report_clone(RUN, 4, ok=False, error_code="git_tls_failed", error_detail="bad cert")
+    assert client.run_context(RUN, 4) == {"version": 1, "payload": {"a": 1}}
+    stored = client.post_events(RUN, 4, 0, [{"source_key": "k", "kind": "status", "payload": {}}])
+    client.post_result(RUN, 4, {"status": "completed", "conclusion": "Done"})
+
+    assert stored == [{"id": "e", "seq": 2, "source_key": "k"}]
+    calls = [(request["method"], request["path"], json.loads(request["body"] or b"{}")) for request in plane.requests]
+    assert calls == [
+        ("POST", f"{base}/renew/", {"lease_generation": 4}),
+        ("POST", f"{base}/clone/", {"lease_generation": 4, "ok": True, "clone_path": "/runs/clone"}),
+        (
+            "POST",
+            f"{base}/clone/",
+            {"lease_generation": 4, "ok": False, "error_code": "git_tls_failed", "error_detail": "bad cert"},
+        ),
+        ("GET", f"{base}/context/?lease_generation=4", {}),
+        (
+            "POST",
+            f"{base}/events/",
+            {"lease_generation": 4, "turn_index": 0, "events": [{"source_key": "k", "kind": "status", "payload": {}}]},
+        ),
+        ("POST", f"{base}/result/", {"lease_generation": 4, "status": "completed", "conclusion": "Done"}),
+    ]
+
+
+def test_git_credential_returns_the_password_only_to_the_caller(plane):
+    plane.respond(
+        f"/api/agent-worker/v1/runs/{RUN}/git-credential/", 200, {"username": "oauth2", "password": "glpat-x"}
+    )
+
+    assert PlaneClient(plane.origin, TOKEN).git_credential(RUN, 2) == "glpat-x"
+    assert json.loads(plane.requests[0]["body"]) == {"lease_generation": 2, "purpose": "fetch"}
+
+
+def test_lost_lease_is_a_conflict(plane):
+    plane.respond(f"/api/agent-worker/v1/runs/{RUN}/renew/", 409, {"error": "lease_superseded"})
+
+    with pytest.raises(Conflict) as error:
+        PlaneClient(plane.origin, TOKEN).renew_run(RUN, 1)
+    assert error.value.code == "lease_superseded"
+    assert not isinstance(error.value, ProbeRejected)
