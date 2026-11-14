@@ -207,8 +207,11 @@ Effort change (Phases 3-7, +4d net against 58.5d):
 
 <!-- 2026-11-14 --> The Code-job sandbox question was removed by Q36. The skills question was answered (Q32 amendment). The Codex login question was answered by Q37.
 
-1. Docker MCP gateway: the `claude` kit connects the Docker MCP gateway (`mcp-gateway.docker.internal`) by default (report limit 2). Keep it, or deny it with a sandbox network rule (not tested)? Proposal: deny it, because Q32 says nothing loads unless the operator lists it.
-2. Auto-stop: `sbx` stops an idle sandbox 30 s after the last command; the first turn after idle pays 1.4-2.1 s to start it. Accept this, or keep a session open? Proposal: accept (no Worker idle logic).
+38. Q38, Docker MCP gateway (user, 2026-11-14): disabled. Each sandbox gets a network deny rule for `mcp-gateway.docker.internal` (or the sbx switch, if Phase 3 Task 0 finds one). The agent sees only the operator-listed MCP servers, the Plane MCP server and Archon MCP.
+39. Q39, auto-stop (user, 2026-11-14): accepted. `sbx` stops an idle sandbox 30 s after the last command; the Worker treats a stopped sandbox as normal and the next command restarts it (1.4-2.1 s). No Worker idle logic.
+
+Still open:
+
 3. Host config brings all hooks and Codex MCP servers (from Q37): the mounted host `~/.claude/settings.json` carries every host hook, and the mounted host `~/.codex/config.toml` carries every host Codex MCP server. Q32 says hooks and MCP servers come only when listed (default nothing), and a read-only mount cannot be filtered without a copy. Hook scripts at host paths do not exist in the VM unless mounted, and stdio servers that need Node.js fail in the kit. Proposal: treat them like skills: all host hooks and Codex MCP servers come with the config; mount `~/.claude/hooks` read-only at its host path when it exists; remove `PLANE_AGENT_IMPORT_HOOKS`. Claude MCP servers live in `~/.claude.json`, which is not mounted, so `PLANE_AGENT_IMPORT_MCP_SERVERS` stays for Claude (the Archon MCP server is listed there, Q36). Keep the proposal, or keep "only listed" (then the Worker must write a filtered copy, which Q37 avoids)?
 
 ## Red Team Review
