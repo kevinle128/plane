@@ -88,3 +88,33 @@ def test_reconcile_removes_the_record_of_a_finished_process(private_dir):
 
     assert registry.reconcile() == []
     assert not (private_dir / "processes" / "done.json").exists()
+
+
+def test_reconcile_removes_recorded_folders_inside_the_cleanup_roots(private_dir):
+    sessions = private_dir / "projects"
+    left = sessions / "-runs-probes-p1-1-workspace"
+    left.mkdir(parents=True)
+    outside = private_dir / "keep"
+    outside.mkdir()
+    registry = ProcessRegistry(private_dir / "processes")
+    process = registry.spawn("probe-3", [sys.executable, "-c", "pass"], cleanup_paths=[str(left), str(outside)])
+    process.wait(timeout=5)
+
+    ProcessRegistry(private_dir / "processes").reconcile(cleanup_roots=[sessions])
+
+    assert not left.exists()
+    assert outside.exists()
+    assert not (private_dir / "processes" / "probe-3.json").exists()
+
+
+def test_release_keeps_no_record_and_reconcile_removes_nothing_after_it(private_dir):
+    session = private_dir / "projects" / "-own"
+    session.mkdir(parents=True)
+    registry = ProcessRegistry(private_dir / "processes")
+    process = registry.spawn("probe-4", [sys.executable, "-c", "pass"], cleanup_paths=[str(session)])
+    process.wait(timeout=5)
+    registry.release("probe-4", process)
+
+    registry.reconcile(cleanup_roots=[private_dir / "projects"])
+
+    assert session.exists()

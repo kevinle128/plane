@@ -6,8 +6,9 @@
 
 A driver proves its Harness on the installed version before Plane shows it as
 connected: authentication, a model report, one resumed follow-up, progress
-events, interruption, permission enforcement (a write is denied under the OS
-boundary) and recovery after the Harness process is killed. It reports the
+events, interruption, permission enforcement (each write path the Harness offers
+is denied by the boundary the Run uses) and recovery after the Harness process
+is killed. It reports the
 native capabilities (midturn input, native resume, permission prompt) apart from
 the checks, because Plane offers its own queue and stop path where a native
 control is missing.
@@ -72,15 +73,24 @@ class ProbeWorkspace:
 
 
 class Deadline:
-    def __init__(self, seconds):
+    """A time limit. When ``cancel`` (a ``threading.Event``) is set, no time remains."""
+
+    def __init__(self, seconds, cancel=None):
         self.end = time.monotonic() + seconds
+        self.cancel = cancel
+
+    @property
+    def cancelled(self):
+        return self.cancel is not None and self.cancel.is_set()
 
     def remaining(self):
+        if self.cancelled:
+            return 0.0
         return max(0.0, self.end - time.monotonic())
 
     def within(self, seconds):
-        """The earlier of this deadline and ``seconds`` from now, as a new deadline."""
-        return Deadline(min(seconds, self.remaining()))
+        """The earlier of this deadline and ``seconds`` from now, as a new deadline with the same cancel event."""
+        return Deadline(min(seconds, self.remaining()), self.cancel)
 
     @property
     def expired(self):
@@ -94,4 +104,4 @@ class ProbeTimeout(Exception):
 class HarnessDriver(Protocol):
     harness: str
 
-    def probe(self, workspace: ProbeWorkspace, sandbox, deadline: Deadline) -> ProbeOutcome: ...
+    def probe(self, workspace: ProbeWorkspace, deadline: Deadline) -> ProbeOutcome: ...

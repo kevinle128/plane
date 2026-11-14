@@ -95,8 +95,10 @@ class PlaneClient:
             return body["error"][:64]
         return "request failed"
 
-    def heartbeat(self):
-        return self._post("/heartbeat/", {})
+    def heartbeat(self, probe_id=None, generation=None):
+        """Record that the Worker is alive. With a probe, Plane also answers whether the probe is still current."""
+        body = {} if probe_id is None else {"probe": {"id": str(probe_id), "generation": generation}}
+        return self._post("/heartbeat/", body)
 
     def claim_probe(self, harnesses):
         body = self._post("/probes/claim/", {"harnesses": list(harnesses)})

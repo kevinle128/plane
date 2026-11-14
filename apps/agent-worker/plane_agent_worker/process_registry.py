@@ -5,14 +5,16 @@
 """Records of the Harness process groups that the Worker starts.
 
 Each Harness process starts in its own process group. The Worker writes one
-private JSON record per group (PID, group ID and process start time). At start,
-``reconcile`` stops the groups that a previous Worker left behind. It compares
-the start time first, so a PID that the system gave to an unrelated process is
-never signalled.
+private JSON record per group (PID, group ID, process start time and the
+folders to remove if the Worker stops before the process ends). At start,
+``reconcile`` stops the groups that a previous Worker left behind and removes
+their recorded folders. It compares the start time first, so a PID that the
+system gave to an unrelated process is never signalled.
 """
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import time
@@ -81,8 +83,11 @@ class ProcessRegistry:
             os.fsync(handle.fileno())
         os.replace(temporary, path)
 
-    def spawn(self, key, argv, **popen_kwargs):
-        """Start ``argv`` in a new process group and record it under ``key``."""
+    def spawn(self, key, argv, cleanup_paths=(), **popen_kwargs):
+        """Start ``argv`` in a new process group and record it under ``key``.
+
+        ``cleanup_paths`` are folders that ``reconcile`` removes when a previous Worker left this record.
+        """
         process = subprocess.Popen(argv, start_new_session=True, **popen_kwargs)
         try:
             self._write_record(
@@ -92,6 +97,7 @@ class ProcessRegistry:
                     "pgid": os.getpgid(process.pid),
                     "started": process_start_time(process.pid),
                     "argv0": os.path.basename(argv[0]),
+                    "cleanup": [str(path) for path in cleanup_paths],
                 },
             )
         except BaseException:
@@ -110,8 +116,13 @@ class ProcessRegistry:
             process.wait()
         self._record_path(key).unlink(missing_ok=True)
 
-    def reconcile(self):
-        """Stop the recorded groups of a previous Worker. Returns the keys of the stopped groups."""
+    def reconcile(self, cleanup_roots=()):
+        """Stop the recorded groups of a previous Worker and remove their recorded folders.
+
+        A folder is removed only when it is strictly inside one of ``cleanup_roots``. Returns the keys of the
+        stopped groups.
+        """
+        roots = [Path(os.path.realpath(root)) for root in cleanup_roots]
         stopped = []
         for path in sorted(self.directory.glob("*.json")):
             key = path.stem
@@ -124,5 +135,16 @@ class ProcessRegistry:
             if started and is_alive(pid) and process_start_time(pid) == started:
                 stop_group(pgid)
                 stopped.append(key)
+            for folder in record.get("cleanup") or []:
+                remove_inside(folder, roots)
             path.unlink(missing_ok=True)
         return stopped
+
+
+def remove_inside(folder, roots):
+    """Remove ``folder`` when it is an absolute path strictly inside one of ``roots``."""
+    if not isinstance(folder, str) or not os.path.isabs(folder):
+        return
+    target = Path(os.path.realpath(folder))
+    if any(root in target.parents for root in roots):
+        shutil.rmtree(target, ignore_errors=True)

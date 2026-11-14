@@ -19,12 +19,11 @@ import threading
 from pathlib import Path
 
 from plane_agent_worker.config import ConfigError, load_config
-from plane_agent_worker.conformance import TranscriptRecorder, run_probe
-from plane_agent_worker.drivers.claude import ClaudeDriver
+from plane_agent_worker.conformance import TranscriptRecorder, remove_stale_probes, run_probe
+from plane_agent_worker.drivers.claude import ClaudeDriver, claude_config_dir
 from plane_agent_worker.loop import WorkerLoop
 from plane_agent_worker.plane_client import PlaneClient
 from plane_agent_worker.process_registry import ProcessRegistry
-from plane_agent_worker.sandbox_macos import MacOSSandbox
 
 logger = logging.getLogger("plane_agent_worker")
 
@@ -33,17 +32,24 @@ def build_drivers(config, registry, recorder=None):
     return {"claude_code": ClaudeDriver(executable=config.claude_bin, registry=registry, recorder=recorder)}
 
 
-def command_run(config, registry):
-    stopped = registry.reconcile()
+def clean_up_previous_worker(config, registry):
+    """Stop the Harness processes of a previous Worker and remove its probe and session folders."""
+    stopped = registry.reconcile(cleanup_roots=[claude_config_dir(os.environ) / "projects"])
     if stopped:
         logger.info("Stopped %d Harness process group(s) left by a previous Worker", len(stopped))
+    removed = remove_stale_probes(config.run_root)
+    if removed:
+        logger.info("Removed %d probe folder(s) left by a previous Worker", removed)
+
+
+def command_run(config, registry):
+    clean_up_previous_worker(config, registry)
     loop = WorkerLoop(
         client=PlaneClient(config.api_origin, config.read_token()),
         drivers=build_drivers(config, registry),
         run_root=config.run_root,
         token_file=config.token_file,
         plane_checkout=config.plane_checkout,
-        sandbox=MacOSSandbox(),
     )
     stop_event = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):
@@ -54,7 +60,7 @@ def command_run(config, registry):
 
 
 def command_probe(config, registry, harness, record_dir):
-    registry.reconcile()
+    clean_up_previous_worker(config, registry)
     recorder = None
     if record_dir:
         home = os.path.expanduser("~")
@@ -72,7 +78,6 @@ def command_probe(config, registry, harness, record_dir):
         probe_key="local-probe",
         token_file=config.token_file,
         plane_checkout=config.plane_checkout,
-        sandbox=MacOSSandbox(),
     )
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0 if all(check["passed"] for check in report["checks"]) and report["models"] else 1
@@ -89,7 +94,7 @@ def main(argv=None):
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if sys.platform != "darwin":
-        print("The Worker needs the macOS sandbox and runs only on macOS.", file=sys.stderr)
+        print("The Worker runs only on macOS (the Mac Mini that holds the Harness CLIs).", file=sys.stderr)
         return 2
     try:
         config = load_config(os.environ)

@@ -5,7 +5,7 @@
 """Connection probe runner.
 
 Creates the private directories of one probe under the Run root, runs the driver
-probe within a time budget below Plane's 120 s answer window, removes the
+probe within a time budget that ends before Plane's answer deadline, removes the
 directories, and returns a version 1 report. The report is evidence only; Plane
 decides whether the Harness is connected.
 """
@@ -51,6 +51,21 @@ def prepare_workspace(run_root, probe_key, token_file, plane_checkout):
     )
 
 
+def remove_stale_probes(run_root):
+    """Remove the probe directories of a previous Worker. No probe continues after a Worker restart."""
+    probes = run_root / "probes"
+    if not probes.is_dir():
+        return 0
+    removed = 0
+    for entry in probes.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry, ignore_errors=True)
+        else:
+            entry.unlink(missing_ok=True)
+        removed += 1
+    return removed
+
+
 def build_report(outcome):
     checks = list(outcome.checks.values())
     hint = outcome.failure_hint
@@ -76,17 +91,20 @@ def run_probe(
     probe_key,
     token_file,
     plane_checkout,
-    sandbox,
     budget_seconds=PROBE_BUDGET_SECONDS,
+    cancel=None,
 ):
-    workspace = prepare_workspace(run_root, probe_key, token_file, plane_checkout)
+    """Run one probe. ``cancel`` (a ``threading.Event``) stops it early, for example when Plane replaced it."""
+    own_dir = run_root / "probes" / probe_key
     try:
-        outcome = driver.probe(workspace, sandbox, Deadline(budget_seconds))
-    except Exception as error:  # a driver defect must still produce a failed report, never a crash
+        workspace = prepare_workspace(run_root, probe_key, token_file, plane_checkout)
+        outcome = driver.probe(workspace, Deadline(budget_seconds, cancel))
+    except Exception as error:  # a driver or disk defect must still produce a failed report, never a crash
         logger.exception("Harness probe %s failed", driver.harness)
         outcome = ProbeOutcome(failure_hint=f"The probe stopped with an internal error ({type(error).__name__}).")
     finally:
-        shutil.rmtree(workspace.own_dir, ignore_errors=True)
+        if probe_key and "/" not in probe_key and not probe_key.startswith("."):
+            shutil.rmtree(own_dir, ignore_errors=True)
     return build_report(outcome)
 
 
