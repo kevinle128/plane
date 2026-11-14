@@ -484,7 +484,11 @@ class TestAgentModelSelection:
         patch_agent(session_client, workspace, {"selected_model": "sonnet"})
         session_client.post(agents_url(workspace.slug, "claude_code", "disconnect"), {}, format="json")
 
-        reconnect_claude(session_client, workspace, models=[{"id": "sonnet", "label": "Sonnet", "description": ""}])
+        reconnect_claude(
+            session_client,
+            workspace,
+            models=[{"id": "sonnet", "label": "Sonnet", "description": "", "source": "reported"}],
+        )
 
         assert session_client.get(agents_url(workspace.slug, "claude_code")).data["selected_model"] == "sonnet"
 
@@ -493,7 +497,9 @@ class TestAgentModelSelection:
         connect_claude(session_client, workspace)
         patch_agent(session_client, workspace, {"selected_model": "sonnet"})
 
-        reconnect_claude(session_client, workspace, models=[{"id": "opus", "label": "Opus", "description": ""}])
+        reconnect_claude(
+            session_client, workspace, models=[{"id": "opus", "label": "Opus", "description": "", "source": "reported"}]
+        )
 
         agent = session_client.get(agents_url(workspace.slug, "claude_code")).data
         assert agent["connection"]["state"] == "connected"

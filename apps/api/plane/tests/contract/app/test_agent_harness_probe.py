@@ -12,6 +12,7 @@ from rest_framework import status
 
 from plane.db.models import AgentConnection
 from plane.tests.agent_settings_fixtures import (
+    FALLBACK_MODELS,
     REPORTED_MODELS,
     agents_url,
     failing_checks,
@@ -288,6 +289,20 @@ class TestProbeReport:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
+    def test_fallback_models_are_stored_and_shown_with_their_source(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+
+        response = worker_client.post(
+            report_url(probe["id"]), probe_report(probe["generation"], models=FALLBACK_MODELS), format="json"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        connection = agent_state(session_client, workspace)["connection"]
+        assert connection["state"] == "connected"
+        assert connection["models"] == FALLBACK_MODELS
+        assert AgentConnection.objects.get(pk=probe["id"]).reported_models == FALLBACK_MODELS
+
+    @pytest.mark.django_db
     def test_failed_check_sets_failed_with_the_missing_action(self, session_client, worker_client, workspace):
         probe = connect_and_claim(session_client, worker_client, workspace)
         report = probe_report(
@@ -432,6 +447,8 @@ class TestProbeReport:
             {"failure_hint": "x" * 1001},
             {"blocking_issue": "something_else"},
             # Every check passed, so the report must carry the passing suite record of this version.
+            {"models": [{"id": "opus", "label": "Opus", "description": ""}]},
+            {"models": [{"id": "opus", "label": "Opus", "description": "", "source": "guess"}]},
             {"suite": None},
             {"suite": suite_record(cli_version="2.1.288")},
             {"suite": suite_record(suite_version=0)},

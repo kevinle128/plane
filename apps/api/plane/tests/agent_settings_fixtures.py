@@ -25,9 +25,15 @@ REQUIRED_CHECK_NAMES = (
 )
 
 REPORTED_MODELS = [
-    {"id": "default", "label": "Default (recommended)", "description": "Use the default model"},
-    {"id": "sonnet", "label": "Sonnet", "description": "Efficient for routine tasks"},
-    {"id": "haiku", "label": "Haiku", "description": "Fastest model"},
+    {"id": "default", "label": "Default (recommended)", "description": "Use the default model", "source": "reported"},
+    {"id": "sonnet", "label": "Sonnet", "description": "Efficient for routine tasks", "source": "reported"},
+    {"id": "haiku", "label": "Haiku", "description": "Fastest model", "source": "reported"},
+]
+
+# The static list the Worker sends when the model list request fails at Connect.
+FALLBACK_MODELS = [
+    {"id": model_id, "label": label, "description": "", "source": "fallback"}
+    for model_id, label in (("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku"))
 ]
 
 

@@ -23,6 +23,7 @@ MAX_CLOCK_SKEW = timedelta(minutes=5)
 MAX_MODELS = 50
 # Model IDs go to the Harness command line, so only a safe character set is accepted.
 MODEL_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$"
+MODEL_SOURCES = ("reported", "fallback")
 
 
 class ProbeReferenceSerializer(serializers.Serializer):
@@ -57,6 +58,8 @@ class ProbeModelSerializer(serializers.Serializer):
     id = serializers.RegexField(MODEL_ID_PATTERN)
     label = serializers.CharField(max_length=128, allow_blank=True, required=False, default="")
     description = serializers.CharField(max_length=300, allow_blank=True, required=False, default="")
+    # "fallback" marks the Worker's static list of CLI aliases, sent when the model list request failed.
+    source = serializers.ChoiceField(choices=MODEL_SOURCES)
 
 
 class ProbeCapabilitiesSerializer(serializers.Serializer):
