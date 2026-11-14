@@ -11,6 +11,7 @@ import {
   getHarnessConnectionAction,
   getHarnessConnectionTag,
   getMissingActionKey,
+  getModelSourceNoteKey,
   isConnectionPending,
 } from "./connection-state";
 
@@ -65,7 +66,7 @@ describe("isConnectionPending", () => {
 });
 
 describe("canSelectModel", () => {
-  const models = [{ id: "sonnet", label: "Sonnet", description: "" }];
+  const models = [{ id: "sonnet", label: "Sonnet", description: "", source: "reported" as const }];
 
   it("allows a model choice only for a connected Harness with reported models", () => {
     expect(canSelectModel(connection({ state: "connected", models }))).toBe(true);
@@ -73,6 +74,15 @@ describe("canSelectModel", () => {
     expect(canSelectModel(connection({ state: "failed", models }))).toBe(false);
     expect(canSelectModel(connection({ state: "not_connected", models }))).toBe(false);
     expect(canSelectModel(undefined)).toBe(false);
+  });
+});
+
+describe("getModelSourceNoteKey", () => {
+  it("marks a fallback model as not reported by the Harness and leaves reported models plain", () => {
+    expect(getModelSourceNoteKey({ id: "opus", label: "Opus", description: "", source: "fallback" })).toBe(
+      "agent_settings.model.not_reported"
+    );
+    expect(getModelSourceNoteKey({ id: "opus", label: "Opus", description: "", source: "reported" })).toBeNull();
   });
 });
 

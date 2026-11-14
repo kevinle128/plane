@@ -9,7 +9,8 @@ import type { TAgentModel } from "@plane/types";
 import { agentSettingsFormOf, changesOf, mergeServerAgent } from "./settings-draft";
 import { makeAgent } from "./test-agent";
 
-const models = (...ids: string[]): TAgentModel[] => ids.map((id) => ({ id, label: id, description: "" }));
+const models = (...ids: string[]): TAgentModel[] =>
+  ids.map((id) => ({ id, label: id, description: "", source: "reported" }));
 
 describe("changesOf", () => {
   it("has no changes for an untouched form", () => {

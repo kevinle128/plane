@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import type { TAgentConnection, TAgentConnectionState } from "@plane/types";
+import type { TAgentConnection, TAgentConnectionState, TAgentModel } from "@plane/types";
 
 export type THarnessConnectionTone = "success" | "tertiary" | "danger" | "accent";
 
@@ -56,6 +56,11 @@ export function isConnectionPending(state: TAgentConnectionState): boolean {
 /** The model selector shows only for a connected Harness that reported models; no model is shown as verified otherwise. */
 export function canSelectModel(connection: TAgentConnection | undefined): boolean {
   return connection?.state === "connected" && connection.models.length > 0;
+}
+
+/** Translation key of the note on a model that the Harness did not report (the static fallback list), or `null`. */
+export function getModelSourceNoteKey(model: TAgentModel): string | null {
+  return model.source === "fallback" ? "agent_settings.model.not_reported" : null;
 }
 
 /** Translation key of the action that fixes a failed connection, or `null` when nothing is missing. */

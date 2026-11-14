@@ -10,11 +10,18 @@ export type TAgentHarness = "claude_code" | "codex" | "omp";
 /** Connection state as Plane shows it. A probe without a report after 120 s reads as `failed`. */
 export type TAgentConnectionState = "not_connected" | "connecting" | "connected" | "failed";
 
-/** A model that the connected Harness reported. Only reported models can be selected. */
+/**
+ * Where a model entry comes from: the Harness reported it, or the Worker used its static list of CLI
+ * aliases because the model list request failed at Connect.
+ */
+export type TAgentModelSource = "reported" | "fallback";
+
+/** A model of the connected Harness. Only models in the connection report can be selected. */
 export type TAgentModel = {
   id: string;
   label: string;
   description: string;
+  source: TAgentModelSource;
 };
 
 export type TAgentConnectionCheck = {

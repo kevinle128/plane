@@ -213,6 +213,7 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: TCardProps)
             {({ controlId, describedBy, invalid }) => (
               <HarnessModelSelect
                 connection={agent.connection}
+                harnessName={AGENT_HARNESS_LABELS[agent.harness]}
                 value={draft.selected_model}
                 controlId={controlId}
                 describedBy={describedBy}

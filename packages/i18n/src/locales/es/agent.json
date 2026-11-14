@@ -313,7 +313,8 @@
       "label": "Model",
       "hint": "Reported by the agent when it connects; picked per agent. New runs use it; started runs keep their model.",
       "unavailable": "Available after connecting",
-      "placeholder": "Choose a model"
+      "placeholder": "Choose a model",
+      "not_reported": "Not reported by {harness}"
     }
   }
 }
