@@ -69,7 +69,13 @@ _NAT64 = ipaddress.ip_network("64:ff9b::/96")
 _FAILURE_PATTERNS = (
     ("git_dns_failed", re.compile(r"could not resolve host", re.IGNORECASE)),
     ("git_unreachable", re.compile(r"connection refused|timed out|couldn't connect|failed to connect", re.IGNORECASE)),
-    ("git_tls_failed", re.compile(r"ssl certificate problem|server certificate verification failed", re.IGNORECASE)),
+    # OpenSSL or Secure Transport builds of curl, then GnuTLS builds (Debian and Ubuntu git).
+    (
+        "git_tls_failed",
+        re.compile(
+            r"ssl certificate problem|server certificate verification failed|server verification failed", re.IGNORECASE
+        ),
+    ),
     (
         "git_auth_failed",
         re.compile(r"authentication failed|returned error: 40[13]\b|could not read username", re.IGNORECASE),

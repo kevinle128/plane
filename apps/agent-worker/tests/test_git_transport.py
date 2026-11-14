@@ -330,7 +330,7 @@ def test_ca_bundle_option_does_not_apply_to_another_port(
         )
 
     assert result.returncode != 0
-    assert "SSL certificate problem" in result.stderr
+    assert failure_code(result.stderr) == "git_tls_failed"
 
 
 # Redirects -----------------------------------------------------------------------
@@ -526,6 +526,11 @@ def test_hanging_server_fails_as_unreachable(monkeypatch, recorder, ca_dir, priv
         ),
         (
             "fatal: unable to access 'https://h/r/': server certificate verification failed. CAfile: none",
+            "git_tls_failed",
+        ),
+        (
+            "fatal: unable to access 'https://h/r/': server verification failed: certificate signer not trusted. "
+            "(CAfile: /etc/ssl/certs/ca-certificates.crt CRLfile: none)",
             "git_tls_failed",
         ),
         ("remote: HTTP Basic: Access denied\nfatal: Authentication failed for 'https://h/r.git/'", "git_auth_failed"),
