@@ -221,7 +221,6 @@ class RunExecutor:
     # Steps --------------------------------------------------------------------
 
     def _work(self, run, layout, driver, sink, cancel, lease):
-        run_id, generation = run["id"], run["lease_generation"]
         turn_index = sink.turn_index
         repository = run["repository"]
         # The Run root is outside the Plane checkout (checked at Worker start), and so is every Run folder.
@@ -238,10 +237,19 @@ class RunExecutor:
             allow=(f"localhost:{self.mcp.port}", *imported_allow_rules(self.imported_servers)),
         )
         try:
-            self.sandboxes.ensure(spec)
+            with self.sandboxes.use(spec):
+                outcome = self._turn(run, layout, driver, sink, cancel, spec)
         except SandboxError as error:
             raise RunFailure(error.code, f"The sandbox is not available: {error.detail}") from None
+        if lease["lost"]:
+            raise LeaseLost("lease_superseded")
+        sink.flush()
+        self._finish(run["id"], run["lease_generation"], outcome)
 
+    def _turn(self, run, layout, driver, sink, cancel, spec):
+        """The version check and the turn, while the Run holds the sandbox. Returns the ``TurnOutcome``."""
+        run_id, generation = run["id"], run["lease_generation"]
+        turn_index = sink.turn_index
         deadline = Deadline(TURN_LIMIT_SECONDS, cancel)
         self._check_version(driver, spec.name, run_id, layout, turn_index, sink, deadline)
 
@@ -278,10 +286,7 @@ class RunExecutor:
             )
         finally:
             self.mcp.close_turn(handle)
-        if lease["lost"]:
-            raise LeaseLost("lease_superseded")
-        sink.flush()
-        self._finish(run_id, generation, outcome)
+        return outcome
 
     def _clone(self, run, layout):
         run_id, generation = run["id"], run["lease_generation"]

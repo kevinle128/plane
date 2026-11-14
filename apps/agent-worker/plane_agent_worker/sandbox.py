@@ -35,12 +35,18 @@ Mounts are fixed at create. The create arguments are kept in ``sandbox.json`` ne
 the scratch folder; different arguments (for example a new skill link target)
 remove and create the sandbox again, which loses its session history.
 
+Several Runs of one repository share its sandbox. A Run holds the sandbox shared
+from its check to the end of its turn (``use``); ``stop``, ``rm`` and ``create`` wait
+until no Run holds it, so a recreate never cuts a live turn. A new Run that needs a
+recreate waits for the live turns, which end at the latest at their turn limit.
+
 A signal to the host ``sbx exec`` client does not stop the process inside, so each
 long-running process writes its PID to a pidfile and is stopped with ``kill`` of that
 PID through a second ``sbx exec``. Never a broad kill: killing the keep-alive
 process stops the whole sandbox.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -108,6 +114,34 @@ class SandboxSpec:
 def probe_scratch(run_root, harness):
     """The writable scratch folder of the probe sandbox of ``harness``."""
     return Path(run_root) / "sandboxes" / f"probe-{harness}" / "scratch"
+
+
+class SandboxLock:
+    """Runs hold a sandbox shared; ``stop``, ``rm`` and ``create`` hold it exclusive.
+
+    ``check`` orders the checks of one sandbox. A check takes the exclusive side only for a
+    stop, remove or create, so a check that finds the sandbox ready does not wait for live turns.
+    """
+
+    def __init__(self):
+        self.check = threading.Lock()
+        self._idle = threading.Condition()
+        self._users = 0
+
+    def enter(self):
+        with self._idle:
+            self._users += 1
+
+    def leave(self):
+        with self._idle:
+            self._users -= 1
+            self._idle.notify_all()
+
+    @contextlib.contextmanager
+    def exclusive(self):
+        with self._idle:
+            self._idle.wait_for(lambda: self._users == 0)
+            yield
 
 
 def first_line(text):
@@ -230,17 +264,33 @@ class Sandboxes:
         allow = [rule for rule in (gateway_rule(self.home), *spec.allow) if rule]
         return [["allow", rule] for rule in dict.fromkeys(allow)] + [["deny", KIT_ALLOW_LIST]]
 
+    def _lock(self, name):
+        with self._locks_guard:
+            return self._locks.setdefault(name, SandboxLock())
+
     def ensure(self, spec):
         """Make sure the sandbox of ``spec`` exists with the current mounts and is running.
 
-        Returns True when the sandbox was created now. Concurrent callers for one sandbox wait for each other.
+        Returns True when the sandbox was created now. Concurrent callers for one sandbox wait for each other,
+        and a stop, remove or create waits until no ``use`` holds the sandbox.
         """
-        with self._locks_guard:
-            lock = self._locks.setdefault(spec.name, threading.Lock())
-        with lock:
-            return self._ensure(spec)
+        lock = self._lock(spec.name)
+        with lock.check:
+            return self._ensure(spec, lock)
 
-    def _ensure(self, spec):
+    @contextlib.contextmanager
+    def use(self, spec):
+        """``ensure`` the sandbox, then hold it shared until the block ends; no stop, remove or create runs then."""
+        lock = self._lock(spec.name)
+        with lock.check:
+            created = self._ensure(spec, lock)
+            lock.enter()
+        try:
+            yield created
+        finally:
+            lock.leave()
+
+    def _ensure(self, spec, lock):
         state_file = Path(spec.primary).parent / "sandbox.json"
         wanted = {"create": self.create_args(spec), "rules": self.rules(spec)}
         try:
@@ -248,26 +298,29 @@ class Sandboxes:
         except (OSError, ValueError):
             known = None
         if known != wanted:
-            self.remove(spec.name)
-            self._create(spec, wanted, state_file)
+            with lock.exclusive():
+                self.remove(spec.name)
+                self._create(spec, wanted, state_file)
             return True
-        status = self.health(spec.name)
+        status = self.health(spec.name, lock)
         if status == NOT_FOUND_EXIT:
-            self._create(spec, wanted, state_file)
+            with lock.exclusive():
+                self._create(spec, wanted, state_file)
             return True
         return False
 
-    def health(self, name):
+    def health(self, name, lock):
         """0 when the sandbox answers and reads its settings; ``NOT_FOUND_EXIT`` when it does not exist.
 
         A stopped sandbox starts. A failed settings read (a stale single-file mount) stops the
-        sandbox once and checks again. Any other failure raises ``sandbox_unavailable``.
+        sandbox once, when no Run holds it, and checks again. Any other failure raises ``sandbox_unavailable``.
         """
         check = ["exec", name, "sh", "-c", f"test -r {VM_SETTINGS}"]
         result = self._run(check)
         if result.returncode == 1:
-            self._run(["stop", name])
-            result = self._run(check)
+            with lock.exclusive():
+                self._run(["stop", name])
+                result = self._run(check)
         if result.returncode in (0, NOT_FOUND_EXIT):
             return result.returncode
         raise SandboxError("sandbox_unavailable", first_line(result.stderr) or f"exit {result.returncode}")

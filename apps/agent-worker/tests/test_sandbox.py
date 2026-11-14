@@ -5,6 +5,8 @@
 import json
 import os
 import subprocess
+import threading
+import time
 
 import pytest
 
@@ -254,3 +256,84 @@ def test_client_environment_has_no_credentials(fake_sbx, host_home):
     )
 
     assert worker.client_env == {"HOME": "/h", "PATH": "/bin"}
+
+
+def changed_gateway(host_home):
+    (host_home / ".claude" / "settings.json").write_text(json.dumps({"env": {"ANTHROPIC_BASE_URL": "https://gw.test"}}))
+
+
+def destructive(fake_sbx):
+    return [call for call in fake_sbx.calls() if {"rm", "stop", "create"} & set(call)]
+
+
+def hold_in_use(worker, box, release):
+    """Hold the sandbox as a live turn does, until ``release`` is set."""
+    in_use = threading.Event()
+
+    def turn():
+        with worker.use(box):
+            in_use.set()
+            release.wait(10)
+
+    thread = threading.Thread(target=turn)
+    thread.start()
+    assert in_use.wait(10)
+    return thread
+
+
+def test_recreate_waits_for_a_live_turn(private_dir, fake_sbx, host_home):
+    box = spec(private_dir, host_home)
+    worker = sandboxes(fake_sbx, host_home)
+    worker.ensure(box)
+    release = threading.Event()
+    turn = hold_in_use(worker, box, release)
+    before = len(destructive(fake_sbx))
+    changed_gateway(host_home)
+
+    second = threading.Thread(target=worker.ensure, args=(box,))
+    second.start()
+    time.sleep(1)
+
+    assert second.is_alive()
+    assert len(destructive(fake_sbx)) == before
+    release.set()
+    turn.join(10)
+    second.join(10)
+    assert ["rm", "--force", box.name] in fake_sbx.calls()[before:]
+    assert fake_sbx.commands("create")[-1][fake_sbx.commands("create")[-1].index("--name") + 1] == box.name
+
+
+def test_stale_settings_stop_waits_for_a_live_turn(private_dir, fake_sbx, host_home):
+    box = spec(private_dir, host_home)
+    worker = sandboxes(fake_sbx, host_home)
+    worker.ensure(box)
+    release = threading.Event()
+    turn = hold_in_use(worker, box, release)
+    fake_sbx.set_scenario("stale_settings")
+
+    second = threading.Thread(target=worker.ensure, args=(box,))
+    second.start()
+    time.sleep(1)
+
+    assert second.is_alive()
+    assert fake_sbx.commands("stop") == []
+    release.set()
+    turn.join(10)
+    second.join(10)
+    assert fake_sbx.commands("stop") == [["stop", box.name]]
+
+
+def test_unchanged_sandbox_is_shared_by_concurrent_turns(private_dir, fake_sbx, host_home):
+    box = spec(private_dir, host_home)
+    worker = sandboxes(fake_sbx, host_home)
+    worker.ensure(box)
+    release = threading.Event()
+    turn = hold_in_use(worker, box, release)
+
+    try:
+        second = hold_in_use(worker, box, release)
+    finally:
+        release.set()
+    turn.join(10)
+    second.join(10)
+    assert len(fake_sbx.commands("create")) == 1
