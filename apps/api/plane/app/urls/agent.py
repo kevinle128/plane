@@ -10,7 +10,7 @@ from plane.app.views.agent.settings import (
     AgentDisconnectEndpoint,
     AgentsEndpoint,
 )
-from plane.app.views.agent.runs import IssueRunDetailEndpoint, IssueRunsEndpoint
+from plane.app.views.agent.runs import IssueRunDetailEndpoint, IssueRunEventsEndpoint, IssueRunsEndpoint
 from plane.app.views.agent.git import (
     AgentGitAccountAttachEndpoint,
     AgentGitAccountDetailEndpoint,
@@ -71,4 +71,5 @@ urlpatterns = [
     path(f"{AGENT_GIT}/repositories/", AgentGitRepositoriesEndpoint.as_view(), name="agent-git-repositories"),
     path(f"{ISSUE_RUNS}/", IssueRunsEndpoint.as_view(), name="issue-agent-runs"),
     path(f"{ISSUE_RUNS}/<uuid:run_id>/", IssueRunDetailEndpoint.as_view(), name="issue-agent-run-detail"),
+    path(f"{ISSUE_RUNS}/<uuid:run_id>/events/", IssueRunEventsEndpoint.as_view(), name="issue-agent-run-events"),
 ]

@@ -16,7 +16,10 @@ from plane.agent.services.lease import is_stale
 from plane.app.permissions import ROLE, allow_permission, issue_hidden_from_guest
 from plane.app.views.base import BaseAPIView
 from plane.app.views.issue.relation import issue_in_project
-from plane.db.models import AgentRun
+from plane.db.models import AgentRun, AgentRunEvent
+
+DEFAULT_EVENT_PAGE = 100
+MAX_EVENT_PAGE = 200
 
 
 def run_view(run, now):
@@ -41,6 +44,26 @@ def run_view(run, now):
         # Sequence numbers have no gap, so the count needs no query.
         "event_count": run.next_event_seq - 1,
         "sandbox": "read_only",
+    }
+
+
+def _int_param(request, name, default, minimum):
+    """The integer query parameter ``name``, or ``None`` when it is not an integer of at least ``minimum``."""
+    try:
+        value = int(request.query_params.get(name, default))
+    except (TypeError, ValueError):
+        return None
+    return value if value >= minimum else None
+
+
+def event_view(event):
+    return {
+        "id": str(event.id),
+        "seq": event.seq,
+        "kind": event.kind,
+        "payload": event.payload,
+        "turn_index": event.turn.index if event.turn else None,
+        "created_at": event.created_at,
     }
 
 
@@ -78,3 +101,34 @@ class IssueRunDetailEndpoint(IssueRunBaseEndpoint):
         if run is None:
             return Response({"error": "Run not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(run_view(run, timezone.now()), status=status.HTTP_200_OK)
+
+
+class IssueRunEventsEndpoint(IssueRunBaseEndpoint):
+    """Timeline page after ``after`` (a seq). Pages are stable because seq is assigned once and never reused."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
+    def get(self, request, slug, project_id, issue_id, run_id):
+        error = self.issue_error(request, slug, project_id, issue_id)
+        if error:
+            return error
+        after = _int_param(request, "after", 0, 0)
+        limit = _int_param(request, "limit", DEFAULT_EVENT_PAGE, 1)
+        if after is None or limit is None:
+            return Response({"error": "invalid_cursor"}, status=status.HTTP_400_BAD_REQUEST)
+        limit = min(limit, MAX_EVENT_PAGE)
+        if not self.runs(slug, project_id, issue_id).filter(pk=run_id).exists():
+            return Response({"error": "Run not found"}, status=status.HTTP_404_NOT_FOUND)
+        rows = list(
+            AgentRunEvent.objects.filter(run_id=run_id, seq__gt=after)
+            .select_related("turn")
+            .order_by("seq")[: limit + 1]
+        )
+        page = rows[:limit]
+        return Response(
+            {
+                "events": [event_view(event) for event in page],
+                "next_after": page[-1].seq if page else after,
+                "has_more": len(rows) > limit,
+            },
+            status=status.HTTP_200_OK,
+        )
