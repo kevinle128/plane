@@ -2,7 +2,7 @@
 
 Each story from [epics.md](../2026-09-28-plane-local-cli-agents-epics/epics.md) is in exactly one phase.
 The acceptance criteria are the Given/When/Then blocks at the cited lines. Phase files cite them again per story.
-Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43. Plus 7 plan-level GitLab stories G1-G7 (table below), so the plan delivers 50 stories.
+Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43. Plus 7 plan-level GitLab stories G1-G7 (table below), so the plan delivers 50 stories. <!-- 2026-11-14 --> After Q25 (2.23, 2.24) and Q36 (3.1-3.9, G6, G7) the plan delivers 32 epics.md stories and G1-G5 = 37 stories.
 
 | Story | Title                                          | epics.md lines | Phase                                                                                         | Mockup rows                                      |
 | ----- | ---------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -36,21 +36,21 @@ Totals: Epic 1 = 8, Epic 2 = 26, Epic 3 = 9, all = 43. Plus 7 plan-level GitLab 
 | 2.20  | Mark a stale Run failed                        | 1113-1133      | 5                                                                                             | I044                                             |
 | 2.21  | Connect Codex CLI as a local Harness           | 1135-1155      | 6 (Q18, Q20, Q21, Q23) <!-- 2026-11-14 --> (Q20, Q23 superseded by Q31; Codex sandbox; login path open) | I063, I064 (Codex states)                        |
 | 2.22  | Ask and converse with Codex on a work item     | 1157-1177      | 6 (Q20, Q23) <!-- 2026-11-14 --> (Q31: Codex sandbox) | I075                                             |
-| 2.23  | Connect Grok CLI as a local Harness            | 1179-1203      | 6 (Q18)                                                                                       | Grok idle detail state                           |
-| 2.24  | Ask and converse with Grok on a work item      | 1205-1229      | 6                                                                                             | none new                                         |
+| 2.23  | Connect Grok CLI as a local Harness            | 1179-1203      | Removed by Q25 (was 6) | Grok idle detail state                           |
+| 2.24  | Ask and converse with Grok on a work item      | 1205-1229      | Removed by Q25 (was 6) | none new                                         |
 | 2.25  | Connect Omp as a local Harness                 | 1231-1251      | 6 (Q18) <!-- 2026-11-14 --> (Q31: Omp sandbox kit) | none new                                         |
 | 2.26  | Ask and converse with Omp on a work item       | 1253-1273      | 6 <!-- 2026-11-14 --> (Q31: Omp sandbox kit) | none new                                         |
-| 3.1   | Deliver a code change after one-time approval  | 1280-1349      | 7 (Q22: AC 2, 4, 6, 7, 8 changed; AC 5 removed) <!-- 2026-11-14 --> (Q31: Code sandbox per job; AC 7 memory limit returns) | I037, I038, I039 (Code-job card), I041 ("Allow") |
-| 3.2   | Grant a matching effect for the rest of a Run  | 1351-1371      | 7 (Q22: closes on the Code-job approval; AC 2, 3 changed)                                     | I040 removed by Q22                              |
-| 3.3   | Deny a proposed Agent effect                   | 1373-1393      | 7 (Q22: AC 2 wording)                                                                         | I042                                             |
-| 3.4   | Decide a Code job's network escalation         | 1395-1415      | 7 (Q22: AC 1-3 removed; closes on the Code-mode network check, proposal pending confirmation) <!-- 2026-11-14 --> (Q27: network open in the Code sandbox only) | none (network variant of I039 removed)           |
-| 3.5   | Decide a Code job's path escalation            | 1417-1437      | 7 (Q22: AC 1-2 removed; AC 3 kept through the sandbox) <!-- 2026-11-14 --> (Q31: AC 3 kept through the mounts) | none (path variant of I039 removed)              |
-| 3.6   | Wait for a Code-job capacity slot              | 1439-1463      | 7 (Q22: AC 1 wording, AC 2-3 changed) <!-- 2026-11-14 --> (Q31: no extra Code sandbox) | I045 (waiting state, no Docker wording)          |
-| 3.7   | Stop a Code job and retain its Worktree        | 1465-1485      | 7 (Q22: AC 1, 3 wording) <!-- 2026-11-14 --> (Q31: Code sandbox removed after Stop, Worktree kept) | I030 (Code variant)                              |
-| 3.8   | Resume a stopped Code job in its Worktree      | 1487-1507      | 7 (Q22: wording) <!-- 2026-11-14 --> (Q31: new Code sandbox, context rebuilt) | I031 (Code variant)                              |
-| 3.9   | Mirror a Run conclusion to its pull request    | 1509-1529      | 7                                                                                             | I052 (consumer)                                  |
+| 3.1   | Deliver a code change after one-time approval  | 1280-1349      | Removed by Q36 (no Code jobs; was 7) | I037, I038, I039 (Code-job card), I041 ("Allow") |
+| 3.2   | Grant a matching effect for the rest of a Run  | 1351-1371      | Removed by Q36 (no Code jobs; was 7) | I040 removed by Q22                              |
+| 3.3   | Deny a proposed Agent effect                   | 1373-1393      | Removed by Q36 (no Code jobs; was 7) | I042                                             |
+| 3.4   | Decide a Code job's network escalation         | 1395-1415      | Removed by Q36 (no Code jobs; was 7) | none (network variant of I039 removed)           |
+| 3.5   | Decide a Code job's path escalation            | 1417-1437      | Removed by Q36 (no Code jobs; was 7) | none (path variant of I039 removed)              |
+| 3.6   | Wait for a Code-job capacity slot              | 1439-1463      | Removed by Q36 (no Code jobs; was 7) | I045 (waiting state, no Docker wording)          |
+| 3.7   | Stop a Code job and retain its Worktree        | 1465-1485      | Removed by Q36 (no Code jobs; was 7) | I030 (Code variant)                              |
+| 3.8   | Resume a stopped Code job in its Worktree      | 1487-1507      | Removed by Q36 (no Code jobs; was 7) | I031 (Code variant)                              |
+| 3.9   | Mirror a Run conclusion to its pull request    | 1509-1529      | Removed by Q36 (no Code jobs; was 7) | I052 (consumer)                                  |
 
-Phase totals (epics.md): 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 9 (sum 43).
+Phase totals (epics.md): 1 = 8, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 4, removed = 11 (2.23, 2.24 by Q25; 3.1-3.9 by Q36) (sum 43).
 
 ## GitLab stories (plan-level)
 
@@ -63,12 +63,12 @@ epics.md has no GitLab story. These stories come from [gitlab-scope-decisions.md
 | G3    | Bind a GitLab repository while creating a project      | [phase-01 G3](./phase-01-github-connection-and-repository.md#g3-bind-a-gitlab-repository-while-creating-a-project)                 | 1                                       | I068-I071, I076       |
 | G4    | Disconnect GitLab (revoke-free)                        | [phase-01 G4](./phase-01-github-connection-and-repository.md#g4-disconnect-gitlab-revoke-free)                                     | 1 (AC2 change-request path closes in 7) | I048                  |
 | G5    | Set GitLab merge-request policy                        | [phase-01 G5](./phase-01-github-connection-and-repository.md#g5-set-gitlab-merge-request-policy)                                   | 1 (AC4 closes in 3 and 7)               | I051, I052, I053      |
-| G6    | Deliver a draft merge request from a Code job          | [phase-07 G6](./phase-07-code-jobs-and-draft-pr.md#g6-deliver-a-draft-merge-request-from-a-code-job) (Q22: AC1, AC6 changed) <!-- 2026-11-14 --> (Q31: AC6 "a command in the Harness sandbox" reads "a command in the Code sandbox") | 7                                       | I037-I039, I041       |
-| G7    | Mirror a Run conclusion to its merge request           | [phase-07 G7](./phase-07-code-jobs-and-draft-pr.md#g7-mirror-a-run-conclusion-to-its-merge-request)                                | 7                                       | I052 (consumer)       |
+| G6    | Deliver a draft merge request from a Code job          | [phase-07 G6](./phase-07-code-jobs-and-draft-pr.md#g6-deliver-a-draft-merge-request-from-a-code-job) (Q22: AC1, AC6 changed) <!-- 2026-11-14 --> (Q31: AC6 "a command in the Harness sandbox" reads "a command in the Code sandbox") | Removed by Q36 (was 7) | I037-I039, I041       |
+| G7    | Mirror a Run conclusion to its merge request           | [phase-07 G7](./phase-07-code-jobs-and-draft-pr.md#g7-mirror-a-run-conclusion-to-its-merge-request)                                | Removed by Q36 (was 7) | I052 (consumer)       |
 
-Phase totals with GitLab: 1 = 13, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 6, 7 = 11 (sum 50).
+Phase totals with GitLab: 1 = 13, 2 = 6, 3 = 2, 4 = 5, 5 = 7, 6 = 4 (sum 37); removed: 2.23, 2.24, 3.1-3.9, G6, G7.
 
-Provider-neutral consumers of Epic 1 behavior (no new story): Phase 3 (Run snapshot with provider and policy, Worker clone through `git_transport.py`), Phase 4 (2.11 options from both providers), Phase 5 (resume remote check, `git-credential` fencing), Phase 7 (3.1 and 3.9 through `GitProviderClient`).
+Provider-neutral consumers of Epic 1 behavior (no new story): Phase 3 (Run snapshot with provider, Worker clone through `git_transport.py`), Phase 4 (2.11 options from both providers), Phase 5 (resume remote check, `git-credential` fencing, purpose `fetch`). <!-- 2026-11-14 --> The Phase 7 consumer and the policy snapshot are removed by Q36.
 
 ## Mockup scenes to phases
 
@@ -78,20 +78,22 @@ Provider-neutral consumers of Epic 1 behavior (no new story): Phase 3 (Run snaps
 | 2     | In progress      | 3, 4 (plan), 5 (queue, Stop)                |
 | 3     | Elicit           | 4                                           |
 | 4     | Completed        | 3                                           |
-| 5     | Code job + PR    | 7 (GitLab: same scene with a merge request) |
-| 6     | Permission       | 7                                           |
+| 5     | Code job + PR    | Not built (Q36)                             |
+| 6     | Permission       | Not built (Q36)                             |
 | 7     | Failed           | 3                                           |
 | 8     | Stale            | 5                                           |
-| 9     | Capacity         | 7                                           |
+| 9     | Capacity         | Not built (Q36; the banner is the Code-job limit, I045) |
 | 10    | Stopped to steer | 5                                           |
 | 11    | Integrations     | 1 (GitHub and GitLab), 2 (Harnesses)        |
 | 12    | New project      | 1                                           |
 
 Row I070 shows clone progress at project creation. UX-DR16 (epics.md:309) forbids a shared Mirror clone state, so Phase 1 implements the selection part of I070 and omits clone progress.
 
-<!-- red-team 2026-11-12 --> Two Epic 1 criteria need a Run and close in later phases: 1.4 AC 2 (epics.md:472) in Phase 3 (new launches) and Phase 7 (pending change-request delivery); 1.8 AC 4 (epics.md:588) in Phase 7 (3.1). Stories 1.4 and 1.8 are "done" only after those tests pass. The same applies to G4 AC2 (Phase 3 launch, Phase 7 delivery) and G5 AC4 (Phase 3 snapshot, Phase 7 G6). The missing-connection code is `provider_disconnected` with a `provider` field for both providers.
+<!-- red-team 2026-11-12 --> Two Epic 1 criteria need a Run and close in later phases: 1.4 AC 2 (epics.md:472) in Phase 3 (new launches) and Phase 7 (pending change-request delivery); 1.8 AC 4 (epics.md:588) in Phase 7 (3.1). Stories 1.4 and 1.8 are "done" only after those tests pass. <!-- 2026-11-14 --> Q36: the Phase 7 parts are removed; 1.4 AC 2 and G4 AC2 close in Phase 3; 1.8 AC 4 and G5 AC4 are removed. The same applies to G4 AC2 (Phase 3 launch, Phase 7 delivery) and G5 AC4 (Phase 3 snapshot, Phase 7 G6). The missing-connection code is `provider_disconnected` with a `provider` field for both providers.
 
 ## Q22 effect on Epic 3 and mockup rows (2026-11-14)
+
+<!-- 2026-11-14 --> Superseded by Q36 (section below). Kept for history.
 
 Decision Q22 ([plan.md](./plan.md#multica-comparison-decisions-2026-11-14)) keeps every Epic 3 story in Phase 7, so the totals above do not change. Some criteria change or are removed; the full per-criterion table is [Phase 7 spec deviations](./phase-07-code-jobs-and-draft-pr.md#spec-deviations-q22-2026-11-14).
 
@@ -110,3 +112,12 @@ Decisions Q31-Q35 ([plan.md](./plan.md#docker-sandboxes-decisions-2026-11-14)) m
 - Stories 2.17-2.19 and 3.7: no criterion change; the Stop and reconcile mechanism is the in-sandbox pidfile kill.
 - No mockup row changes. Connect error text for a missing Docker sign-in reuses the existing "missing action" row of the Harness detail (I063, I064).
 
+## Q36 effect: no Code jobs (2026-11-14)
+
+Decision Q36 ([plan.md](./plan.md#docker-sandboxes-decisions-2026-11-14)) removes Code jobs. Code work goes to Archon through the Archon MCP server; Plane builds no UI for it.
+
+- Removed stories: 3.1-3.9, G6, G7. The Q31-Q35 criterion notes on 3.1, 3.5-3.7 above have no consumer.
+- Mockup rows not built: I037 (Code job completed), I038 (draft pull request card), I039 (write approval), I041 (Allow once), I042 (Deny), I045 (Code-job capacity). I040 was already removed by Q22. The browser review counts 58 rows (65 minus 7).
+- Rows kept in their Q&A form only: I030 (Stop) and I031 (Stopped); their Code variants are not built. The run kind pill "Code job · worktree" and the PR line of the Run card (design README Screen 1) are not built.
+- Scenes not built: 5 (Code job + PR), 6 (Permission), 9 (Capacity; the banner shows the Code-job limit).
+- Phase 1 rows I051, I052, I053 (policy rows, merged) stay as built; they have no consumer now (plan.md Q36 follow-up).

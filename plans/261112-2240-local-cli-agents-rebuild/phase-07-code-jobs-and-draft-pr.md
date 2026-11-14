@@ -9,6 +9,8 @@ dependencies: [1, 5, 6]
 
 # Phase 7: Code jobs and draft pull or merge request
 
+> **2026-11-14, decision Q36: REMOVED from scope.** Plane has no Code jobs. When code must change, the agent delegates the work to Archon through the Archon MCP server ([plan.md](./plan.md#docker-sandboxes-decisions-2026-11-14)). Stories 3.1-3.9, G6 and G7 are not built. This file is kept for history only; do not implement it.
+
 > **2026-11-14, decision Q27:** commands the agent runs in a Code job have network access (no deny rule, no host allowlist). Where this file proposes "deny all command network" or per-host grants, read it as Q27. Provider tokens still never reach the agent; only the Worker pushes.
 
 > **2026-11-14, decisions Q31-Q35:** the Harness runs in a Code sandbox (Docker Sandbox), one per Code job ([architecture-contracts.md §12](./architecture-contracts.md#12-docker-sandboxes-for-runs); plan.md Docker Sandboxes open question 1). Its only writable host folder is the Worktree; the git metadata is mounted read-only; the network is open (Q27). Every "CLI sandbox", "Code-mode boundary" and "Code-mode check" rule below that only fenced the agent on the host is superseded. Effort 9.5d (was 10d).
