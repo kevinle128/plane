@@ -17,6 +17,16 @@ MAX_MODELS = 50
 MODEL_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$"
 
 
+class ProbeReferenceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    generation = serializers.IntegerField(min_value=1)
+
+
+class HeartbeatSerializer(serializers.Serializer):
+    # With a probe, Plane also answers whether the Worker should continue it.
+    probe = ProbeReferenceSerializer(required=False)
+
+
 class ProbeClaimSerializer(serializers.Serializer):
     harnesses = serializers.ListField(
         child=serializers.ChoiceField(choices=AgentHarness.choices), allow_empty=True, max_length=10

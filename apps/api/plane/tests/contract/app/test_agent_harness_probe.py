@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import pytest
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from freezegun import freeze_time
 from rest_framework import status
 
@@ -20,6 +21,7 @@ from plane.tests.agent_settings_fixtures import (
 )
 
 CLAIM_URL = "/api/agent-worker/v1/probes/claim/"
+HEARTBEAT_URL = "/api/agent-worker/v1/heartbeat/"
 
 
 def report_url(probe_id):
@@ -115,10 +117,112 @@ class TestProbeClaim:
         assert claim(worker_client).data["probe"] is None
 
     @pytest.mark.django_db
+    def test_claim_returns_the_answer_deadline_and_the_seconds_left(self, session_client, worker_client, workspace):
+        start = timezone.now().replace(microsecond=0)
+        with freeze_time(start):
+            connect(session_client, workspace)
+        with freeze_time(start + timedelta(seconds=20)):
+            probe = claim(worker_client).json()["probe"]
+
+        assert probe["seconds_left"] == 100
+        assert parse_datetime(probe["deadline"]) == start + timedelta(seconds=120)
+
+    @pytest.mark.django_db
+    def test_probe_near_the_claim_cutoff_is_claimed_with_the_time_left(self, session_client, worker_client, workspace):
+        start = timezone.now().replace(microsecond=0)
+        with freeze_time(start):
+            connect(session_client, workspace)
+        with freeze_time(start + timedelta(seconds=59)):
+            probe = claim(worker_client).data["probe"]
+
+        assert probe is not None
+        assert probe["seconds_left"] == 61
+
+    @pytest.mark.django_db
+    def test_probe_without_enough_time_left_is_not_claimed(self, session_client, worker_client, workspace):
+        start = timezone.now()
+        with freeze_time(start):
+            connect(session_client, workspace)
+        with freeze_time(start + timedelta(seconds=61)):
+            assert claim(worker_client).data["probe"] is None
+
+        connection = AgentConnection.objects.get(agent__workspace=workspace, agent__harness="claude_code")
+        assert connection.probe_claimed_at is None
+
+    @pytest.mark.django_db
     def test_invalid_harness_list_returns_400(self, worker_client):
         response = worker_client.post(CLAIM_URL, {"harnesses": "claude_code"}, format="json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def probe_check(worker_client, probe_id, generation):
+    return worker_client.post(HEARTBEAT_URL, {"probe": {"id": probe_id, "generation": generation}}, format="json")
+
+
+@pytest.mark.contract
+class TestProbeCurrentCheck:
+    @pytest.mark.django_db
+    def test_running_probe_is_current(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+
+        response = probe_check(worker_client, probe["id"], probe["generation"])
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["probe_current"] is True
+
+    @pytest.mark.django_db
+    def test_probe_replaced_by_retry_is_not_current(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        connect(session_client, workspace)
+
+        assert probe_check(worker_client, probe["id"], probe["generation"]).data["probe_current"] is False
+
+    @pytest.mark.django_db
+    def test_probe_stopped_by_disconnect_is_not_current(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        session_client.post(agents_url(workspace.slug, "claude_code", "disconnect"), {}, format="json")
+
+        assert probe_check(worker_client, probe["id"], probe["generation"]).data["probe_current"] is False
+
+    @pytest.mark.django_db
+    def test_probe_past_its_deadline_is_not_current(self, session_client, worker_client, workspace):
+        start = timezone.now()
+        with freeze_time(start):
+            probe = connect_and_claim(session_client, worker_client, workspace)
+        with freeze_time(start + timedelta(seconds=121)):
+            assert probe_check(worker_client, probe["id"], probe["generation"]).data["probe_current"] is False
+
+    @pytest.mark.django_db
+    def test_probe_of_another_worker_is_not_current(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        _, other_token = make_worker(name="other")
+
+        response = probe_check(worker_client_for(other_token), probe["id"], probe["generation"])
+
+        assert response.data["probe_current"] is False
+
+    @pytest.mark.django_db
+    def test_unknown_probe_is_not_current(self, worker_client):
+        response = probe_check(worker_client, "00000000-0000-0000-0000-000000000000", 1)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["probe_current"] is False
+
+    @pytest.mark.django_db
+    def test_heartbeat_without_a_probe_has_no_probe_answer(self, worker_client):
+        response = worker_client.post(HEARTBEAT_URL, {}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "probe_current" not in response.data
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        "body",
+        [{"probe": {"id": "not-a-uuid", "generation": 1}}, {"probe": {"id": "00000000-0000-0000-0000-000000000000"}}],
+    )
+    def test_malformed_probe_check_returns_400(self, worker_client, body):
+        assert worker_client.post(HEARTBEAT_URL, body, format="json").status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.contract

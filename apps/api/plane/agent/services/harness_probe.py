@@ -19,7 +19,7 @@ from django.db import transaction
 from django.utils import timezone
 
 # Module imports
-from plane.agent.services.agent_settings import PROBE_ANSWER_SECONDS, is_probe_expired
+from plane.agent.services.agent_settings import PROBE_ANSWER_SECONDS, is_probe_expired, probe_answer_deadline
 from plane.db.models import Agent, AgentConnection, AgentConnectionState, AgentHarness
 
 # Harnesses with a Worker probe. The other Harnesses can be configured but not connected yet.
@@ -37,6 +37,10 @@ REQUIRED_CHECKS = (
 )
 
 CAPABILITY_FLAGS = ("midturn_input", "native_resume", "permission_prompt")
+
+# A Worker claims a probe only while at least this much of the answer window is left, so the
+# probe can finish and report before the deadline.
+MINIMUM_PROBE_SECONDS = 60
 
 # Problems that stop the probe before any check can run.
 BLOCKING_ISSUES = ("harness_not_found", "unsupported_version")
@@ -90,9 +94,9 @@ def disconnect(agent):
 
 
 def claim_probe(worker, harnesses):
-    """Give the oldest pending, unclaimed and unexpired probe for one of ``harnesses`` to ``worker``."""
+    """Give the oldest pending, unclaimed probe with enough time left for one of ``harnesses`` to ``worker``."""
     now = timezone.now()
-    oldest_request = now - timedelta(seconds=PROBE_ANSWER_SECONDS)
+    oldest_request = now - timedelta(seconds=PROBE_ANSWER_SECONDS - MINIMUM_PROBE_SECONDS)
     with transaction.atomic():
         connection = (
             AgentConnection.objects.select_for_update(skip_locked=True, of=("self",))
@@ -114,6 +118,24 @@ def claim_probe(worker, harnesses):
         connection.probe_worker = worker
         connection.save(update_fields=["probe_claimed_at", "probe_worker"], disable_auto_set_user=True)
     return connection
+
+
+def seconds_left(connection, now=None):
+    """Whole seconds before the answer deadline of the probe, never below zero."""
+    deadline = probe_answer_deadline(connection)
+    return max(0, int((deadline - (now or timezone.now())).total_seconds()))
+
+
+def is_probe_current(worker, probe_id, generation):
+    """True while ``worker`` holds this generation of the probe and its answer deadline has not passed."""
+    connection = AgentConnection.objects.filter(pk=probe_id, agent__deleted_at__isnull=True).first()
+    return (
+        connection is not None
+        and connection.probe_generation == generation
+        and connection.state == AgentConnectionState.CONNECTING
+        and connection.probe_worker_id == worker.id
+        and not is_probe_expired(connection)
+    )
 
 
 def _missing_action(checks, models, blocking_issue):

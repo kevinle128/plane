@@ -21,7 +21,8 @@ from rest_framework.views import APIView
 # Module imports
 from plane.agent.services import harness_probe
 from plane.agent.worker_api.authentication import IsAgentWorker, WorkerTokenAuthentication
-from plane.agent.worker_api.serializers import ProbeClaimSerializer, ProbeReportSerializer
+from plane.agent.services.agent_settings import probe_answer_deadline
+from plane.agent.worker_api.serializers import HeartbeatSerializer, ProbeClaimSerializer, ProbeReportSerializer
 from plane.db.models import AgentConnection, AgentWorker
 
 
@@ -37,9 +38,16 @@ class WorkerAPIView(APIView):
 
 class WorkerHeartbeatEndpoint(WorkerAPIView):
     def post(self, request):
+        serializer = HeartbeatSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         now = timezone.now()
         AgentWorker.objects.filter(pk=self.worker.pk).update(last_seen_at=now)
-        return Response({"worker": self.worker.name, "server_time": now}, status=status.HTTP_200_OK)
+        body = {"worker": self.worker.name, "server_time": now}
+        probe = serializer.validated_data.get("probe")
+        if probe is not None:
+            body["probe_current"] = harness_probe.is_probe_current(self.worker, probe["id"], probe["generation"])
+        return Response(body, status=status.HTTP_200_OK)
 
 
 class WorkerProbeClaimEndpoint(WorkerAPIView):
@@ -57,6 +65,8 @@ class WorkerProbeClaimEndpoint(WorkerAPIView):
                     "harness": connection.agent.harness,
                     "generation": connection.probe_generation,
                     "requested_at": connection.probe_requested_at,
+                    "deadline": probe_answer_deadline(connection),
+                    "seconds_left": harness_probe.seconds_left(connection),
                 }
             },
             status=status.HTTP_200_OK,

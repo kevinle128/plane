@@ -7,16 +7,40 @@ import io
 import os
 import stat
 
+import uuid
+
 import pytest
+from django.core.cache.backends.locmem import LocMemCache
 from django.core.management import CommandError, call_command
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
+from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.views import APIView
 
+from plane.agent.worker_api.views import (
+    WorkerAPIView,
+    WorkerHeartbeatEndpoint,
+    WorkerProbeClaimEndpoint,
+    WorkerProbeReportEndpoint,
+)
 from plane.db.models import AgentWorker
 from plane.tests.agent_settings_fixtures import make_worker, worker_client_for
 
 HEARTBEAT_URL = "/api/agent-worker/v1/heartbeat/"
+
+
+def strict_throttle():
+    """A throttle that allows 60 calls per minute for every caller, in its own cache."""
+
+    class StrictThrottle(SimpleRateThrottle):
+        rate = "60/min"
+        cache = LocMemCache(f"worker-throttle-{uuid.uuid4()}", {})
+
+        def get_cache_key(self, request, view):
+            return "every-caller"
+
+    return StrictThrottle
 
 
 @pytest.mark.contract
@@ -32,8 +56,17 @@ class TestWorkerTokenAuthentication:
         worker.refresh_from_db()
         assert worker.last_seen_at is not None
 
+    @pytest.mark.parametrize("view", [WorkerHeartbeatEndpoint, WorkerProbeClaimEndpoint, WorkerProbeReportEndpoint])
+    def test_worker_views_have_no_throttle(self, view):
+        assert view.throttle_classes == []
+        assert view().get_throttles() == []
+
     @pytest.mark.django_db
-    def test_120_calls_in_one_minute_are_not_throttled(self, worker_client):
+    def test_120_calls_in_one_minute_are_not_throttled_when_other_views_are(self, worker_client, mocker):
+        # Every view without its own exemption now gets a 60-per-minute throttle.
+        mocker.patch.object(APIView, "throttle_classes", [strict_throttle()])
+        assert WorkerAPIView.throttle_classes == []
+
         codes = {worker_client.post(HEARTBEAT_URL, {}, format="json").status_code for _ in range(120)}
 
         assert codes == {status.HTTP_200_OK}
@@ -76,7 +109,8 @@ class TestWorkerTokenAuthentication:
         assert session_client.post(HEARTBEAT_URL, {}, format="json").status_code == status.HTTP_403_FORBIDDEN
 
     @pytest.mark.django_db
-    def test_worker_request_is_not_sent_to_the_api_activity_log(self, worker_client, mocker):
+    def test_bearer_request_without_api_key_header_is_not_sent_to_the_api_activity_log(self, worker_client, mocker):
+        # A guard on the middleware rule. The Worker client test proves that the Worker never sends X-Api-Key.
         process_logs = mocker.patch("plane.middleware.logger.process_logs")
 
         response = worker_client.post(HEARTBEAT_URL, {}, format="json")
