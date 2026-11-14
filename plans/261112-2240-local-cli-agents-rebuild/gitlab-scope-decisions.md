@@ -21,4 +21,4 @@ The user added self-hosted GitLab to the scope on 2026-11-12 and accepted all re
 - Verified endpoints (2026-11-12, test token): `/api/v4/version`, `/api/v4/personal_access_tokens/self` (returns name, scopes, active, revoked, expires_at, user_id) and `/api/v4/user` (has the `bot` field).
 - The available test token is a personal access token of a human user (`bot=false`, scope `api`, no expiry), not a Group Access Token. It is suitable only for read-only live checks. Live push and merge-request checks need a dedicated Group Access Token. The user gives tokens through the secret store, never in chat.
 
-Plan consequences (added by the planner, 2026-11-12; not part of the user-accepted list above): minimum GitLab version 15.5, provisional warn-and-accept for non-bot tokens, and the open questions are in [plan.md](./plan.md#open-questions-need-the-user).
+Plan consequences (added by the planner, 2026-11-12; not part of the user-accepted list above): minimum GitLab version 15.5, provisional warn-and-accept for non-bot tokens, and the open questions were decided as Q11-Q15 in [plan.md](./plan.md#gitlab-decisions-2026-11-12).

@@ -3,7 +3,7 @@ title: "Local CLI Agents rebuild on current preview"
 description: "Rebuild all 43 Local CLI Agents stories, plus self-hosted GitLab parity, on current preview in seven PR-sized, test-first phases."
 status: in-progress
 priority: P1
-effort: "67d"
+effort: "60.5d"
 branch: feat/local-cli-agents
 tags: [feature, backend, frontend, worker, github, gitlab, security]
 blockedBy: []
@@ -38,19 +38,26 @@ Rebuild the Git provider connection (GitHub and self-hosted GitLab), four local 
 
 ## Phases
 
-| #   | Phase                                                                                                                | Stories                | Depends on | Status  |
-| --- | -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------- | ------- |
-| 1   | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5) | none       | Pending |
-| 2   | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md)                           | 2.1-2.6 (6)            | 1          | Pending |
-| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)            | 1, 2       | Pending |
-| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)           | 3          | Pending |
-| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)          | 4          | Pending |
-| 6   | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md)                                          | 2.21-2.26 (6)          | 5          | Pending |
-| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2) | 1, 5       | Pending |
+| #   | Phase                                                                                                                | Stories                | Depends on | Effort | Status  |
+| --- | -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------- | ------ | ------- |
+| 1   | [Git provider connection (GitHub and GitLab) and project repository](./phase-01-github-connection-and-repository.md) | 1.1-1.8 (8), G1-G5 (5) | none       | 11d    | Pending |
+| 2   | [Agent settings and Claude connection](./phase-02-agent-settings-and-claude-connection.md)                           | 2.1-2.6 (6)            | 1          | 8d     | Pending |
+| 3   | [Claude Q&A Run and durable timeline](./phase-03-claude-qa-run-and-timeline.md)                                      | 2.7-2.8 (2)            | 1, 2       | 9d     | Pending |
+| 4   | [Run context and conversation](./phase-04-run-context-and-conversation.md)                                           | 2.9-2.13 (5)           | 3          | 6d     | Pending |
+| 5   | [Steering, Stop and stale recovery](./phase-05-steering-stop-and-stale-recovery.md)                                  | 2.14-2.20 (7)          | 4          | 7.5d   | Pending |
+| 6   | [Codex, Grok and Omp Harnesses](./phase-06-codex-grok-and-omp-harnesses.md)                                          | 2.21-2.26 (6)          | 5          | 9d     | Pending |
+| 7   | [Code jobs and draft pull or merge request](./phase-07-code-jobs-and-draft-pr.md)                                    | 3.1-3.9 (9), G6-G7 (2) | 1, 5, 6    | 10d    | Pending |
 
-Effort: 11d + 6d + 9d + 6d + 8d + 10d + 17d = 67d. GitLab adds 5d to Phase 1, 1d to Phase 3 and 3d to Phase 7 compared with the GitHub-only plan (58d).
+Effort (re-estimated 2026-11-14 after decisions Q17-Q24): 11d + 8d + 9d + 6d + 7.5d + 9d + 10d = 60.5d (was 67d).
 
-Order: 1, 2, 3, 4, 5, then 6 and 7 in either order. They run one after the other, not in parallel: their Worker files are disjoint (`drivers/{codex,grok,omp}.py` vs `code/*`), but both add keys to `packages/i18n/src/locales/*/agent.json`. Each phase branches from `preview` after the previous merge because each PR regenerates `apps/api/migrations_lockfile.txt`.
+- Phase 2: +2d (6d planned plus the remaining Q18/Q21 work in [Phase 2 remaining work](./phase-02-agent-settings-and-claude-connection.md#remaining-work-to-pr-readiness-2026-11-14)).
+- Phase 3: unchanged 9d. The Q18 Run-time version check and the Q24 MCP config replace the boundary work that Q16 moved into Phase 2.
+- Phase 5: -0.5d (Q19: no Claude midturn injection path).
+- Phase 6: -1d (Q20 and Q23 save about 2.5d; the restored outer profile for Grok and Omp, the Codex read and `apply_patch` proof and the Grok route check add about 1.5d).
+- Phase 7: -7d (Q22: no Docker sandbox, no slot pool, no per-effect cards, no file-publish path; the Code-job approval, the Code-mode boundary per Harness and the Worker commit add about 2d).
+- GitLab adds 5d to Phase 1, 1d to Phase 3 and 3d to Phase 7 compared with a GitHub-only plan.
+
+Order: 1, 2, 3, 4, 5, 6, 7. <!-- 2026-11-14 --> Phase 7 now depends on Phase 6: the Code mode of Codex, Grok and Omp uses their Phase 6 drivers and boundaries (Q22). Both phases also add keys to `packages/i18n/src/locales/*/agent.json`. Each phase branches from `preview` after the previous merge because each PR regenerates `apps/api/migrations_lockfile.txt`.
 
 ## Delivery rules
 
@@ -60,17 +67,17 @@ One PR per phase to `preview`; one commit per story; no plan IDs in code, tests,
 
 - [ ] Every Given/When/Then case of all 43 stories and of GitLab stories G1-G7 passes with a test or recorded live/browser evidence.
 - [ ] The provider contract suite (`test_agent_git_provider_contract.py`) passes for GitHub and GitLab with recorded responses; the GitLab live read-only check passes against git.oceanlabs.dev when `PLANE_TEST_GITLAB_TOKEN` is set.
-- [ ] The 65 changed mockup rows pass browser review in Light and Dark at 375, 768 and 1280 px.
+- [ ] The 65 changed mockup rows pass browser review in Light and Dark at 375, 768 and 1280 px. Exception (Q22, 2026-11-14): I040 ("Allow for this run" button) is removed; I039, I041 and I045 are reviewed in their Q22 form ([story-coverage.md](./story-coverage.md#q22-effect-on-epic-3-and-mockup-rows-2026-11-14)).
 - [ ] API, Worker, web, migration, copyright and i18n checks pass in every phase PR.
-- [ ] Q&A cannot write; Code effects need a matching grant; Docker never exceeds N slots; the Agent cannot push or merge to the default branch or a protected branch on either provider.
-- [ ] No provider token appears in an API response, Run context, log line, git argv, process environment, remote URL or `.git/config` (asserted by tests).
+- [ ] Q&A cannot write. A Code job writes only inside its Worktree and only after its Code-job approval. Push and change-request creation each need their own approval. A Worker never runs more Code turns at once than its configured limit. The Agent cannot push or merge to the default branch or a protected branch on either provider. (Changed 2026-11-14 by Q22.)
+- [ ] No provider token appears in an API response, Run context, log line, git argv, the environment of the Harness process or of a command in its sandbox, remote URL or `.git/config` (asserted by tests).
 
 ## User decisions (2026-11-12)
 
 The user accepted all recommended answers on 2026-11-12.
 
 1. Q1, disposable runtime: accepted. Each Codex, Grok and Omp turn gets a private runtime directory outside the clone. Only that process can write to it, and the Worker deletes it after the turn. The clone, credentials and other Runs stay read-only. This is an accepted exception to AD-7. Phase 6 is unblocked.
-2. Q2, network grants by hostname (3.4): the user approves a hostname. At approval time the Worker resolves the hostname and pins the resolved IP and port set. If the IP changes later, the Worker asks for a new decision.
+2. Q2, network grants by hostname (3.4) <!-- 2026-11-14 --> (superseded by Q22 when the user confirms the Code-job network proposal; until then it has no consumer, because Q22 removes the network card): the user approves a hostname. At approval time the Worker resolves the hostname and pins the resolved IP and port set. If the IP changes later, the Worker asks for a new decision.
 3. Q3, GitHub App: the user registers the GitHub App. The client ID, secret and slug come from instance configuration (admin app). When the instance configuration is empty, the values come from environment variables.
 4. Q4, Phase 7 size: Phase 7 can split into two PRs at the 3.5/3.6 boundary.
 5. Q5, browser tests: no Playwright in CI. UI logic is tested with Vitest in `packages/blocks`. Each phase has a manual browser check script and records its evidence in the phase report.
@@ -104,6 +111,32 @@ The user accepted the recommended answers on 2026-11-12. The answer came through
     - The `claude` process itself runs outside the boundary, so it writes its own session history normally and `--resume` works without an exception.
     - This replaces, for Claude only, the AD-4/AD-7 rule "Q&A writes are denied at the OS boundary": file-tool denial is enforced by Claude Code's permission system, not by the OS. The probe's permission check changes from "write denied under the OS boundary" to "Edit/Write denied by permission rule and a Bash write denied by the built-in sandbox".
     - Accepted trade-off (user, 2026-11-13): weaker isolation for Claude's own file tools, MCP and hooks than an outer OS sandbox, in exchange for no session-folder exception and simpler setup.
+    - <!-- 2026-11-14 --> Amendment 1 (Phase 2 finding, implemented in `apps/agent-worker/plane_agent_worker/drivers/claude_boundary.py:14-19`): "writes are denied everywhere" has one narrow exception. Sandboxed Bash can write Claude Code's own temporary folder, because the Bash tool keeps its shell state there and every Bash command fails without it. The Worker sets `CLAUDE_CODE_TMPDIR` and `TMPDIR` to the private `tmp` folder of the probe or Run (`drivers/claude.py:108-113`); without that variable Claude Code uses `/tmp/claude-<uid>`. The folder is outside the clone and is removed with the probe or Run. An `Edit` deny rule wider than the working directory also denies this folder (`claude_boundary.py:30-32`), so the rule stays limited to the working directory.
+    - <!-- 2026-11-14 --> Amendment 2 (Q24): "MCP servers are turned off for Runs" changes to "user MCP servers stay off; only the Worker-supplied Plane MCP server runs". Each Run turn gets `--strict-mcp-config --mcp-config <generated file>` with that one server. Hooks stay off. The probe and the per-version suite use no MCP server.
+
+## Multica comparison decisions (2026-11-14)
+
+Source: [reports/research-multica-agent-integration.md](./reports/research-multica-agent-integration.md) (simplifications S1-S5, spec items F1-F7). The user decided Q18-Q24 on 2026-11-14. Q17 was decided on 2026-11-13 and is recorded here because no earlier section had it. Each item names the spec rule or story it changes; the phase files carry the per-criterion detail.
+
+17. Q17, Worker access (decided 2026-11-13; closes Phase 2 review finding F2 as an accepted risk): no workspace allowlist for the Worker and no rate limit on Connect or Retry. Reason: the instance is reachable only through Tailscale, so only trusted people can sign up and create workspaces. Revisit before any public exposure of the instance (then add an instance allowlist that Connect and `claim_probe` both check, and a Connect throttle per workspace). Spec effect: none; this records a deployment assumption. Details: [Phase 2 risks](./phase-02-agent-settings-and-claude-connection.md#risks).
+18. Q18, connection check (S1; reading of AD-4 accepted by the user): Connect and Retry run a quick check only: CLI found, `--version`, login status and model list. The behavior conformance suite (the seven AD-4 checks) runs once per CLI version and its result is cached per (Harness, CLI version, suite version) on the Worker. A Connect on a version without a passing cached result runs the suite in the same probe. A Run on a version without a passing cached result runs the suite before its first turn; it does not fail at once. Reason: Claude Code native installs "automatically update in the background" and an update takes effect "the next time you start Claude Code" ([code.claude.com/docs/en/setup](https://code.claude.com/docs/en/setup), sections "Update Claude Code" and "Auto-updates"), so a version change without operator action is the normal case. Failing the Run would break every Run after each update until an admin selects Retry in every workspace. Running the suite first costs about 25-35 s once per version and keeps the AD-4 rule that no Run uses an unverified version. A failed suite fails that Run with `harness_version_unverified` and the failed check, and sets that Agent's connection to Connection failed. Spec effect: AD-4 (reading, accepted); stories 2.1, 2.21, 2.23, 2.25 (Connect is fast; the suite result can come from the cache). Details: [Phase 2](./phase-02-agent-settings-and-claude-connection.md#key-decisions), [Phase 3](./phase-03-claude-qa-run-and-timeline.md#key-decisions), [Phase 6](./phase-06-codex-grok-and-omp-harnesses.md#key-decisions).
+19. Q19, Claude Send now (S2 option a): Send now for Claude cancels the current turn, waits for the process to exit, then sends the message as the next turn (AD-5 fallback). No hook-based midturn injection. The Claude driver reports `midturn_input=false` and does not measure it. Spec effect: none (2.15 AC 2, epics.md:1005-1007, is the path for Claude; AC 1 applies to Codex and Omp only). Details: [Phase 5](./phase-05-steering-stop-and-stale-recovery.md#key-decisions).
+20. Q20, Codex runtime directory (S4): the Q1 private runtime directory for Codex is a per-Run `CODEX_HOME` with a Worker-written `config.toml`. Spec effect: none (this is how Q1 is implemented). Details: [Phase 6](./phase-06-codex-grok-and-omp-harnesses.md#key-decisions).
+21. Q21, model listing (S3): one control request per CLI. Claude: one `initialize` control request in a one-shot process, with a static fallback list. Codex: `model/list`, with `codex debug models` as fallback. Spec effect for the Claude static fallback: it changes 2.1 AC 5 (epics.md:621-623, "rather than a hard-coded model list") and 2.6 AC 3 (epics.md:735-737, "no mock model is presented as verified"). The plan keeps both criteria as close as possible: the suite still requires a real model report for each version, the fallback applies only when the Connect-time request fails, and the selector labels fallback models as not reported by the CLI. This needs user confirmation (open question 6). Details: [Phase 2](./phase-02-agent-settings-and-claude-connection.md#key-decisions).
+22. Q22, Code jobs (research F1, F3, and F2 kept): one approval per Code job instead of a permission card per effect. The agent works in its own CLI sandbox inside the per-job Worktree (Claude: built-in sandbox in Code mode, per Q16; Codex: its own `workspace-write` sandbox; Grok and Omp: the Q1 outer profile in Code mode). Approval is asked again only before push and before opening the pull or merge request. The Worker (not the agent) commits and pushes; Plane opens the draft change request; provider tokens never reach the agent. The Docker slot pool (AD-11) is dropped; a simple limit of concurrent Code turns per Worker stays, with the durable visible waiting state. Command network: proposal "deny all command network; the CLI process itself still reaches its model host", which needs user confirmation (open question 7). Spec effect: AD-7 (Code boundary is the CLI sandbox, not Docker), AD-8 (per-effect requests and the file-publish exception removed), AD-11 (slot pool removed, waiting state kept); stories 3.1-3.8 and G6 change, 3.9 and G7 do not. Per-criterion table: [Phase 7 spec deviations](./phase-07-code-jobs-and-draft-pr.md#spec-deviations-q22-2026-11-14).
+23. Q23, Codex Q&A boundary (research F4): Codex Q&A uses Codex's own sandbox in `read-only` mode with `approval_policy = "never"`, the same model as Q16 for Claude. The Phase 6 connection check must prove that Codex cannot write under that mode, including `apply_patch`, and that it cannot read the Worker token, other Runs or credential stores. Spec effect: AD-7 "read-only OS boundary" for Codex (same exception as Q16 gives Claude). Grok and Omp keep Q1 with the outer profile. Details: [Phase 6](./phase-06-codex-grok-and-omp-harnesses.md#key-decisions).
+24. Q24, Harness questions (S5 rejected): keep the structured question card (`plane_ask_question`, `AgentRunQuestion(kind=harness)`) and the "Waiting for you" state as specified. Consequence: Runs need the Plane MCP server, so Q16 is amended (amendment 2 above). Spec effect: none on epics.md; it fixes the conflict between Q16 and the Phase 3 data flow. Details: [Phase 3](./phase-03-claude-qa-run-and-timeline.md#key-decisions), [Phase 4](./phase-04-run-context-and-conversation.md).
+
+Also from the research (F7, information only): Multica runs Grok through ACP (`grok agent stdio`), while the PRD says "No ACP". Phase 6 lists "re-check the Grok route before Phase 6" as a risk. No decision changes.
+
+The red-team gate has not run on the Q17-Q24 changes. Recommended before Phase 3 starts: a focused pass on the Q18 cache, the Q22 Code-mode boundary and the Q23 Codex read isolation.
+
+### Open questions from these decisions
+
+Earlier open questions 1-5 were decided as Q11-Q15, so these continue at 6.
+
+6. Q21 static fallback: do you accept the changed 2.1 AC 5 and 2.6 AC 3 (fallback list shown only when the Connect-time request fails after the version's suite proved a real model report, labeled "Not reported by Claude Code")? The alternative is no static fallback for Claude, which keeps both criteria as written.
+7. Q22 command network for Code jobs: do you confirm "deny all network for commands in the CLI sandbox" (the Claude and Codex processes still reach their model hosts)? Cost: a fresh clone has no installed dependencies, so `npm install`, `pip install` and tests that need them fail, and the agent reports "tests not run". Alternative: an operator-configured list of package registry hosts in the Worker config (Claude sandbox only; Codex has no host-level allowlist), never the Git provider hosts.
 
 ## Red Team Review
 

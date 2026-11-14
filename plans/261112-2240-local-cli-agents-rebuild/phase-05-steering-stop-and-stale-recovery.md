@@ -3,7 +3,7 @@ phase: 5
 title: "Steering, Stop and stale recovery"
 status: todo
 priority: P1
-effort: "8d"
+effort: "7.5d"
 dependencies: [4]
 ---
 
@@ -27,7 +27,7 @@ Members queue messages during active work, send a queued message now, remove an 
 
 - Composer mode: `in_progress` shows Queue labels; other states show Reply labels (design status sentences).
 - Drain: the Worker takes the lowest `position` queued message at a safe point, sets `dispatching` through the API, sends it, then reports `accepted` after the driver acknowledgement.
-- Send now: Plane records `send_now_requested_at` on the selected message. If the driver capability `midturn_input=true`, the Worker injects it into the active turn. Otherwise it cancels the turn, waits for process exit or a 30 s timeout, then sends the message as the next turn. On timeout it reports an actionable error and does not start a second process in the CWD.
+- Send now: Plane records `send_now_requested_at` on the selected message. If the driver capability `midturn_input=true`, the Worker injects it into the active turn. Otherwise it cancels the turn, waits for process exit or a 30 s timeout, then sends the message as the next turn. On timeout it reports an actionable error and does not start a second process in the CWD. <!-- 2026-11-14 --> Claude (Q19): always cancel-then-next-turn. The Claude driver reports `midturn_input=false` (Phase 2) and has no inject method; no hook-based injection (hooks stay off, Q16). The inject path stays in `drivers/base.py` for Codex (`turn/steer`) and Omp (`steer`) in Phase 6 and is tested here with a fake that declares `midturn_input=true`. Spec effect: none; 2.15 AC 2 (epics.md:1005-1007) is the Claude path and AC 1 (epics.md:1001-1003) applies only to a driver with verified midturn input.
 - Stop: member confirms; Plane records a Stop command with actor and time and cancels all `queued` messages (count stored). The Worker interrupts the Harness, blocks later tool calls in that turn, waits for exit, then acknowledges. Status becomes `stopped` with discarded count. Clone is kept.
 - Resume from stopped: reply creates a new turn on the same Run; the Worker verifies clone path, remote and inode before launch; the remote check compares with the snapshot `clone_url` (stored without credentials for every provider); failure is a recoverable error with Retry.
 - Retry pickup: allowed only when derived Stale. Plane increments `lease_generation`, clears the lease owner, and returns the Run to pickup. A GitLab `git-credential` request with the old generation returns 409, so a stale Worker cannot fetch or push after Retry. The claiming Worker reconciles the process registry (stop old process group) before it starts. Accepted messages and completed effects are never replayed without a new user command.
@@ -48,13 +48,13 @@ Modify (web): `apps/web/components/agent-run/composer.tsx`, `apps/web/components
 
 ## API endpoints
 
-| Path | Auth | Story |
-| --- | --- | --- |
-| `POST .../agent-runs/<id>/messages/<mid>/send-now/` | comment permission | 2.15 |
-| `DELETE .../agent-runs/<id>/messages/<mid>/` | comment permission | 2.16 |
-| `POST .../agent-runs/<id>/stop/` | comment permission | 2.17 |
-| `POST .../agent-runs/<id>/retry-pickup/`, `POST .../agent-runs/<id>/mark-failed/` | comment permission | 2.19, 2.20 |
-| `GET api/agent-worker/v1/runs/<id>/commands/`, `POST .../messages/<mid>/dispatching/`, `POST .../commands/<cid>/ack/` | Worker token + lease | 2.14-2.18 |
+| Path                                                                                                                  | Auth                 | Story      |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------- | ---------- |
+| `POST .../agent-runs/<id>/messages/<mid>/send-now/`                                                                   | comment permission   | 2.15       |
+| `DELETE .../agent-runs/<id>/messages/<mid>/`                                                                          | comment permission   | 2.16       |
+| `POST .../agent-runs/<id>/stop/`                                                                                      | comment permission   | 2.17       |
+| `POST .../agent-runs/<id>/retry-pickup/`, `POST .../agent-runs/<id>/mark-failed/`                                     | comment permission   | 2.19, 2.20 |
+| `GET api/agent-worker/v1/runs/<id>/commands/`, `POST .../messages/<mid>/dispatching/`, `POST .../commands/<cid>/ack/` | Worker token + lease | 2.14-2.18  |
 
 ## Tests Before
 
@@ -67,15 +67,15 @@ Protected by Tests Before 1-2: `lease.py` gains a generation bump for Retry pick
 
 ## Story steps and Tests After
 
-| Story | Steps | Tests After |
-| --- | --- | --- |
-| 2.14 | Queue on active Run, positions, drain, accepted after ack, disclosure, restart safety | API: queued with order; no `accepted` without Worker ack; Worker: drain order; restart after accepted does not redeliver; blocks vitest: waiting count, Reply vs Queue labels, named actions |
-| 2.15 | Send now with native injection or cancel-then-next-turn, pending states, timeout | Worker: fake with `midturn_input=true` injects; fake without it cancels, waits, sends next turn; stuck fake hits timeout and reports error with no second process; API: pending state visible, event order kept |
-| 2.16 | Remove queued, conflict for dispatching/accepted | API: queued -> cancelled and never claimed; dispatching/accepted returns 409 with actual state; audit event kept, waiting count excludes it |
-| 2.17 | Stop confirm, fenced command, interrupt, discarded count | API: guest without comment right 403 and state unchanged; stop records actor, time, count; Worker: interrupt stops process group and blocks later tool calls; browser: confirm and Cancel paths, scene 10 |
-| 2.18 | Resume stopped Run | Worker: same clone path and inode; unverifiable clone gives recoverable error and no launch; API: new turn on same Run ID with history |
-| 2.19 | Derived Stale with last progress, Retry pickup with new generation, reconcile | API (freezegun): 5 min without renewal reads Stale; retry increments generation; old generation 409 (events and `git-credential`); Worker: reconcile stops old process before resume; no replay of an accepted message; Worker absent keeps Stale/waiting |
-| 2.20 | Mark failed | API: records actor, time, reason; later old-generation event 409 and conclusion unchanged; guest 403 |
+| Story | Steps                                                                                 | Tests After                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.14  | Queue on active Run, positions, drain, accepted after ack, disclosure, restart safety | API: queued with order; no `accepted` without Worker ack; Worker: drain order; restart after accepted does not redeliver; blocks vitest: waiting count, Reply vs Queue labels, named actions                                                                                                                                                                                                                                                          |
+| 2.15  | Send now with native injection or cancel-then-next-turn, pending states, timeout      | Worker: fake with `midturn_input=true` injects; fake without it cancels, waits, sends next turn; <!-- 2026-11-14 --> the Claude driver never injects, even when a fake Claude echoes a queued message during a turn (Q19); native (Mini): Claude Send now cancels, settles and sends the message as the next turn in the same session; stuck fake hits timeout and reports error with no second process; API: pending state visible, event order kept |
+| 2.16  | Remove queued, conflict for dispatching/accepted                                      | API: queued -> cancelled and never claimed; dispatching/accepted returns 409 with actual state; audit event kept, waiting count excludes it                                                                                                                                                                                                                                                                                                           |
+| 2.17  | Stop confirm, fenced command, interrupt, discarded count                              | API: guest without comment right 403 and state unchanged; stop records actor, time, count; Worker: interrupt stops process group and blocks later tool calls; browser: confirm and Cancel paths, scene 10                                                                                                                                                                                                                                             |
+| 2.18  | Resume stopped Run                                                                    | Worker: same clone path and inode; unverifiable clone gives recoverable error and no launch; API: new turn on same Run ID with history                                                                                                                                                                                                                                                                                                                |
+| 2.19  | Derived Stale with last progress, Retry pickup with new generation, reconcile         | API (freezegun): 5 min without renewal reads Stale; retry increments generation; old generation 409 (events and `git-credential`); Worker: reconcile stops old process before resume; no replay of an accepted message; Worker absent keeps Stale/waiting                                                                                                                                                                                             |
+| 2.20  | Mark failed                                                                           | API: records actor, time, reason; later old-generation event 409 and conclusion unchanged; guest 403                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Verification
 
@@ -96,11 +96,11 @@ pnpm check:lint && pnpm --filter=@plane/i18n check:sync
 
 ## Risks
 
-| Risk | L x I | Mitigation |
-| --- | --- | --- |
-| Claude has no verified midturn input | High x Low | Capability flag false; cancel-then-next-turn path is the default and fully tested |
-| Process does not exit after interrupt | Medium x High | Timeout, process-group kill, registry record kept; Run shows error; no competing turn |
-| Late poll restores an older status | Medium x Medium | Store applies projections by `seq` only (prior lesson) |
+| Risk                                      | L x I           | Mitigation                                                                            |
+| ----------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
+| Claude Send now loses in-flight tool work | High x Low      | Accepted by Q19; the session resumes, and the timeline shows the cancelled turn       |
+| Process does not exit after interrupt     | Medium x High   | Timeout, process-group kill, registry record kept; Run shows error; no competing turn |
+| Late poll restores an older status        | Medium x Medium | Store applies projections by `seq` only (prior lesson)                                |
 
 ## Rollback
 
