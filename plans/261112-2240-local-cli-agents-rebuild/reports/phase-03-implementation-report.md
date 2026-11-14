@@ -105,11 +105,11 @@ Cleanup: every test stack ended with `docker compose -f docker-compose-test.yml 
 1. Health check of a sandbox reads the mounted settings file (`sbx exec <name> sh -c 'test -r /opt/user-claude/settings.json'`). Exit 1 means a stale single-file mount: the Worker runs `sbx stop <name>` and checks once more. This branch is not in the phase file. It keeps the single-file decision (Q37) and heals the stale mount found in task 0.
 2. `~/.claude/hooks` is mounted read-only at its host path (not at a neutral path), because hook commands in the host settings use absolute host paths (task 0: `/Users/dale/.claude/hooks/...`). Hooks outside `~/.claude/hooks` and hooks that need Node.js fail in the kit (accepted by Q40).
 
-3. The sandbox environment is empty: the Worker does not pass `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` (the phase file's "Changes to Phase 2 code" says the sandbox environment is only that variable). Reason: with it Claude leaves bypass mode, which breaks Q31 (full permissions) and the suite's permission check (bypass mode, no permission request). The scrub would protect nothing in the sandbox, because the agent can read the mounted settings file that holds the token (Q30 and Q37 accept that the token is visible inside the sandbox). Needs user confirmation; see Concerns.
+3. The sandbox environment is empty: the Worker does not pass `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` (the phase file's "Changes to Phase 2 code" says the sandbox environment is only that variable). Reason: with it Claude leaves bypass mode, which breaks Q31 (full permissions) and the suite's permission check (bypass mode, no permission request). The scrub would protect nothing in the sandbox, because the agent can read the mounted settings file that holds the token (Q30 and Q37 accept that the token is visible inside the sandbox). Needs user confirmation; see Concerns. Resolved: user decision Q41 (no scrub for Runs).
 
 4. The Run executor lives in a new module `runs.py` (the phase file names `loop.py`); `loop.py` only claims Runs and starts one thread each (at most 4 at a time).
 5. The Run prompt tells the agent to delegate code changes through the Archon MCP tools when they are available (Q36); the plan does not give prompt text.
-6. Run folders (clone and scratch) are kept after the Run, because later turns of the same Run (Phase 4) start in the same clone; the README documents manual cleanup. The host-only folder with the CA bundle is removed at the end of each Run.
+6. Run folders (clone and scratch) are kept after the Run, because later turns of the same Run (Phase 4) start in the same clone; the README documents manual cleanup. Superseded by Q45 (see Review fixes): the Worker removes them after 7 days without activity. The host-only folder with the CA bundle is removed at the end of each Run.
 7. API (helper): Runs that fail at launch (`provider_*`, `repository_unavailable`) have no context snapshot and no trigger event; the Worker `events/` endpoint refuses kind `conclusion`; a failed `result/` needs a `failure_code` (the Worker always sends one).
 8. Web (helper): Run cards show when the Comments filter is on; polling stops at `stale`; the panel width is fixed at 540 px.
 
@@ -119,11 +119,13 @@ Cleanup: every test stack ended with `docker compose -f docker-compose-test.yml 
 - Live check on a GitLab-bound project (git.oceanlabs.dev): not done (no GitLab connection or token in this session). GitLab clone behavior is covered by the local HTTPS tests and the API contract tests.
 - Web not built: resizable panel with a saved width, header banners for stale, failed and stopped Runs, a health tag on mentionable Agents.
 - The plain-text export of a comment shows an agent mention as `@user` (`parseAdditionalEditorContent` has no `agent_mention` case).
-- The conclusion comment is stored as escaped paragraphs, so Markdown in Claude's answer (bold, code) shows as raw characters.
-- The conclusion comment sends no notification and fires no webhook (`issue_activity.delay` is not called for it); the contract did not ask for it.
+- Fixed (Q44, `ec5ea2f210`): the conclusion comment was stored as escaped paragraphs, so Markdown in Claude's answer (bold, code) showed as raw characters.
+- The conclusion comment sends no notification and fires no webhook (`issue_activity.delay` is not called for it). Decided Q43: built in Phase 4.
 - The live check ran on this development Mac, not on the Mac Mini.
 
 ## Open questions for the user
+
+All four are decided (2026-11-14): 1 = Q41 (no scrub), 2 = Q42 (accepted), 3 = Q43 (Phase 4), 4 = Q44 (built, see Review fixes).
 
 1. Deviation 3: drop `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` in the sandbox (needed for full permissions)? The alternative keeps the scrub and answers every permission request with allow, which changes the Q31 suite check.
 2. The Docker MCP gateway stays reachable by raw HTTP from inside a sandbox, and a deny rule does not block it (task 0). It lists no servers and does not show in `system/init`. Accept as is?
