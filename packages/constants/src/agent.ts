@@ -27,13 +27,12 @@ export const AGENT_GIT_BRANCH_FORMATS: { key: TAgentGitPolicy["branch_format"]; 
 ];
 
 /** Harness order on the Integrations page and in the Agent selector. */
-export const AGENT_HARNESSES: TAgentHarness[] = ["claude_code", "codex", "grok", "omp"];
+export const AGENT_HARNESSES: TAgentHarness[] = ["claude_code", "codex", "omp"];
 
 /** Harness names are product names and are not translated. */
 export const AGENT_HARNESS_LABELS: Record<TAgentHarness, string> = {
   claude_code: "Claude Code",
   codex: "Codex CLI",
-  grok: "Grok CLI",
   omp: "Omp",
 };
 
@@ -41,7 +40,6 @@ export const AGENT_HARNESS_LABELS: Record<TAgentHarness, string> = {
 export const AGENT_HARNESS_COMMANDS: Record<TAgentHarness, string> = {
   claude_code: "claude",
   codex: "codex",
-  grok: "grok",
   omp: "omp",
 };
 

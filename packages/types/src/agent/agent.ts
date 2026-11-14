@@ -5,7 +5,7 @@
  */
 
 /** The four local CLI Harnesses. Each workspace has one Agent per Harness. */
-export type TAgentHarness = "claude_code" | "codex" | "grok" | "omp";
+export type TAgentHarness = "claude_code" | "codex" | "omp";
 
 /** Connection state as Plane shows it. A probe without a report after 120 s reads as `failed`. */
 export type TAgentConnectionState = "not_connected" | "connecting" | "connected" | "failed";

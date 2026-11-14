@@ -232,7 +232,6 @@
       "blurbs": {
         "claude_code": "Anthropic's coding agent, run from the CLI on the Mini.",
         "codex": "OpenAI's coding agent, run from the CLI on the Mini.",
-        "grok": "xAI's coding agent, run from the CLI on the Mini.",
         "omp": "Oh My Pi coding agent, run from the CLI on the Mini."
       }
     },
