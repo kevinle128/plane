@@ -150,3 +150,21 @@ class TestWorkerReachability:
         connection.refresh_from_db()
         assert connection.worker_last_error == ""
         assert connection.worker_checked_at > checked_at
+
+    @pytest.mark.django_db
+    def test_blocked_host_report_is_stored(self, session_client, worker_client, gitlab_setup):
+        run = create_run(session_client, gitlab_setup)
+        claimed = claim_run(worker_client)
+
+        response = clone_report(
+            worker_client,
+            run.id,
+            claimed["lease_generation"],
+            ok=False,
+            error_code="git_host_blocked",
+            error_detail="git.test resolves to a private address",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        connection = AgentGitConnection.objects.get(workspace=gitlab_setup.workspace)
+        assert connection.worker_last_error == "git_host_blocked"

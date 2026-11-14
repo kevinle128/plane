@@ -145,6 +145,7 @@ GIT_ERROR_CODES = (
     "git_dns_failed",
     "git_unreachable",
     "git_tls_failed",
+    "git_host_blocked",
     "git_auth_failed",
     "git_not_found",
     "git_failed",
