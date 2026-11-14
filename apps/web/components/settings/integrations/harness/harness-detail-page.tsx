@@ -8,46 +8,28 @@ import { useId, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
-import useSWR from "swr";
 import { Button } from "@makeplane/propel/components/button";
 import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { Switch } from "@makeplane/propel/components/switch";
 import { TextArea } from "@makeplane/propel/components/text-area";
 import { AgentOutline, ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
-import { isConnectionPending } from "@plane/blocks/agent-run";
 import { setToast } from "@plane/blocks/toast";
-import { AGENT_CONNECTION_POLL_MS, AGENT_HARNESSES, AGENT_HARNESS_LABELS } from "@plane/constants";
+import { AGENT_HARNESSES, AGENT_HARNESS_LABELS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TAgent, TAgentHarness, TAgentSettingsError, TAgentSettingsField, TAgentUpdate } from "@plane/types";
 import { cn } from "@plane/utils";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgent } from "@/hooks/store/use-agent";
 import { HarnessConnectionRow, HarnessStatusTag } from "./connection-row";
-import { agentsKey, harnessCliLabel } from "./harness-card";
+import { harnessCliLabel } from "./harness-card";
 import { HarnessModelSelect } from "./model-select";
+import { AgentsLoadError, useWorkspaceAgents } from "./workspace-agents";
 
 type Props = {
   workspaceSlug: string;
   harness: TAgentHarness;
   canEdit: boolean;
 };
-
-/** Poll while any probe runs, so the page and the selector tags follow the live state. */
-const pollWhilePending = (agents: TAgent[] | undefined) =>
-  agents?.some((agent) => isConnectionPending(agent.connection.state)) ? AGENT_CONNECTION_POLL_MS : 0;
-
-export function AgentsLoadError({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div
-      role="alert"
-      className="flex flex-wrap items-center gap-2 rounded-md bg-danger-subtle px-3 py-2 text-body-sm-regular text-danger-primary"
-    >
-      <span className="flex-1">{t("agent_settings.integrations.load_error")}</span>
-      <Button variant="secondary" size="sm" stretch="auto" label={t("common.retry")} onClick={onRetry} />
-    </div>
-  );
-}
 
 type TTranslate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -348,10 +330,8 @@ function AgentSelector({ workspaceSlug, current }: { workspaceSlug: string; curr
 /** Harness detail page: Agent selector with live tags, and the settings of the selected Agent. */
 export const HarnessDetailPage = observer(function HarnessDetailPage({ workspaceSlug, harness, canEdit }: Props) {
   const { t } = useTranslation();
-  const { fetchAgents, getAgent } = useAgent();
-  const { error, isLoading, mutate } = useSWR(agentsKey(workspaceSlug), () => fetchAgents(workspaceSlug), {
-    refreshInterval: pollWhilePending,
-  });
+  const { getAgent } = useAgent();
+  const { error, isLoading, mutate } = useWorkspaceAgents(workspaceSlug);
   const agent = getAgent(workspaceSlug, harness);
   const version = agent?.connection.harness_version ?? "";
 
@@ -362,7 +342,7 @@ export const HarnessDetailPage = observer(function HarnessDetailPage({ workspace
         className="flex w-fit items-center gap-1 text-caption-sm-regular text-tertiary hover:text-secondary"
       >
         <ArrowNarrowLeftOutline className="size-3.5" aria-hidden="true" />
-        {t("agent_git.integrations.back")}
+        {t("agent_settings.detail.back")}
       </Link>
       <SettingsHeading title={AGENT_HARNESS_LABELS[harness]} description={t("agent_settings.detail.description")} />
       {!!error && !isLoading && <AgentsLoadError onRetry={() => void mutate()} />}

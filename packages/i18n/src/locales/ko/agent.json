@@ -245,6 +245,7 @@
     "detail": {
       "description": "Connect the CLI installed on the Mini and set how members mention this agent.",
       "selector_label": "Agents",
+      "back": "Integrations",
       "on_the_mini": "{version} on the Mini",
       "not_found": "This agent does not exist.",
       "read_only": "Only workspace admins can change agent settings."

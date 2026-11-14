@@ -20,8 +20,8 @@ import {
   agentGitConnectionsKey,
   agentGitProviderLabel,
 } from "./git/provider-meta";
-import { HarnessCard, agentsKey } from "./harness/harness-card";
-import { AgentsLoadError } from "./harness/harness-detail-page";
+import { HarnessCard } from "./harness/harness-card";
+import { AgentsLoadError, useWorkspaceAgents } from "./harness/workspace-agents";
 
 type Props = { workspaceSlug: string };
 
@@ -39,8 +39,8 @@ export const IntegrationsIndexPage = observer(function IntegrationsIndexPage({ w
   const hasLoadError = !!error && !isLoading;
   // Without loaded connections the status is unknown, so the cards show no status or "Connect" label.
   const isStatusKnown = data !== undefined;
-  const { fetchAgents, getAgent } = useAgent();
-  const agents = useSWR(agentsKey(workspaceSlug), () => fetchAgents(workspaceSlug));
+  const { getAgent } = useAgent();
+  const agents = useWorkspaceAgents(workspaceSlug);
   const hasAgentsError = !!agents.error && !agents.isLoading;
 
   return (

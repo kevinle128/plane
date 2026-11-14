@@ -34,14 +34,6 @@ export class AgentService extends APIService {
       });
   }
 
-  async retrieve(workspaceSlug: string, harness: TAgentHarness): Promise<TAgent> {
-    return this.get(`${this.base(workspaceSlug)}/${harness}/`)
-      .then((response) => response?.data)
-      .catch((error) => {
-        throw toAgentSettingsError(error);
-      });
-  }
-
   async update(workspaceSlug: string, harness: TAgentHarness, data: TAgentUpdate): Promise<TAgent> {
     return this.patch(`${this.base(workspaceSlug)}/${harness}/`, data)
       .then((response) => response?.data)

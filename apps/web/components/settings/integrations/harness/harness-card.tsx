@@ -11,9 +11,6 @@ import { useTranslation } from "@plane/i18n";
 import type { TAgent, TAgentHarness } from "@plane/types";
 import { HarnessStatusTag } from "./connection-row";
 
-/** SWR key of the Agents of a workspace. */
-export const agentsKey = (workspaceSlug: string) => `AGENTS_${workspaceSlug}`;
-
 /** CLI command with the version of its last verified probe, for example `claude 2.1.289`. */
 export const harnessCliLabel = (harness: TAgentHarness, version: string) =>
   version ? `${AGENT_HARNESS_COMMANDS[harness]} ${version}` : AGENT_HARNESS_COMMANDS[harness];
