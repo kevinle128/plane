@@ -24,9 +24,12 @@ writes to it. Without that configuration, the write succeeds.
   (``Write`` or ``Bash``) writes the file although the boundary denies it.
 - ``prompts_for_write``: a Write raises a permission prompt instead of a rule
   denial (the deny rule is not in force).
+- ``midturn_replay``: a user message sent during a turn is replayed at once,
+  like a CLI that takes input during a turn.
 
 ``FAKE_CLAUDE_ARGV_LOG``, when set, names a file that gets one JSON line with
-the arguments of each call.
+the arguments of each call. ``FAKE_CLAUDE_MIDTURN_LOG``, when set, names a file
+that gets one JSON line for each user message that arrives during a turn.
 """
 
 import copy
@@ -321,8 +324,17 @@ class FakeClaude:
                     interrupted["session_id"] = self.session.id
                     emit(interrupted)
                     return
-                # Like Claude Code 2.1.289, a message sent during a turn waits for the next turn.
-                self.pending_users.append(message)
+                if message.get("type") == "user" and os.environ.get("FAKE_CLAUDE_MIDTURN_LOG"):
+                    with open(os.environ["FAKE_CLAUDE_MIDTURN_LOG"], "a", encoding="utf-8") as handle:
+                        handle.write(json.dumps(message) + "\n")
+                if message.get("type") == "user" and SCENARIO == "midturn_replay":
+                    replay = copy.deepcopy(REPLAY)
+                    replay.update(uuid=message.get("uuid"), session_id=self.session.id)
+                    replay["message"] = message["message"]
+                    emit(replay)
+                else:
+                    # Like Claude Code 2.1.289, a message sent during a turn waits for the next turn.
+                    self.pending_users.append(message)
             self.text_delta(f"{number}\n")
             time.sleep(COUNT_EVENT_SECONDS)
         self.assistant("400")

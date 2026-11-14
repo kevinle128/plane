@@ -21,8 +21,9 @@ verified with Claude Code 2.1.289):
 2. Session A: a turn with partial-message events (progress); a Write in the
    working directory that a permission rule must deny, and a Bash write there
    that the built-in sandbox must deny (permission); and a long turn that
-   receives a queued message and then ``interrupt`` (interruption and the
-   midturn input flag).
+   receives ``interrupt``, then a next turn in the same process (interruption).
+   The driver reports ``midturn_input`` as False and does not measure it: Send
+   now for Claude stops the turn and sends the message as the next turn.
 3. Session B resumes the session and recalls a code word (follow-up, native resume).
 4. Session C resumes, is killed during a turn; session D resumes and recalls the
    code word again (recovery).
@@ -602,34 +603,30 @@ class ClaudeDriver:
         return session_id
 
     def _check_interruption(self, session, outcome, deadline):
-        queued_uuid = str(uuid.uuid4())
-        state = {"queued": False, "interrupted": False}
+        """Interrupt a long turn, then the same process must take the next turn.
 
-        def steer(message, turn):
-            if message.get("type") != "stream_event":
-                return
-            if turn.stream_events == 3 and not state["queued"]:
-                session.send_user("Reply with the single word NEXT.", queued_uuid)
-                state["queued"] = True
-            elif turn.stream_events == 8 and not state["interrupted"]:
+        Send now for Claude stops the current turn and sends the message as the next turn, so no
+        message is sent during the turn and midturn input is not measured: it stays False.
+        """
+        state = {"interrupted": False}
+
+        def interrupt(message, turn):
+            if message.get("type") == "stream_event" and turn.stream_events == 8 and not state["interrupted"]:
                 session.send(
                     {"type": "control_request", "request_id": "plane-interrupt", "request": {"subtype": "interrupt"}}
                 )
                 state["interrupted"] = True
 
         session.send_user(COUNT_PROMPT)
-        turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS), steer)
-        midturn = queued_uuid in turn.replayed
-        outcome.capabilities["midturn_input"] = midturn
+        turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS), interrupt)
+        outcome.capabilities["midturn_input"] = False
         interrupted = bool(turn.result) and (
             turn.result.get("subtype") == "error_during_execution" or turn.result.get("is_error") is True
         )
         if not state["interrupted"] or not interrupted:
             outcome.checks["interruption"].set(False, "the turn was not interrupted")
             return
-        # The process must still take the next turn after the interruption.
-        if midturn:
-            session.send_user("Reply with the single word NEXT.")
+        session.send_user("Reply with the single word NEXT.")
         follow = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS))
         continued = follow.succeeded and "NEXT" in follow.text.upper()
         outcome.checks["interruption"].set(continued, "" if continued else "no turn after the interruption")

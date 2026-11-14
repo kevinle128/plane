@@ -36,6 +36,7 @@ def fake_claude(private_dir, scenario="ok", version="2.1.289", write_tool=""):
         f"export FAKE_CLAUDE_VERSION={version}\n"
         f"export FAKE_CLAUDE_WRITE_TOOL={write_tool}\n"
         f'export FAKE_CLAUDE_ARGV_LOG="{private_dir / "argv.jsonl"}"\n'
+        f'export FAKE_CLAUDE_MIDTURN_LOG="{private_dir / "midturn.jsonl"}"\n'
         f'env | cut -d= -f1 | sort > "{private_dir / "harness-env.txt"}"\n'
         f'exec "{sys.executable}" "{FAKE}" "$@"\n'
     )
@@ -197,6 +198,22 @@ def test_ignored_interrupt_fails_the_interruption_check(private_dir, token_file,
     checks = checks_of(report)
     assert checks["interruption"]["passed"] is False
     assert all(check["passed"] for name, check in checks.items() if name != "interruption")
+
+
+def test_interruption_sends_no_message_during_the_turn(private_dir, token_file, home):
+    report = probe(private_dir, token_file, home, fake_claude(private_dir))
+
+    assert checks_of(report)["interruption"]["passed"] is True
+    assert not (private_dir / "midturn.jsonl").exists()
+
+
+def test_midturn_input_is_not_reported_for_claude(private_dir, token_file, home):
+    # Send now for Claude stops the turn and sends the message as the next turn, so the
+    # driver does not measure midturn input even when the CLI would take it.
+    report = probe(private_dir, token_file, home, fake_claude(private_dir, scenario="midturn_replay"))
+
+    assert report["capabilities"]["midturn_input"] is False
+    assert checks_of(report)["interruption"]["passed"] is True
 
 
 def test_session_lost_after_a_crash_fails_the_recovery_check(private_dir, token_file, home):
