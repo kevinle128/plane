@@ -6,7 +6,7 @@ Earlier spike (plugin `docker sandbox` v0.12.0): `spike-docker-sandbox-claude.md
 
 ## Verdict: sbx GO with limits
 
-All 10 criteria pass on `sbx`. No fallback to the plugin is needed. `sbx` is better than the plugin on auth (the VM sees only a placeholder), network (no hidden allow list after one deny rule), and disk (about 75 MB per sandbox instead of 9 to 17 GB).
+All 10 criteria pass on `sbx`. For criterion 10 the symlink idea works only until the first restart (sbx remounts its managed skills dir through the link); the durable route is extra `:ro` mounts plus `claude --add-dir`. No fallback to the plugin is needed. `sbx` is better than the plugin on auth (the VM sees only a placeholder), network (no hidden allow list after one deny rule), and disk (about 75 MB per sandbox instead of 9 to 17 GB).
 
 The limits:
 
@@ -98,19 +98,19 @@ echo "$DOCKER_PAT" | sbx login --username <docker-id> --password-stdin   # PAT w
 sbx diagnose
 sbx policy init deny-all
 
-# Pre-pull the kit (49 s, 1.5 GB) by one throwaway create
-sbx create --name warmup claude /tmp && sbx rm --force warmup
+# Pre-pull the kit (49 s, 1.5 GB) by one throwaway create in a scratch dir
+mkdir -p ~/sbx-warmup && sbx --no-input create --name warmup claude ~/sbx-warmup && sbx rm --force warmup
 
 # Per sandbox (the Worker runs these when it creates one)
-sbx create --name <sandbox> claude <workspace> [<repo>:ro] \
+sbx --no-input create --name <sandbox> claude <workspace> [<repo>:ro] \
   ~/.claude/skills:/opt/user-claude/.claude/skills:ro \
   ~/.agents/skills:/opt/user-claude/.agents/skills:ro ~/.agents/skills:ro \
   <each other skill link target dir>:ro
 sbx policy allow network --sandbox <sandbox> <gateway-host>:<gateway-port>
 sbx policy allow network --sandbox <sandbox> localhost:<plane-mcp-port>      # if Plane MCP runs on the host
 sbx policy deny network --sandbox <sandbox> "api.anthropic.com:443,bridge.claudeusercontent.com:443,claude.com:443,deb.debian.org:80,dhi.io:80,downloads.claude.ai:443,mcp-proxy.anthropic.com:443,platform.claude.com:443"
-printf '%s' "<gateway-token>" | sbx secret set-custom --sandbox <sandbox> \
-  --host <gateway-host> --env ANTHROPIC_AUTH_TOKEN --value-stdin               # prints the placeholder
+printf '%s' "$GATEWAY_TOKEN" | sbx secret set-custom --sandbox <sandbox> \
+  --host <gateway-host> --env ANTHROPIC_AUTH_TOKEN --value-stdin               # GATEWAY_TOKEN from the operator's secret store; prints the placeholder
 
 # Per Run
 sbx exec -i -w <workspace> -e ANTHROPIC_BASE_URL=<gateway-url> \
