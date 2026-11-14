@@ -26,9 +26,7 @@ export function HarnessModelSelect({ connection, value, controlId, describedBy, 
   const { t } = useTranslation();
   if (!canSelectModel(connection)) {
     return (
-      <span id={controlId} className="text-right text-caption-sm-regular text-tertiary">
-        {t("agent_settings.model.unavailable")}
-      </span>
+      <span className="text-right text-caption-sm-regular text-tertiary">{t("agent_settings.model.unavailable")}</span>
     );
   }
   const items = connection.models.map((model) => ({ value: model.id, label: model.id }));

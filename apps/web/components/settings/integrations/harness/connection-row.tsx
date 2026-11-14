@@ -43,19 +43,29 @@ export function HarnessStatusTag({ state, className }: { state: TAgentConnection
   return <span className={cn("text-caption-sm-medium", TONE_CLASSES[tag.tone], className)}>{t(tag.labelKey)}</span>;
 }
 
+/** A request of the Agent settings card. */
+export type TAgentCardAction = "save" | "mentionable" | "connect" | "disconnect";
+
+/** Runs one card request and marks the card busy until it ends. */
+export type TRunCardAction = (action: TAgentCardAction, task: () => Promise<void>) => Promise<void>;
+
 type Props = {
   workspaceSlug: string;
   agent: TAgent;
   canEdit: boolean;
+  /** The card request that runs now; the actions are disabled while any request runs. */
+  busy: TAgentCardAction | null;
+  run: TRunCardAction;
 };
 
 /** Connection row: state, hint, the missing action of a failed probe, and the one available action. */
-export const HarnessConnectionRow = observer(function HarnessConnectionRow({ workspaceSlug, agent, canEdit }: Props) {
+export const HarnessConnectionRow = observer(function HarnessConnectionRow(props: Props) {
+  const { workspaceSlug, agent, canEdit, busy, run } = props;
   const { t } = useTranslation();
   const { connect, disconnect } = useAgent();
-  const [isStarting, setIsStarting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const isStarting = busy === "connect";
+  const isOtherBusy = busy !== null && busy !== "connect";
   const { state, missing_action: missingAction, failure_hint: failureHint } = agent.connection;
   const probeAvailable = AGENT_PROBE_HARNESSES.includes(agent.harness);
   const action = canEdit && probeAvailable ? getHarnessConnectionAction(state) : null;
@@ -63,28 +73,24 @@ export const HarnessConnectionRow = observer(function HarnessConnectionRow({ wor
   const hintKey =
     probeAvailable || state !== "not_connected" ? HINT_KEYS[state] : "agent_settings.connection.hint_unavailable";
 
-  const startProbe = async () => {
-    setIsStarting(true);
-    try {
-      await connect(workspaceSlug, agent.harness);
-    } catch {
-      setToast({ type: "error", title: t("agent_settings.connection.connect_failed") });
-    } finally {
-      setIsStarting(false);
-    }
-  };
+  const startProbe = () =>
+    run("connect", async () => {
+      try {
+        await connect(workspaceSlug, agent.harness);
+      } catch {
+        setToast({ type: "error", title: t("agent_settings.connection.connect_failed") });
+      }
+    });
 
-  const confirmDisconnect = async () => {
-    setIsDisconnecting(true);
-    try {
-      await disconnect(workspaceSlug, agent.harness);
-      setIsConfirmOpen(false);
-    } catch {
-      setToast({ type: "error", title: t("agent_settings.connection.disconnect_failed") });
-    } finally {
-      setIsDisconnecting(false);
-    }
-  };
+  const confirmDisconnect = () =>
+    run("disconnect", async () => {
+      try {
+        await disconnect(workspaceSlug, agent.harness);
+        setIsConfirmOpen(false);
+      } catch {
+        setToast({ type: "error", title: t("agent_settings.connection.disconnect_failed") });
+      }
+    });
 
   return (
     <li
@@ -121,6 +127,7 @@ export const HarnessConnectionRow = observer(function HarnessConnectionRow({ wor
             stretch="auto"
             label={t("agent_settings.connection.connect")}
             loading={isStarting}
+            disabled={isOtherBusy}
             onClick={() => void startProbe()}
           />
         )}
@@ -131,6 +138,7 @@ export const HarnessConnectionRow = observer(function HarnessConnectionRow({ wor
             stretch="auto"
             label={t("agent_settings.connection.retry")}
             loading={isStarting}
+            disabled={isOtherBusy}
             onClick={() => void startProbe()}
           />
         )}
@@ -140,6 +148,7 @@ export const HarnessConnectionRow = observer(function HarnessConnectionRow({ wor
             size="sm"
             stretch="auto"
             label={t("agent_settings.connection.disconnect")}
+            disabled={busy !== null}
             onClick={() => setIsConfirmOpen(true)}
           />
         )}
@@ -151,7 +160,7 @@ export const HarnessConnectionRow = observer(function HarnessConnectionRow({ wor
         content={t("agent_settings.connection.disconnect_confirm_content")}
         handleClose={() => setIsConfirmOpen(false)}
         handleSubmit={confirmDisconnect}
-        isSubmitting={isDisconnecting}
+        isSubmitting={busy === "disconnect"}
         primaryButtonText={{
           default: t("agent_settings.connection.disconnect"),
           loading: t("agent_settings.connection.disconnecting"),

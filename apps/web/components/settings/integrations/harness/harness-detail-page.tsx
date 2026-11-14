@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
@@ -13,14 +13,24 @@ import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { Switch } from "@makeplane/propel/components/switch";
 import { TextArea } from "@makeplane/propel/components/text-area";
 import { AgentOutline, ArrowNarrowLeftOutline } from "@makeplane/propel/icons";
+import {
+  agentSettingsFormOf,
+  canSelectModel,
+  changesOf,
+  clearFieldError,
+  getFieldErrorMessage,
+  mergeServerAgent,
+  type TAgentSettingsDraft,
+} from "@plane/blocks/agent-run";
 import { setToast } from "@plane/blocks/toast";
 import { AGENT_HARNESSES, AGENT_HARNESS_LABELS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import type { TAgent, TAgentHarness, TAgentSettingsError, TAgentSettingsField, TAgentUpdate } from "@plane/types";
+import type { TAgent, TAgentHarness, TAgentSettingsError } from "@plane/types";
 import { cn } from "@plane/utils";
 import { SettingsHeading } from "@/components/settings/heading";
 import { useAgent } from "@/hooks/store/use-agent";
 import { HarnessConnectionRow, HarnessStatusTag } from "./connection-row";
+import type { TAgentCardAction, TRunCardAction } from "./connection-row";
 import { harnessCliLabel } from "./harness-card";
 import { HarnessModelSelect } from "./model-select";
 import { AgentsLoadError, useWorkspaceAgents } from "./workspace-agents";
@@ -31,41 +41,7 @@ type Props = {
   canEdit: boolean;
 };
 
-type TTranslate = (key: string, params?: Record<string, unknown>) => string;
-
-/** Translated message of a field error; an unknown code shows the API message. */
-function fieldErrorMessage(t: TTranslate, error: TAgentSettingsError | null, field: TAgentSettingsField) {
-  const messages = error?.[field];
-  if (!messages?.length) return null;
-  const code = error?.codes?.[field];
-  if (code) {
-    const key = `agent_settings.errors.${field}_${code}`;
-    const message = t(key);
-    if (message && message !== key) return message;
-  }
-  return messages[0];
-}
-
-type TDraft = Pick<TAgent, "name" | "handle" | "instructions" | "selected_model">;
-
-const draftOf = (agent: TAgent): TDraft => ({
-  name: agent.name,
-  handle: agent.handle,
-  instructions: agent.instructions,
-  selected_model: agent.selected_model,
-});
-
 const MAX_INSTRUCTIONS_LENGTH = 10000;
-
-/** Changed fields only, so a Save never rewrites a value that another admin changed meanwhile. */
-function changesOf(draft: TDraft, agent: TAgent): TAgentUpdate {
-  const changes: TAgentUpdate = {};
-  if (draft.name !== agent.name) changes.name = draft.name;
-  if (draft.handle !== agent.handle) changes.handle = draft.handle;
-  if (draft.instructions !== agent.instructions) changes.instructions = draft.instructions;
-  if (draft.selected_model !== agent.selected_model) changes.selected_model = draft.selected_model;
-  return changes;
-}
 
 function SettingRow(props: {
   label: string;
@@ -73,9 +49,11 @@ function SettingRow(props: {
   error: string | null;
   /** Puts the control under the label at full width, for long text. */
   stacked?: boolean;
+  /** False when the row shows text in place of a control; the label then names no element. */
+  hasControl?: boolean;
   children: (ids: TRowIds) => ReactNode;
 }) {
-  const { label, hint, error, stacked = false, children } = props;
+  const { label, hint, error, stacked = false, hasControl = true, children } = props;
   const labelId = useId();
   const hintId = useId();
   const errorId = useId();
@@ -83,9 +61,15 @@ function SettingRow(props: {
   return (
     <li className={cn("flex gap-2 border-b border-subtle px-4 py-3", stacked ? "flex-col" : "flex-wrap items-center")}>
       <span className="flex min-w-0 flex-1 basis-44 flex-col gap-0.5">
-        <label id={labelId} htmlFor={controlId} className="text-body-sm-medium text-primary">
-          {label}
-        </label>
+        {hasControl ? (
+          <label id={labelId} htmlFor={controlId} className="text-body-sm-medium text-primary">
+            {label}
+          </label>
+        ) : (
+          <span id={labelId} className="text-body-sm-medium text-primary">
+            {label}
+          </span>
+        )}
         <span id={hintId} className="text-caption-sm-regular text-tertiary">
           {hint}
         </span>
@@ -104,50 +88,64 @@ function SettingRow(props: {
 
 type TRowIds = { controlId: string; describedBy: string; invalid: boolean };
 
-/**
- * Agent settings with one Save. The whole fieldset is disabled while Save runs, so no edit is lost
- * when the saved values replace the draft.
- */
-const AgentSettingsForm = observer(function AgentSettingsForm(props: {
+type TCardProps = {
   workspaceSlug: string;
   agent: TAgent;
   canEdit: boolean;
-}) {
-  const { workspaceSlug, agent, canEdit } = props;
+  /** The card action that runs now; all card actions are disabled while one runs. */
+  busy: TAgentCardAction | null;
+  run: TRunCardAction;
+};
+
+/**
+ * Agent settings with one Save. Save sends only the fields that the user changed. When the store gets
+ * new server values (a poll, another tab, a new probe), the fields that the user did not change take them.
+ */
+const AgentSettingsForm = observer(function AgentSettingsForm(props: TCardProps) {
+  const { workspaceSlug, agent, canEdit, busy, run } = props;
   const { t } = useTranslation();
   const { updateAgent } = useAgent();
-  const [draft, setDraft] = useState<TDraft>(() => draftOf(agent));
+  const [form, setForm] = useState(() => agentSettingsFormOf(agent));
   const [error, setError] = useState<TAgentSettingsError | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const changes = changesOf(draft, agent);
+  const isSaving = busy === "save";
+  const changes = changesOf(form);
   const hasChanges = Object.keys(changes).length > 0;
+  const { draft } = form;
 
-  const save = async (event: FormEvent) => {
+  useEffect(() => {
+    setForm((current) => mergeServerAgent(current, agent));
+  }, [agent]);
+
+  const edit = <F extends keyof TAgentSettingsDraft>(field: F, value: TAgentSettingsDraft[F]) => {
+    setForm((current) => ({ ...current, draft: { ...current.draft, [field]: value } }));
+    setError((current) => clearFieldError(current, field));
+  };
+
+  const save = (event: FormEvent) => {
     event.preventDefault();
-    if (!hasChanges) return;
-    setIsSaving(true);
-    try {
-      const saved = await updateAgent(workspaceSlug, agent.harness, changes);
-      setDraft(draftOf(saved));
-      setError(null);
-      setToast({ type: "success", title: t("agent_settings.settings.saved") });
-    } catch (saveError) {
-      const body = (saveError ?? {}) as TAgentSettingsError;
-      setError(body);
-      if (!body.codes) setToast({ type: "error", title: t("agent_settings.settings.save_failed") });
-    } finally {
-      setIsSaving(false);
-    }
+    if (!hasChanges || busy) return;
+    void run("save", async () => {
+      try {
+        const saved = await updateAgent(workspaceSlug, agent.harness, changes);
+        setForm(agentSettingsFormOf(saved));
+        setError(null);
+        setToast({ type: "success", title: t("agent_settings.settings.saved") });
+      } catch (saveError) {
+        const body = (saveError ?? {}) as TAgentSettingsError;
+        setError(body);
+        if (!body.codes) setToast({ type: "error", title: t("agent_settings.settings.save_failed") });
+      }
+    });
   };
 
   return (
-    <form onSubmit={(event) => void save(event)} noValidate>
+    <form onSubmit={save} noValidate>
       <fieldset disabled={!canEdit || isSaving} className="m-0 min-w-0 border-0 p-0">
         <ul>
           <SettingRow
             label={t("agent_settings.settings.name_label")}
             hint={t("agent_settings.settings.name_hint")}
-            error={fieldErrorMessage(t, error, "name")}
+            error={getFieldErrorMessage(t, error, "name")}
           >
             {({ controlId, describedBy, invalid }) => (
               <Input
@@ -157,14 +155,14 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                 maxLength={64}
                 aria-describedby={describedBy}
                 aria-invalid={invalid || undefined}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                onChange={(event) => edit("name", event.target.value)}
               />
             )}
           </SettingRow>
           <SettingRow
             label={t("agent_settings.settings.handle_label")}
             hint={t("agent_settings.settings.handle_hint")}
-            error={fieldErrorMessage(t, error, "handle")}
+            error={getFieldErrorMessage(t, error, "handle")}
           >
             {({ controlId, describedBy, invalid }) => (
               <InputGroup size="md">
@@ -180,7 +178,7 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                   spellCheck={false}
                   aria-describedby={describedBy}
                   aria-invalid={invalid || undefined}
-                  onChange={(event) => setDraft({ ...draft, handle: event.target.value })}
+                  onChange={(event) => edit("handle", event.target.value)}
                 />
               </InputGroup>
             )}
@@ -189,7 +187,7 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
             stacked
             label={t("agent_settings.settings.instructions_label")}
             hint={t("agent_settings.settings.instructions_hint")}
-            error={fieldErrorMessage(t, error, "instructions")}
+            error={getFieldErrorMessage(t, error, "instructions")}
           >
             {({ controlId, describedBy, invalid }) => (
               <TextArea
@@ -202,14 +200,15 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                 placeholder={t("agent_settings.settings.instructions_placeholder")}
                 aria-describedby={describedBy}
                 aria-invalid={invalid || undefined}
-                onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
+                onChange={(event) => edit("instructions", event.target.value)}
               />
             )}
           </SettingRow>
           <SettingRow
             label={t("agent_settings.model.label")}
             hint={t("agent_settings.model.hint")}
-            error={fieldErrorMessage(t, error, "selected_model")}
+            error={getFieldErrorMessage(t, error, "selected_model")}
+            hasControl={canSelectModel(agent.connection)}
           >
             {({ controlId, describedBy, invalid }) => (
               <HarnessModelSelect
@@ -218,7 +217,7 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
                 controlId={controlId}
                 describedBy={describedBy}
                 invalid={invalid}
-                onChange={(modelId) => setDraft({ ...draft, selected_model: modelId })}
+                onChange={(modelId) => edit("selected_model", modelId)}
               />
             )}
           </SettingRow>
@@ -232,7 +231,7 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
               stretch="auto"
               label={isSaving ? t("agent_settings.settings.saving") : t("agent_settings.settings.save")}
               loading={isSaving}
-              disabled={!hasChanges}
+              disabled={!hasChanges || (busy !== null && !isSaving)}
             />
           </div>
         )}
@@ -242,28 +241,21 @@ const AgentSettingsForm = observer(function AgentSettingsForm(props: {
 });
 
 /** Saves on change. Off blocks new Runs from mentions; existing Runs stay available. */
-const MentionableSwitch = observer(function MentionableSwitch(props: {
-  workspaceSlug: string;
-  agent: TAgent;
-  canEdit: boolean;
-}) {
-  const { workspaceSlug, agent, canEdit } = props;
+const MentionableSwitch = observer(function MentionableSwitch(props: TCardProps) {
+  const { workspaceSlug, agent, canEdit, busy, run } = props;
   const { t } = useTranslation();
   const { updateAgent } = useAgent();
-  const [isSaving, setIsSaving] = useState(false);
   const labelId = useId();
   const hintId = useId();
 
-  const toggle = async (mentionable: boolean) => {
-    setIsSaving(true);
-    try {
-      await updateAgent(workspaceSlug, agent.harness, { mentionable });
-    } catch {
-      setToast({ type: "error", title: t("agent_settings.settings.save_failed") });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const toggle = (mentionable: boolean) =>
+    run("mentionable", async () => {
+      try {
+        await updateAgent(workspaceSlug, agent.harness, { mentionable });
+      } catch {
+        setToast({ type: "error", title: t("agent_settings.settings.save_failed") });
+      }
+    });
 
   return (
     <span className="ml-auto flex shrink-0 items-center gap-2">
@@ -276,12 +268,70 @@ const MentionableSwitch = observer(function MentionableSwitch(props: {
       <Switch
         size="sm"
         checked={agent.mentionable}
-        disabled={!canEdit || isSaving}
+        disabled={!canEdit || busy !== null}
         aria-labelledby={labelId}
         aria-describedby={hintId}
         onCheckedChange={(checked) => void toggle(checked)}
       />
     </span>
+  );
+});
+
+/**
+ * Settings card of one Agent. Save, Mentionable, Connect and Disconnect share one busy state, so only
+ * one request of the card runs at a time and a late response cannot replace a newer one.
+ */
+const AgentSettingsCard = observer(function AgentSettingsCard(props: {
+  workspaceSlug: string;
+  agent: TAgent;
+  canEdit: boolean;
+}) {
+  const { workspaceSlug, agent, canEdit } = props;
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState<TAgentCardAction | null>(null);
+  const version = agent.connection.harness_version;
+
+  const run: TRunCardAction = async (action, task) => {
+    setBusy(action);
+    try {
+      await task();
+    } finally {
+      setBusy(null);
+    }
+  };
+  const cardProps = { workspaceSlug, agent, canEdit, busy, run };
+
+  return (
+    <section
+      aria-labelledby="agent-settings-title"
+      className="min-w-0 flex-1 rounded-lg border border-subtle bg-surface-1 shadow-raised-100"
+    >
+      <div className="flex items-center gap-3 border-b border-subtle px-4 py-3">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">
+          <AgentOutline className="size-4" aria-hidden="true" />
+        </span>
+        <div className="flex min-w-0 flex-col">
+          <h4 id="agent-settings-title" className="truncate text-body-md-semibold text-primary">
+            {agent.name}
+          </h4>
+          <span className="truncate text-caption-sm-regular text-tertiary">
+            {agent.connection.state === "connected"
+              ? t("agent_settings.detail.on_the_mini", { version: harnessCliLabel(agent.harness, version) })
+              : harnessCliLabel(agent.harness, "")}
+          </span>
+        </div>
+        <MentionableSwitch {...cardProps} />
+      </div>
+      {!canEdit && (
+        <p className="border-b border-subtle px-4 py-2 text-caption-sm-regular text-tertiary">
+          {t("agent_settings.detail.read_only")}
+        </p>
+      )}
+      <ul>
+        <HarnessConnectionRow {...cardProps} />
+      </ul>
+      <AgentSettingsForm {...cardProps} />
+    </section>
   );
 });
 
@@ -333,7 +383,6 @@ export const HarnessDetailPage = observer(function HarnessDetailPage({ workspace
   const { getAgent } = useAgent();
   const { error, isLoading, mutate } = useWorkspaceAgents(workspaceSlug);
   const agent = getAgent(workspaceSlug, harness);
-  const version = agent?.connection.harness_version ?? "";
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -349,36 +398,7 @@ export const HarnessDetailPage = observer(function HarnessDetailPage({ workspace
       {agent && (
         <div className="flex flex-col gap-4 md:flex-row md:items-start">
           <AgentSelector workspaceSlug={workspaceSlug} current={harness} />
-          <section
-            aria-labelledby="agent-settings-title"
-            className="min-w-0 flex-1 rounded-lg border border-subtle bg-surface-1 shadow-raised-100"
-          >
-            <div className="flex items-center gap-3 border-b border-subtle px-4 py-3">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-subtle text-accent-primary">
-                <AgentOutline className="size-4" aria-hidden="true" />
-              </span>
-              <div className="flex min-w-0 flex-col">
-                <h4 id="agent-settings-title" className="truncate text-body-md-semibold text-primary">
-                  {agent.name}
-                </h4>
-                <span className="truncate text-caption-sm-regular text-tertiary">
-                  {agent.connection.state === "connected"
-                    ? t("agent_settings.detail.on_the_mini", { version: harnessCliLabel(harness, version) })
-                    : harnessCliLabel(harness, "")}
-                </span>
-              </div>
-              <MentionableSwitch workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
-            </div>
-            {!canEdit && (
-              <p className="border-b border-subtle px-4 py-2 text-caption-sm-regular text-tertiary">
-                {t("agent_settings.detail.read_only")}
-              </p>
-            )}
-            <ul>
-              <HarnessConnectionRow workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
-            </ul>
-            <AgentSettingsForm key={agent.id} workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
-          </section>
+          <AgentSettingsCard key={agent.id} workspaceSlug={workspaceSlug} agent={agent} canEdit={canEdit} />
         </div>
       )}
     </div>
