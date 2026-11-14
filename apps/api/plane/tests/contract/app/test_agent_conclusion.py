@@ -60,17 +60,45 @@ class TestCompletedResult:
             run_setup.issue.id,
         )
         assert Description.objects.get(pk=comment.description_id).created_by_id == bot_user.id
-        assert comment.comment_html == (
-            f"<p><strong>Answer from Claude Code (Run {run.short_id})</strong></p>"
-            "<p>Line one &lt;script&gt;alert(1)&lt;/script&gt;<br />line two</p>"
-            "<p>Second paragraph</p>"
-        )
+        html = comment.comment_html
+        assert html.startswith(f"<p><strong>Answer from Claude Code (Run {run.short_id})</strong></p>")
+        assert "<script" not in html and "alert(1)" not in html
+        assert "line two" in html and "<p>Second paragraph</p>" in html
         last = AgentRunEvent.objects.filter(run=run).order_by("-seq").first()
         assert (last.kind, last.source_key) == ("conclusion", "conclusion")
         assert last.payload == {"text": conclusion, "comment_id": str(comment.id), "status": "completed"}
         turn = AgentRunTurn.objects.get(run=run, index=0)
         assert (turn.status, turn.driver_session_ref) == ("completed", "sess-1")
         assert turn.ended_at is not None
+
+    @pytest.mark.django_db
+    def test_markdown_answer_is_stored_as_sanitized_rich_text(self, worker_client, leased):
+        run, generation = leased
+        conclusion = (
+            "## Cause\n\n"
+            "The token check runs **twice**:\n\n"
+            "- first in `views.py`\n"
+            "- then in the middleware\n\n"
+            "1. Remove one check\n"
+            "2. Add a test\n\n"
+            "```python\nif token:\n    return True\n```\n\n"
+            "See [the docs](https://docs.plane.so/auth) and [this](javascript:alert(2)).\n\n"
+            "<script>alert(1)</script>"
+        )
+
+        post_result(worker_client, run.id, generation, conclusion=conclusion)
+
+        run.refresh_from_db()
+        html = IssueComment.objects.get(pk=run.conclusion_comment_id).comment_html
+        assert html.startswith(f"<p><strong>Answer from Claude Code (Run {run.short_id})</strong></p>")
+        assert "<h2>Cause</h2>" in html
+        assert "<strong>twice</strong>" in html
+        assert "<ul>" in html and "<li>first in <code>views.py</code></li>" in html
+        assert "<ol>" in html and "<li>Add a test</li>" in html
+        assert '<pre><code class="language-python">if token:\n    return True\n</code></pre>' in html
+        assert 'href="https://docs.plane.so/auth"' in html and ">the docs</a>" in html
+        assert "javascript:" not in html
+        assert "<script" not in html and "alert(1)" not in html
 
     @pytest.mark.django_db
     def test_duplicate_result_creates_one_conclusion(self, worker_client, leased):

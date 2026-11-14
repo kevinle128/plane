@@ -79,6 +79,8 @@ dependencies = [
     "drf-spectacular==0.29.0",
     # html sanitizer
     "nh3==0.2.18",
+    # markdown to html (agent answers in comments)
+    "mistune==3.4.0",
 ]
 
 [dependency-groups]

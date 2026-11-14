@@ -21,18 +21,23 @@ from django.utils import timezone
 # Module imports
 from plane.agent.services import harness_probe, lease, run_events
 from plane.db.models import AgentRun, AgentRunEventKind, AgentRunStatus, AgentRunTurn, AgentRunTurnStatus, IssueComment
+from plane.utils.content_validator import validate_html_content
+from plane.utils.markdown import markdown
 
 HARNESS_VERSION_UNVERIFIED = "harness_version_unverified"
 
 
 def conclusion_html(run, status, conclusion, failure_message):
+    """The comment HTML: a heading, then the Agent's Markdown as rich text, sanitized like a member's comment."""
     if status == AgentRunStatus.COMPLETED:
         heading = f"Answer from {run.agent_name} (Run {run.short_id})"
     else:
         heading = f"Run {run.short_id} failed: {failure_message}"
-    paragraphs = [part.strip() for part in conclusion.replace("\r\n", "\n").split("\n\n") if part.strip()]
-    body = "".join(f"<p>{escape(part).replace(chr(10), '<br />')}</p>" for part in paragraphs)
-    return f"<p><strong>{escape(heading)}</strong></p>{body}"
+    heading_html = f"<p><strong>{escape(heading)}</strong></p>"
+    is_valid, _, clean_html = validate_html_content(heading_html + markdown(conclusion))
+    if not is_valid:
+        return f"{heading_html}<p>{escape(conclusion)}</p>"
+    return clean_html
 
 
 def result_body(run):

@@ -4,4 +4,6 @@
 
 import mistune
 
-markdown = mistune.Markdown()
+# Markdown to HTML. Raw HTML passes through unchanged, so callers must sanitize the
+# result (for example with ``validate_html_content``) before they store it.
+markdown = mistune.create_markdown(escape=False, plugins=["strikethrough", "table", "url"])
