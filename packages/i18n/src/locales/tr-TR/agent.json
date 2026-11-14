@@ -275,9 +275,11 @@
       "follow_up": "The CLI could not resume a conversation. Update the CLI, then retry.",
       "progress": "The CLI sent no progress events. Update the CLI, then retry.",
       "interruption": "The CLI could not be interrupted. Update the CLI, then retry.",
-      "permission": "The CLI did not ask before a write, or the read-only boundary did not hold. Check the CLI and the Worker, then retry.",
+      "permission": "The CLI did not run with full permissions inside its sandbox. Check the CLI and the Worker, then retry.",
       "recovery": "The CLI could not continue after its process stopped. Update the CLI, then retry.",
-      "generic": "The connection check did not pass. Retry."
+      "generic": "The connection check did not pass. Retry.",
+      "sandbox_not_signed_in": "Sign in to Docker with `sbx login` on the Worker machine, then retry.",
+      "harness_version_unverified": "This CLI version did not pass a check during a Run. Retry the connection to check it again."
     },
     "settings": {
       "save": "Save",
@@ -315,6 +317,39 @@
       "unavailable": "Available after connecting",
       "placeholder": "Choose a model",
       "not_reported": "Not reported by {harness}"
+    }
+  },
+  "agent_run": {
+    "status": {
+      "created": "Waiting for pickup",
+      "in_progress": "In progress",
+      "awaiting": "Waiting for you",
+      "completed": "Completed",
+      "failed": "Failed",
+      "stale": "Stale",
+      "stopped": "Stopped"
+    },
+    "kind": {
+      "qa_read_only": "Q&A · read-only clone"
+    },
+    "card": {
+      "mentioned": "mentioned {agent}",
+      "failed_generic": "The Run failed before it started."
+    },
+    "mention": {
+      "section_title": "Agents",
+      "unknown_agent": "Agent",
+      "disabled_reason": {
+        "not_connected": "Not connected",
+        "not_mentionable": "Not mentionable",
+        "no_repository": "No repository"
+      },
+      "unavailable": {
+        "not_connected": "{agent} is not connected. The comment was not saved.",
+        "not_mentionable": "{agent} cannot be mentioned now. The comment was not saved.",
+        "not_found": "{agent} does not exist in this workspace. The comment was not saved.",
+        "generic": "{agent} cannot start a Run now. The comment was not saved."
+      }
     }
   }
 }

@@ -90,6 +90,10 @@ describe("getMissingActionKey", () => {
   it("names the missing action for known codes and falls back for unknown ones", () => {
     expect(getMissingActionKey("worker_did_not_answer")).toBe("agent_settings.missing_action.worker_did_not_answer");
     expect(getMissingActionKey("permission")).toBe("agent_settings.missing_action.permission");
+    expect(getMissingActionKey("sandbox_not_signed_in")).toBe("agent_settings.missing_action.sandbox_not_signed_in");
+    expect(getMissingActionKey("harness_version_unverified")).toBe(
+      "agent_settings.missing_action.harness_version_unverified"
+    );
     expect(getMissingActionKey("teleport")).toBe("agent_settings.missing_action.generic");
     expect(getMissingActionKey("")).toBeNull();
   });

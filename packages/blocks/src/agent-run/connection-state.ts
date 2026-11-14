@@ -36,6 +36,8 @@ const KNOWN_MISSING_ACTIONS = new Set([
   "interruption",
   "permission",
   "recovery",
+  "sandbox_not_signed_in",
+  "harness_version_unverified",
 ]);
 
 /** Tag label key and semantic tone of a connection state; the tag is derived from live state, never stored copy. */

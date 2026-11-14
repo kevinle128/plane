@@ -48,3 +48,6 @@ export const AGENT_PROBE_HARNESSES: TAgentHarness[] = ["claude_code"];
 
 /** Poll interval of the Harness detail page while a probe runs. */
 export const AGENT_CONNECTION_POLL_MS = 2000;
+
+/** Poll interval of a Run and its timeline while the Run is active. */
+export const AGENT_RUN_POLL_MS = 2000;

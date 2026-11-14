@@ -6,6 +6,7 @@
 
 import { observer } from "mobx-react";
 // plane imports
+import { insertRunsByTime } from "@plane/blocks/agent-run";
 import { EmptyStateCompact } from "@plane/blocks/empty-state";
 import type { E_SORT_ORDER, TActivityFilters } from "@plane/constants";
 import { BASE_ACTIVITY_FILTER_TYPES, EActivityFilterType, filterActivityOnSelectedFilters } from "@plane/constants";
@@ -14,9 +15,11 @@ import type { TCommentsOperations } from "@plane/types";
 // components
 import { CommentCard } from "@/components/comments/card/root";
 // hooks
+import { useAgentRun } from "@/hooks/store/use-agent-run";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local imports
 import { IssueActivityItem } from "./activity/activity-list";
+import { AgentRunCardRow } from "./agent-run-card-row";
 import { IssueActivityLoader } from "./loader";
 
 type TIssueActivityCommentRoot = {
@@ -50,12 +53,23 @@ export const IssueActivityCommentRoot = observer(function IssueActivityCommentRo
     activity: { getActivityAndCommentsByIssueId },
     comment: { getCommentById },
   } = useIssueDetail();
+  const { getRunsByIssueId } = useAgentRun();
   // derived values
   const activityAndComments = getActivityAndCommentsByIssueId(issueId, sortOrder);
 
   if (!activityAndComments) return <IssueActivityLoader />;
 
-  const filteredActivityAndComments = filterActivityOnSelectedFilters(activityAndComments, selectedFilters);
+  // Run cards go with comments. A Run's conclusion comment is shown inside its card, not a second time.
+  const runs = selectedFilters.includes(EActivityFilterType.COMMENT) ? (getRunsByIssueId(issueId) ?? []) : [];
+  const conclusionCommentIds = new Set(runs.map((run) => run.conclusion_comment_id).filter(Boolean));
+  const filteredActivityAndComments = insertRunsByTime(
+    filterActivityOnSelectedFilters(activityAndComments, selectedFilters).filter(
+      (activityComment) =>
+        !(activityComment.activity_type === "COMMENT" && conclusionCommentIds.has(activityComment.id))
+    ),
+    runs,
+    sortOrder
+  );
 
   if (filteredActivityAndComments.length <= 0) {
     const isCommentsOnly = selectedFilters.every((filter) => filter === EActivityFilterType.COMMENT);
@@ -75,7 +89,18 @@ export const IssueActivityCommentRoot = observer(function IssueActivityCommentRo
 
   return (
     <div>
-      {filteredActivityAndComments.map((activityComment, index) => {
+      {filteredActivityAndComments.map((row, index) => {
+        if (row.type === "run")
+          return (
+            <AgentRunCardRow
+              key={`agent-run-${row.run.id}`}
+              runId={row.run.id}
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              ends={getEnds(index)}
+            />
+          );
+        const activityComment = row.entry;
         const comment = getCommentById(activityComment.id);
         return activityComment.activity_type === "COMMENT" ? (
           <CommentCard

@@ -28,13 +28,15 @@ type TCommentCreate = {
   activityOperations: TCommentsOperations;
   projectId?: string;
   onSubmitCallback?: (elementId: string) => void;
+  /** Suggest workspace Agents in the `@` menu of the composer. */
+  enableAgentMentions?: boolean;
 };
 
 // services
 const fileService = new FileService();
 
 export const CommentCreate = observer(function CommentCreate(props: TCommentCreate) {
-  const { workspaceSlug, entityId, activityOperations, projectId, onSubmitCallback } = props;
+  const { workspaceSlug, entityId, activityOperations, projectId, onSubmitCallback, enableAgentMentions } = props;
   // translation
   const { t } = useTranslation();
   // states
@@ -146,6 +148,7 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
                     value={"<p></p>"}
                     workspaceSlug={workspaceSlug}
                     projectId={projectId}
+                    enableAgentMentions={enableAgentMentions}
                     onEnterKeyPress={(e) => {
                       if (!isEmpty && !isSubmitting) {
                         handleSubmit(onSubmit)(e);

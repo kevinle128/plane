@@ -8,13 +8,27 @@ import { useMemo } from "react";
 import { useTranslation } from "@plane/i18n";
 import { setToast } from "@plane/blocks/toast";
 import { EFileAssetType } from "@plane/types";
-import type { TCommentsOperations } from "@plane/types";
+import type { TAgentUnavailableError, TCommentsOperations } from "@plane/types";
 import { copyUrlToClipboard, formatTextList, generateWorkItemLink } from "@plane/utils";
 import { useEditorAsset } from "@/hooks/store/use-editor-asset";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { useUser } from "@/hooks/store/user";
+
+const AGENT_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set(["not_connected", "not_mentionable", "not_found"]);
+
+/**
+ * Agent name and reason key of a 400 `agent_unavailable` comment error (nothing was saved), else `undefined`.
+ * An unknown reason gets the generic message.
+ */
+function getAgentUnavailableError(error: unknown): { agent: string; reasonKey: string } | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const body = error as Partial<Record<keyof TAgentUnavailableError, unknown>>;
+  if (body.error !== "agent_unavailable" || typeof body.agent !== "string") return undefined;
+  const known = typeof body.reason === "string" && AGENT_UNAVAILABLE_REASONS.has(body.reason);
+  return { agent: body.agent, reasonKey: known ? String(body.reason) : "generic" };
+}
 
 export const useWorkItemCommentOperations = (
   workspaceSlug: string | undefined,
@@ -81,11 +95,14 @@ export const useWorkItemCommentOperations = (
             message: t("issue.comments.create.success"),
           });
           return comment;
-        } catch {
+        } catch (error) {
+          const agentError = getAgentUnavailableError(error);
           setToast({
             title: t("common.error.label"),
             type: "error",
-            message: t("issue.comments.create.error"),
+            message: agentError
+              ? t(`agent_run.mention.unavailable.${agentError.reasonKey}`, { agent: agentError.agent })
+              : t("issue.comments.create.error"),
           });
         }
       },

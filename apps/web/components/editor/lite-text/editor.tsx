@@ -45,6 +45,8 @@ type LiteTextEditorWrapperProps = MakeOptional<
   parentClassName?: string;
   editorClassName?: string;
   submitButtonText?: string;
+  /** Suggest workspace Agents in the `@` menu; a saved comment that mentions one starts a Run. */
+  enableAgentMentions?: boolean;
 } & (
     | {
         editable: false;
@@ -81,6 +83,7 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
     editorClassName = "",
     showPlaceholderOnEmpty = true,
     submitButtonText = "common.comment",
+    enableAgentMentions = false,
     ...rest
   } = props;
   // states
@@ -102,6 +105,7 @@ export const LiteTextEditor = React.forwardRef(function LiteTextEditor(
   });
   // use editor mention
   const { fetchMentions } = useEditorMention({
+    enableAgentMentions,
     searchEntity: async (payload) =>
       await workspaceService.searchEntity(workspaceSlug, {
         ...payload,

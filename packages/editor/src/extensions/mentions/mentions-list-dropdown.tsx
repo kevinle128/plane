@@ -20,8 +20,9 @@ import {
 } from "@makeplane/propel/elements/suggestion-menu";
 // plane utils
 import { useOutsideClickDetector } from "@plane/hooks";
+import { cn } from "@plane/utils";
 // helpers
-import { DROPDOWN_NAVIGATION_KEYS, getNextValidIndex } from "@/helpers/tippy";
+import { DROPDOWN_NAVIGATION_KEYS, getFirstEnabledIndex, getNextValidIndex } from "@/helpers/tippy";
 // types
 import type { TMentionHandler, TMentionSection, TMentionSuggestion } from "@/types";
 
@@ -47,7 +48,7 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
       try {
         const item = sections?.[sectionIndex]?.items?.[itemIndex];
         const transactionId = uuidv4();
-        if (item) {
+        if (item && !item.disabled) {
           command({
             ...item,
             id: transactionId,
@@ -82,12 +83,9 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
     },
   }));
 
-  // initialize the select index to 0 by default
+  // initialize the selection to the first item that can be selected
   useEffect(() => {
-    setSelectedIndex({
-      section: 0,
-      item: 0,
-    });
+    setSelectedIndex(getFirstEnabledIndex(sections));
   }, [sections]);
 
   // debounced search callback
@@ -185,19 +183,24 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
                       <button
                         id={`mention-item-${sectionIndex}-${itemIndex}`}
                         type="button"
-                        className="focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
+                        aria-disabled={item.disabled ? true : undefined}
+                        className={cn(
+                          "focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset",
+                          item.disabled && "cursor-not-allowed opacity-60"
+                        )}
                         style={{ textAlign: "start" }}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           selectItem(sectionIndex, itemIndex);
                         }}
-                        onMouseEnter={() =>
+                        onMouseEnter={() => {
+                          if (item.disabled) return;
                           setSelectedIndex({
                             section: sectionIndex,
                             item: itemIndex,
-                          })
-                        }
+                          });
+                        }}
                       />
                     }
                   >
@@ -210,6 +213,11 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
                           </span>
                         )}
                         <span className="truncate">{item.title}</span>
+                        {item.disabled && item.disabledReason && (
+                          <span className="ms-auto shrink-0 ps-2 text-caption-sm-regular whitespace-nowrap text-tertiary">
+                            {item.disabledReason}
+                          </span>
+                        )}
                       </span>
                     </SuggestionMenuItemTitle>
                   </SuggestionMenuItem>

@@ -4,12 +4,14 @@
  * See the LICENSE file for details.
  */
 
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo } from "react";
 import uniq from "lodash-es/uniq";
 import { observer } from "mobx-react";
 // plane package imports
 import type { TActivityFilters } from "@plane/constants";
 import { E_SORT_ORDER, EActivityFilterType, defaultActivityFilters } from "@plane/constants";
+import { isAgentRunActive } from "@plane/blocks/agent-run";
+import { AGENT_RUN_POLL_MS } from "@plane/constants";
 import { useLocalStorage } from "@plane/hooks";
 // i18n
 import { useTranslation } from "@plane/i18n";
@@ -18,6 +20,8 @@ import type { TFileSignedURLResponse, TIssueComment } from "@plane/types";
 // components
 import { CommentCreate } from "@/components/comments/comment-create";
 // hooks
+import { useAgentRun } from "@/hooks/store/use-agent-run";
+import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 // local imports
 import { IssueActivityCommentRoot } from "./activity-comment-root";
@@ -68,6 +72,13 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
   const { setValue: setSortOrder, storedValue: sortOrder } = useLocalStorage("activity_sort_order", E_SORT_ORDER.ASC);
 
   const { getProjectById } = useProject();
+  const { fetchRuns } = useAgentRun();
+  const {
+    fetchComments,
+    comment: { getCommentById, getCommentsByIssueId },
+  } = useIssueDetail();
+  // A new comment can start Runs, so the Run list is fetched again whenever the comment count changes.
+  const commentCount = getCommentsByIssueId(issueId)?.length ?? 0;
 
   const { setValue: setActiveTabKey, storedValue: storedActiveTabKey } = useLocalStorage<string>(
     "issue_activity_active_tab",
@@ -103,6 +114,29 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
     setSortOrder(sortOrder === E_SORT_ORDER.ASC ? E_SORT_ORDER.DESC : E_SORT_ORDER.ASC);
   };
 
+  // Runs of this work item: fetched on open and polled while one is active, so the cards follow the
+  // status. A Run that ends adds its conclusion comment, which the incremental comment fetch picks up.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const runs = await fetchRuns(workspaceSlug, projectId, issueId);
+        if (cancelled) return;
+        if (runs.some((run) => run.conclusion_comment_id && !getCommentById(run.conclusion_comment_id)))
+          await fetchComments(workspaceSlug, projectId, issueId, "mutate");
+        if (!cancelled && runs.some((run) => isAgentRunActive(run.status))) timer = setTimeout(poll, AGENT_RUN_POLL_MS);
+      } catch (error) {
+        console.error("Failed to fetch the Runs of the work item:", error);
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [workspaceSlug, projectId, issueId, commentCount, fetchRuns, fetchComments, getCommentById]);
+
   // helper hooks
   const activityOperations = useWorkItemCommentOperations(workspaceSlug, projectId, issueId);
 
@@ -114,6 +148,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
         entityId={issueId}
         activityOperations={activityOperations}
         projectId={projectId}
+        enableAgentMentions
       />
     ),
     [workspaceSlug, issueId, activityOperations, projectId]
