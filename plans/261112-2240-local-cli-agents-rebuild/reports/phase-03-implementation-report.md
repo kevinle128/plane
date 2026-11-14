@@ -12,9 +12,11 @@ Report: [sbx-verification.md](./sbx-verification.md). Criterion 9 PASS with one 
 
 ## Baselines (Tests Before)
 
-| #   | Check                                                              | Result on the branch head before any Phase 3 code |
-| --- | ------------------------------------------------------------------ | ------------------------------------------------- |
-| 5   | Worker unit suite (`uv run pytest -m "not native and not docker"`) | 110 passed                                        |
+| #   | Check                                                                                                                  | Result on the branch head before any Phase 3 code |
+| --- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 1-3 | Comment create without agent mentions (same body, same two `.delay` calls), email user mentions, `user_mention` search | 7 passed on the unchanged API code                |
+| 4   | `pnpm --filter=@plane/editor test` before the editor type change                                                       | 2 files / 12 tests passed                         |
+| 5   | Worker unit suite (`uv run pytest -m "not native and not docker"`)                                                     | 110 passed                                        |
 
 ## Stories
 
@@ -76,6 +78,26 @@ Setup: the API test stack ran `runserver` on `127.0.0.1:8765` (`docker compose -
 
 Not checked live: a GitLab-bound project on git.oceanlabs.dev (no GitLab connection was set up in this stack), and the browser review of the Run card and panel (no web server ran).
 
+## Phase verification (final, on `43e8750b40`'s tree)
+
+| Command                                                                                                                                                                                            | Result                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `docker compose -f docker-compose-test.yml run --rm --build api-tests pytest plane/tests/contract/app -k "agent_run or agent_worker or agent_conclusion or agent_git_credential or entity_search"` | 114 passed, 1002 deselected                                                                                      |
+| `... pytest plane/tests/unit -k "mention"`                                                                                                                                                         | 11 passed, 688 deselected                                                                                        |
+| `... pytest plane/tests/contract/app plane/tests/unit -k "agent or comment or issue_activity or search or api_token"` (regression)                                                                 | 670 passed, 1145 deselected                                                                                      |
+| `... python manage.py makemigrations --check --dry-run`                                                                                                                                            | No changes detected                                                                                              |
+| `... ruff check .` (apps/api, test image)                                                                                                                                                          | All checks passed                                                                                                |
+| `cd apps/agent-worker && uv run ruff check . && uv run ruff format --check .` (uv 0.12.21)                                                                                                         | All checks passed; 41 files formatted                                                                            |
+| `uv run pytest -m "not native and not docker"`                                                                                                                                                     | macOS 254 passed before the GnuTLS fix, 255 with it; Linux (`python:3.12-slim`, git 2.47.3, `procps`) 255 passed |
+| `uv run pytest -m native` (real `sbx` v0.53.0, `deny-all`)                                                                                                                                         | 4 passed in 138 s; no `plane-test-*` sandbox left                                                                |
+| `pnpm --filter=@plane/editor test && pnpm --filter=@plane/blocks test`                                                                                                                             | editor 3 files / 17 tests; blocks 53 files / 484 tests                                                           |
+| `pnpm turbo run check:types --filter=web --filter=space --filter=@plane/editor --filter=@plane/blocks --filter=@plane/types --filter=@plane/constants`                                             | 15/15 successful                                                                                                 |
+| `pnpm check:lint`                                                                                                                                                                                  | 15/15 successful, 0 errors (web 429 warnings, within the package limit)                                          |
+| `pnpm check:format`                                                                                                                                                                                | 15/15 successful                                                                                                 |
+| `pnpm --filter=@plane/i18n check:sync`                                                                                                                                                             | All locales are in sync with English                                                                             |
+
+Cleanup: every test stack ended with `docker compose -f docker-compose-test.yml down -v`; the end-to-end sandboxes (`plane-probe-claude-code`, `plane-qa-00903909710bbcd1`) were removed with `sbx rm --force`, the global policy was reset (`sbx policy reset --force`, as before the phase), the e2e Worker token file was deleted. `sbx ls`, `sbx secret ls`: none. Only containers of other projects remain (untouched).
+
 ## Deviations
 
 1. Health check of a sandbox reads the mounted settings file (`sbx exec <name> sh -c 'test -r /opt/user-claude/settings.json'`). Exit 1 means a stale single-file mount: the Worker runs `sbx stop <name>` and checks once more. This branch is not in the phase file. It keeps the single-file decision (Q37) and heals the stale mount found in task 0.
@@ -83,6 +105,25 @@ Not checked live: a GitLab-bound project on git.oceanlabs.dev (no GitLab connect
 
 3. The sandbox environment is empty: the Worker does not pass `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` (the phase file's "Changes to Phase 2 code" says the sandbox environment is only that variable). Reason: with it Claude leaves bypass mode, which breaks Q31 (full permissions) and the suite's permission check (bypass mode, no permission request). The scrub would protect nothing in the sandbox, because the agent can read the mounted settings file that holds the token (Q30 and Q37 accept that the token is visible inside the sandbox). Needs user confirmation; see Concerns.
 
+4. The Run executor lives in a new module `runs.py` (the phase file names `loop.py`); `loop.py` only claims Runs and starts one thread each (at most 4 at a time).
+5. The Run prompt tells the agent to delegate code changes through the Archon MCP tools when they are available (Q36); the plan does not give prompt text.
+6. Run folders (clone and scratch) are kept after the Run, because later turns of the same Run (Phase 4) start in the same clone; the README documents manual cleanup. The host-only folder with the CA bundle is removed at the end of each Run.
+7. API (helper): Runs that fail at launch (`provider_*`, `repository_unavailable`) have no context snapshot and no trigger event; the Worker `events/` endpoint refuses kind `conclusion`; a failed `result/` needs a `failure_code` (the Worker always sends one).
+8. Web (helper): Run cards show when the Comments filter is on; polling stops at `stale`; the panel width is fixed at 540 px.
+
 ## Not done
 
-(Filled at the end.)
+- Browser review of the mockup rows (I010, I011, I013-I017, I019-I022, I035, I036, I043, I074) in Light and Dark at 375, 768 and 1280 px, and scenes 1, 2, 4, 7 with keyboard and screen reader: not done (no web server ran in this session). The web helper reports I014 as partial (no "current action" on the card) and I043 as depending on the failure text.
+- Live check on a GitLab-bound project (git.oceanlabs.dev): not done (no GitLab connection or token in this session). GitLab clone behavior is covered by the local HTTPS tests and the API contract tests.
+- Web not built: resizable panel with a saved width, header banners for stale, failed and stopped Runs, a health tag on mentionable Agents.
+- The plain-text export of a comment shows an agent mention as `@user` (`parseAdditionalEditorContent` has no `agent_mention` case).
+- The conclusion comment is stored as escaped paragraphs, so Markdown in Claude's answer (bold, code) shows as raw characters.
+- The conclusion comment sends no notification and fires no webhook (`issue_activity.delay` is not called for it); the contract did not ask for it.
+- The live check ran on this development Mac, not on the Mac Mini.
+
+## Open questions for the user
+
+1. Deviation 3: drop `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` in the sandbox (needed for full permissions)? The alternative keeps the scrub and answers every permission request with allow, which changes the Q31 suite check.
+2. The Docker MCP gateway stays reachable by raw HTTP from inside a sandbox, and a deny rule does not block it (task 0). It lists no servers and does not show in `system/init`. Accept as is?
+3. Should the conclusion comment notify the requester (activity and webhook), now or in Phase 4?
+4. Should the conclusion comment render Claude's Markdown as rich text?
