@@ -43,6 +43,8 @@ MAX_DETAIL = 500
 PIPE_HELPER = Path(__file__).with_name("git_credential_pipe.py")
 # These variables override ``core.askPass``.
 PROMPT_VARIABLES = ("GIT_ASKPASS", "SSH_ASKPASS")
+# Turn off a host-wide git-lfs filter, so the checkout runs no git-lfs download.
+NO_LFS_OPTIONS = ("-c", "filter.lfs.smudge=", "-c", "filter.lfs.process=", "-c", "filter.lfs.required=false")
 
 logger = logging.getLogger("plane_agent_worker.git_transport")
 
@@ -175,6 +177,8 @@ def _git_env(env):
     for name in PROMPT_VARIABLES:
         git_env.pop(name, None)
     git_env["GIT_TERMINAL_PROMPT"] = "0"
+    # git-lfs has its own HTTP client (no address pin, follows a repository's .lfsconfig): never run it.
+    git_env["GIT_LFS_SKIP_SMUDGE"] = "1"
     return git_env
 
 
@@ -278,6 +282,7 @@ def clone_repository(
         "http.followRedirects=false",
         "-c",
         "core.askPass=",
+        *NO_LFS_OPTIONS,
         *_pin_option(parts.hostname, port, addresses),
     ]
     if ca_bundle:

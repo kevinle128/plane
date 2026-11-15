@@ -46,6 +46,14 @@ describe("getNextValidIndex", () => {
       item: 0,
     });
   });
+
+  it("never selects a position without an item, such as an empty section", () => {
+    const sections = [{ items: [] }, { items: [item()] }];
+    expect(getNextValidIndex({ event: key("ArrowUp"), sections, selectedIndex: { section: 1, item: 0 } })).toEqual({
+      section: 1,
+      item: 0,
+    });
+  });
 });
 
 describe("getFirstEnabledIndex", () => {

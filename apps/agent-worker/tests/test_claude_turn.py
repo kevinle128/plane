@@ -452,13 +452,21 @@ def test_clone_failure_is_reported_and_fails_the_run(world):
 def test_gitlab_run_fetches_the_token_only_through_the_clone(world):
     w = world()
     w.verify()
+    record_clone = fake_clone(w.clone_calls)
 
+    def clone_fetching_the_token(**kwargs):
+        # The token is fetched only by the clone, before the turn runs in the sandbox.
+        assert w.plane.credentials == 0
+        assert kwargs["fetch_token"]() == "glpat-secret-0001"
+        record_clone(**kwargs)
+
+    w.executor.clone = clone_fetching_the_token
     w.executor.execute(claim(provider="gitlab", credential_mode="plane_token"))
 
     [call] = w.clone_calls
     assert call["credential_mode"] == "plane_token"
-    assert w.plane.credentials == 0
-    assert call["fetch_token"]() == "glpat-secret-0001"
+    assert w.plane.credentials == 1
+    assert w.plane.result()["status"] == "completed"
     names = set((w.private_dir / "harness-env.txt").read_text().split())
     assert not any("TOKEN" in name for name in names)
     assert "glpat-secret-0001" not in json.dumps(w.plane.events)

@@ -46,8 +46,7 @@ export class AgentRunService extends APIService {
     after: number
   ): Promise<TAgentRunEventsPage> {
     return this.get(`${this.base(workspaceSlug, projectId, issueId)}/${runId}/events/`, {
-      after,
-      limit: EVENTS_PAGE_LIMIT,
+      params: { after, limit: EVENTS_PAGE_LIMIT },
     })
       .then((response) => response?.data)
       .catch((error) => {

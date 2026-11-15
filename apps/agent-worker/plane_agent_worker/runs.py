@@ -54,6 +54,8 @@ VERSION_SECONDS = 60
 SUITE_BUDGET_SECONDS = 100
 EVENT_BATCH = 100
 MAX_MESSAGE_CHARS = 1000
+MAX_CONCLUSION_CHARS = 100_000
+MAX_SESSION_REF_CHARS = 128
 CREDENTIAL_MODES = frozenset({"host", "plane_token"})
 # The 409 codes of a lost lease. Any other 409 is a refusal of the request itself.
 LEASE_CODES = frozenset({"lease_superseded", "run_finished"})
@@ -74,6 +76,16 @@ class RunFailure(Exception):
 
 class LeaseLost(Exception):
     """Plane gave the Run to a newer lease; this Worker stops and posts nothing more."""
+
+
+def _run_gone(error):
+    """Plane answered 404: the Run (or its work item) no longer exists, so the lease is lost."""
+    return error.status == 404
+
+
+def _refused(error):
+    """Plane refused the request itself (a 4xx other than a timeout or rate limit): a retry gets the same answer."""
+    return error.status is not None and 400 <= error.status < 500 and error.status not in (408, 429)
 
 
 class EventSink:
@@ -104,8 +116,19 @@ class EventSink:
             except Conflict as error:
                 raise LeaseLost(error.code) from None
             except PlaneClientError as error:
-                logger.warning("Run %s: events not sent yet (status %s, %s)", self.run_id, error.status, error.code)
-                return
+                if _run_gone(error):
+                    raise LeaseLost(error.code) from None
+                if not _refused(error):
+                    logger.warning("Run %s: events not sent yet (status %s, %s)", self.run_id, error.status, error.code)
+                    return
+                # Sending the same batch again gets the same refusal and would block every later event.
+                logger.warning(
+                    "Run %s: Plane refused %s events (status %s, %s); dropping them",
+                    self.run_id,
+                    len(batch),
+                    error.status,
+                    error.code,
+                )
             del self.pending[: len(batch)]
 
 
@@ -144,6 +167,9 @@ class RunExecutor:
         # Runs this Worker works now. The folder cleanup holds the same lock, so it never removes their folders.
         self._active = set()
         self._active_lock = threading.Lock()
+        # Set by ``stop`` at Worker shutdown: every turn is cancelled and no failed result is posted.
+        self._stopping = threading.Event()
+        self._cancels = {}
 
     # Entry --------------------------------------------------------------------
 
@@ -160,9 +186,12 @@ class RunExecutor:
             logger.warning("Ignoring a Run claim this Worker cannot work")
             return
         run_id = run["id"]
+        cancel = threading.Event()
         with self._active_lock:
             self._active.add(run_id)
-        cancel = threading.Event()
+            self._cancels[run_id] = cancel
+            if self._stopping.is_set():
+                cancel.set()
         lease = {"lost": False}
         stop_renewal = threading.Event()
         renewer = threading.Thread(
@@ -189,8 +218,16 @@ class RunExecutor:
             with self._active_lock:
                 layout.touch()
                 self._active.discard(run_id)
+                self._cancels.pop(run_id, None)
             if lease["lost"]:
                 logger.info("Run %s: the lease moved on; this Worker stopped it", run_id)
+
+    def stop(self):
+        """Cancel every turn for a Worker shutdown. The Runs post nothing more; Plane reclaims their leases."""
+        with self._active_lock:
+            self._stopping.set()
+            for cancel in self._cancels.values():
+                cancel.set()
 
     def remove_stale_folders(self, now=None):
         """Remove the clone and scratch folders of Runs with no activity for ``run_folder_days``.
@@ -223,10 +260,14 @@ class RunExecutor:
                 cancel.set()
                 return
             except PlaneClientError as error:
+                if _run_gone(error):
+                    lease["lost"] = True
+                    cancel.set()
+                    return
                 logger.warning("Run %s: lease renewal failed (status %s, %s)", run_id, error.status, error.code)
 
     def _post_failure(self, run_id, generation, sink, failure, lease):
-        if lease["lost"]:
+        if lease["lost"] or self._stopping.is_set():
             return
         try:
             sink.flush()
@@ -251,7 +292,9 @@ class RunExecutor:
             except Conflict as error:
                 raise LeaseLost(error.code) from None
             except PlaneClientError as error:
-                if delay is None:
+                if _run_gone(error):
+                    raise LeaseLost(error.code) from None
+                if delay is None or _refused(error):
                     raise
                 logger.warning("Run %s: result not sent (status %s, %s); retrying", run_id, error.status, error.code)
                 time.sleep(delay)
@@ -302,7 +345,14 @@ class RunExecutor:
         handle = self.mcp.open_turn(run_id=run_id, turn_index=turn_index, lease_generation=generation, context=payload)
         try:
             mcp_config = layout.run_scratch / "mcp.json"
-            descriptor = os.open(mcp_config, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            # The sandbox can write in its scratch folder: never follow a symbolic link it put there.
+            folder = os.open(layout.run_scratch, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                descriptor = os.open(
+                    mcp_config.name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600, dir_fd=folder
+                )
+            finally:
+                os.close(folder)
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle_file:
                 json.dump(turn_mcp_config(self.mcp.port, handle, self.imported_servers), handle_file)
             mapper = EventMapper(turn_index)
@@ -385,18 +435,40 @@ class RunExecutor:
             plane_checkout=self.plane_checkout,
         )
         if suite.record is None:
-            failed = next((name for name in SUITE_CHECKS if not suite.checks[name].passed), "")
-            detail = suite.checks[failed].detail if failed else suite.failure_hint
+            # Only a check that ran and failed marks the version unverified; a suite that could not run
+            # (sandbox, lock wait, version change) fails this Run and leaves the connection alone.
+            failed = next(
+                (
+                    name
+                    for name in SUITE_CHECKS
+                    if not suite.checks[name].passed and not suite.checks[name].detail.startswith("not ")
+                ),
+                "",
+            )
+            if not suite.ran_now or not failed:
+                hint = suite.failure_hint or next(
+                    (suite.checks[name].detail for name in SUITE_CHECKS if not suite.checks[name].passed), ""
+                )
+                raise RunFailure("sandbox_unavailable", f"Could not check Claude Code {version}: {hint}")
+            detail = suite.checks[failed].detail
             raise RunFailure(
                 "harness_version_unverified",
-                f"Claude Code {version} did not pass the {failed or 'behavior'} check: {detail}",
+                f"Claude Code {version} did not pass the {failed} check: {detail}",
                 harness_version=version,
                 failed_check=failed,
             )
 
     def _finish(self, run_id, generation, outcome):
         if outcome.succeeded:
-            result = {"status": "completed", "conclusion": outcome.text, "session_ref": outcome.session_id or ""}
+            # Plane refuses a completed result with a blank or too long conclusion, or a too long session.
+            conclusion = (outcome.text or "")[:MAX_CONCLUSION_CHARS]
+            if not conclusion.strip():
+                raise RunFailure("harness_exited", "Claude Code finished the turn without an answer.")
+            result = {
+                "status": "completed",
+                "conclusion": conclusion,
+                "session_ref": (outcome.session_id or "")[:MAX_SESSION_REF_CHARS],
+            }
             self._post_result(run_id, generation, result)
             return
         if outcome.no_output:

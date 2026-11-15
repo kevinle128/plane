@@ -69,6 +69,13 @@ describe("RunTimelineRows", () => {
     expect(screen.getByText("export const ttl = 0;")).toBeTruthy();
   });
 
+  it("shows the conclusion of a failed Run as failed, not as a success", () => {
+    const failed = [runEvent(1, "conclusion", { text: "", comment_id: null, status: "failed" })];
+    render(<RunTimelineRows entries={groupRunTimeline(failed, false)} />);
+    expect(screen.getByText("agent_run.status.failed")).toBeTruthy();
+    expect(screen.queryByText("agent_run.timeline.conclusion")).toBeNull();
+  });
+
   it("renders markdown through the given renderer", () => {
     render(
       <RunTimelineRows

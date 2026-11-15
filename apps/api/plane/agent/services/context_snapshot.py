@@ -80,7 +80,11 @@ def build_payload(run, trigger_comment):
             "id": str(issue.id),
             "identifier": f"{project.identifier}-{issue.sequence_id}",
             "sequence_id": issue.sequence_id,
-            "url": f"{settings.WEB_URL or ''}/{workspace.slug}/projects/{project.id}/issues/{issue.id}",
+            # The web app URL, as ``plane.utils.host.base_host(is_app=True)`` picks it.
+            "url": (
+                f"{(settings.APP_BASE_URL or settings.WEB_URL or '').rstrip('/')}"
+                f"/{workspace.slug}/projects/{project.id}/issues/{issue.id}"
+            ),
             "title": issue.name,
             "description": plain_text(issue.description_html),
             "state": {"name": issue.state.name, "group": issue.state.group} if issue.state else None,

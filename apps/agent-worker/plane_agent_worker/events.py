@@ -17,6 +17,9 @@ import json
 
 MAX_PART_CHARS = 16_384
 MAX_TEXT_CHARS = 60_000
+# Plane refuses an event payload over 64 KiB of ``json.dumps`` (ASCII escapes: up to 12 bytes a character),
+# so a text field is also cut to this many bytes once JSON-encoded.
+MAX_TEXT_JSON_BYTES = 60_000
 
 
 def status_event(turn_index, code, text):
@@ -36,11 +39,37 @@ def _text_of(content):
     return ""
 
 
+def _fit(text, budget=MAX_TEXT_JSON_BYTES):
+    """The longest prefix of ``text`` whose ``json.dumps`` is at most ``budget`` bytes."""
+    if len(json.dumps(text)) <= budget:
+        return text
+    low, high = 0, len(text)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if len(json.dumps(text[:middle])) <= budget:
+            low = middle
+        else:
+            high = middle - 1
+    return text[:low]
+
+
 def _cut(text):
-    payload = {"text": text[:MAX_TEXT_CHARS]}
-    if len(text) > MAX_TEXT_CHARS:
+    cut = _fit(text[:MAX_TEXT_CHARS])
+    payload = {"text": cut}
+    if len(cut) < len(text):
         payload["truncated"] = True
     return payload
+
+
+def _parts(text):
+    """``text`` in parts of at most ``MAX_PART_CHARS`` characters and ``MAX_TEXT_JSON_BYTES`` JSON bytes."""
+    parts = []
+    start = 0
+    while start < len(text):
+        part = _fit(text[start : start + MAX_PART_CHARS])
+        parts.append(part)
+        start += len(part)
+    return parts or [""]
 
 
 class EventMapper:
@@ -81,8 +110,8 @@ class EventMapper:
             elif block_type == "tool_use" and isinstance(block.get("id"), str):
                 tool_input = block.get("input")
                 encoded = json.dumps(tool_input, ensure_ascii=False)
-                if len(encoded) > MAX_PART_CHARS:
-                    tool_input = {"truncated": True, "text": encoded[:MAX_PART_CHARS]}
+                if len(encoded) > MAX_PART_CHARS or len(json.dumps(tool_input)) > MAX_TEXT_JSON_BYTES:
+                    tool_input = {"truncated": True, "text": _fit(encoded[:MAX_PART_CHARS])}
                 payload = {"call_id": block["id"], "name": str(block.get("name") or ""), "input": tool_input}
                 events.append({"source_key": key, "kind": "tool_call", "payload": payload})
         return events
@@ -94,7 +123,7 @@ class EventMapper:
             if block.get("type") != "tool_result" or not isinstance(call_id, str):
                 continue
             text = _text_of(block.get("content"))
-            parts = [text[start : start + MAX_PART_CHARS] for start in range(0, len(text), MAX_PART_CHARS)] or [""]
+            parts = _parts(text)
             for index, part in enumerate(parts):
                 payload = {
                     "call_id": call_id,

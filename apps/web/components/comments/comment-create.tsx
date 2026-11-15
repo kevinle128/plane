@@ -64,7 +64,9 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
   const onSubmit = async (formData: Partial<TIssueComment>) => {
     try {
       const comment = await activityOperations.createComment(formData);
-      if (comment?.id) onSubmitCallback?.(comment.id);
+      // The comment was not saved (the error toast is shown): keep the draft so the member can change it.
+      if (!comment?.id) return;
+      onSubmitCallback?.(comment.id);
       if (uploadedAssetIds.length > 0) {
         if (projectId) {
           await fileService.updateBulkProjectAssetsUploadStatus(workspaceSlug, projectId.toString(), entityId, {
@@ -79,12 +81,11 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
       }
     } catch (error) {
       console.error(error);
-    } finally {
-      reset({
-        comment_html: "<p></p>",
-      });
-      editorRef.current?.clearEditor();
     }
+    reset({
+      comment_html: "<p></p>",
+    });
+    editorRef.current?.clearEditor();
   };
 
   const commentHTML = watch("comment_html");

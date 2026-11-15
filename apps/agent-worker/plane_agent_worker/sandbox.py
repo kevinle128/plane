@@ -243,7 +243,10 @@ class Sandboxes:
         except FileNotFoundError as error:
             raise SandboxError("sandbox_cli_missing", CLI_MISSING_HINT) from error
         except subprocess.TimeoutExpired as error:
-            raise SandboxError("sandbox_unavailable", f"sbx {args[0]} did not answer in {timeout} s") from error
+            subcommand = next((arg for arg in args if not arg.startswith("-")), "")
+            raise SandboxError("sandbox_unavailable", f"sbx {subcommand} did not answer in {timeout} s") from error
+        except OSError as error:
+            raise SandboxError("sandbox_unavailable", f"sbx could not run ({type(error).__name__})") from error
 
     def check_signed_in(self):
         """``sbx ls`` must succeed; it fails when the Docker sign-in is missing."""
@@ -326,16 +329,24 @@ class Sandboxes:
         raise SandboxError("sandbox_unavailable", first_line(result.stderr) or f"exit {result.returncode}")
 
     def _create(self, spec, wanted, state_file):
+        # The state file is written only once every network rule is set, so a half-made sandbox is never reused.
+        state_file.unlink(missing_ok=True)
         Path(spec.primary).mkdir(mode=0o700, parents=True, exist_ok=True)
         result = self._run(wanted["create"], timeout=CREATE_TIMEOUT_SECONDS)
         if result.returncode != 0:
             raise SandboxError("sandbox_unavailable", first_line(result.stderr) or "sbx create failed")
-        for action, rule in wanted["rules"]:
-            result = self._run(["policy", action, "network", "--sandbox", spec.name, rule])
-            if result.returncode != 0:
+        try:
+            for action, rule in wanted["rules"]:
+                result = self._run(["policy", action, "network", "--sandbox", spec.name, rule])
+                if result.returncode != 0:
+                    raise SandboxError(
+                        "sandbox_unavailable", first_line(result.stderr) or f"sbx policy {action} failed"
+                    )
+            state_file.write_text(json.dumps(wanted), encoding="utf-8")
+        except BaseException:
+            with contextlib.suppress(SandboxError):
                 self.remove(spec.name)
-                raise SandboxError("sandbox_unavailable", first_line(result.stderr) or f"sbx policy {action} failed")
-        state_file.write_text(json.dumps(wanted), encoding="utf-8")
+            raise
         logger.info("Created sandbox %s", spec.name)
 
     def remove(self, name):

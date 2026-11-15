@@ -28,7 +28,11 @@ type TArgs = {
 
 export const DROPDOWN_NAVIGATION_KEYS = ["ArrowUp", "ArrowDown", "Enter"];
 
-const isItemEnabled = (sections: TSections, index: TIndex) => !isDisabled(sections[index.section]?.items?.[index.item]);
+/** An index is selectable only when an item exists there (an empty section or an index past the end is not). */
+const isItemEnabled = (sections: TSections, index: TIndex) => {
+  const item = sections[index.section]?.items?.[index.item];
+  return item !== undefined && !isDisabled(item);
+};
 
 /** One step up or down, wrapping across sections. */
 const step = (sections: TSections, index: TIndex, direction: "up" | "down"): TIndex => {

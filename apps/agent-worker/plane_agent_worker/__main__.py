@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
 import threading
@@ -27,8 +28,11 @@ from plane_agent_worker.plane_client import PlaneClient
 from plane_agent_worker.process_registry import ProcessRegistry
 from plane_agent_worker.runs import RunExecutor
 from plane_agent_worker.sandbox import Sandboxes
+from plane_agent_worker.workspace import RUN_ID_PATTERN
 
 logger = logging.getLogger("plane_agent_worker")
+# How long a shutdown waits for each Run to stop its turn and clean up.
+SHUTDOWN_WAIT_SECONDS = 60
 
 
 def build_sandboxes(config):
@@ -50,6 +54,9 @@ def clean_up_previous_worker(config, registry):
     removed = remove_stale_probes(config.run_root)
     if removed:
         logger.info("Removed %d probe folder(s) left by a previous Worker", removed)
+    for folder in Path(config.run_root).glob("*"):
+        if RUN_ID_PATTERN.match(folder.name) and folder.is_dir() and not folder.is_symlink():
+            shutil.rmtree(folder, ignore_errors=True)
 
 
 def command_run(config, registry):
@@ -91,6 +98,9 @@ def command_run(config, registry):
     try:
         loop.run_forever(stop_event, config.poll_seconds)
     finally:
+        # Stop the turns and let each Run stop Claude in its sandbox and remove its folders before the MCP server.
+        executor.stop()
+        loop.wait_for_runs(timeout=SHUTDOWN_WAIT_SECONDS)
         mcp.stop()
     return 0
 

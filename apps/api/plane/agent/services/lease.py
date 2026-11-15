@@ -13,6 +13,7 @@ and a write to a finished Run with ``run_finished``. A Worker is not a
 
 # Python imports
 from datetime import timedelta
+from urllib.parse import urlsplit
 
 # Third party imports
 from crum import impersonate
@@ -87,11 +88,17 @@ def claim_run(worker, harnesses):
     with transaction.atomic():
         run = (
             AgentRun.objects.select_for_update(skip_locked=True, of=("self",))
+            .select_related("workspace", "project", "issue")
             .filter(
                 status=AgentRunStatus.CREATED,
                 harness__in=harnesses,
                 agent__deleted_at__isnull=True,
                 agent__connection__state=AgentConnectionState.CONNECTED,
+                # A bulk soft delete does not reach the Runs: a Run of a deleted work item is never claimed.
+                workspace__deleted_at__isnull=True,
+                project__deleted_at__isnull=True,
+                issue__deleted_at__isnull=True,
+                trigger_comment__deleted_at__isnull=True,
             )
             .order_by("created_at")
             .first()
@@ -121,6 +128,31 @@ def renew(worker, run_id, generation):
     return run
 
 
+def _origin(url):
+    """``(scheme, host name, port)`` of ``url``, with the default HTTPS port, or ``None`` when it is not valid."""
+    try:
+        parts = urlsplit(url or "")
+        return (parts.scheme, parts.hostname, parts.port or (443 if parts.scheme == "https" else None))
+    except ValueError:
+        return None
+
+
+def _run_connection(run):
+    """The provider connection of ``run``, or ``None`` when the workspace has none.
+
+    A GitLab connection that now points at another server than the Run's repository is not the Run's:
+    its token and CA bundle must never go to the Run's server.
+    """
+    connection = get_connection(run.workspace_id, run.provider) if run.provider else None
+    if connection is None or run.provider != AgentGitProvider.GITLAB:
+        return connection
+    if (connection.host or "").lower() != (run.host or "").lower() or _origin(connection.base_url) != _origin(
+        run.clone_url
+    ):
+        return None
+    return connection
+
+
 def report_clone(worker, run_id, generation, report):
     """Store the clone path, and the Worker's last git result on the provider connection."""
     now = timezone.now()
@@ -129,7 +161,7 @@ def report_clone(worker, run_id, generation, report):
         if report["ok"]:
             run.clone_path = report["clone_path"]
             run.save(update_fields=["clone_path"], disable_auto_set_user=True)
-        connection = get_connection(run.workspace_id, run.provider) if run.provider else None
+        connection = _run_connection(run)
         if connection is not None:
             AgentGitConnection.objects.filter(pk=connection.pk).update(
                 worker_last_error="" if report["ok"] else report["error_code"], worker_checked_at=now
@@ -139,7 +171,7 @@ def report_clone(worker, run_id, generation, report):
 
 def clone_spec(run):
     """The neutral clone spec of a claimed Run. GitLab clones fetch a token from Plane; GitHub clones use the host."""
-    connection = get_connection(run.workspace_id, run.provider)
+    connection = _run_connection(run)
     is_gitlab = run.provider == AgentGitProvider.GITLAB
     return {
         "provider": run.provider,
@@ -163,9 +195,11 @@ def fetch_credential(worker, run_id, generation):
     run = leased_run(worker, run_id, generation)
     if run.provider != AgentGitProvider.GITLAB:
         raise ProviderError("credential_mode_host", run.provider, http_status=400)
-    connection = get_connection(run.workspace_id, run.provider)
-    if connection is None:
+    if get_connection(run.workspace_id, run.provider) is None:
         raise ProviderError("provider_disconnected", run.provider, http_status=409)
+    connection = _run_connection(run)
+    if connection is None:
+        raise ProviderError("repository_unavailable", run.provider, http_status=409)
     # A Worker request has no User; a status change on the connection must not take one from the request.
     with impersonate(None):
         token = gitlab_connection.usable_token(connection.id)

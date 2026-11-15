@@ -44,16 +44,23 @@ class RunLayout:
     host_dir: Path
 
     def create(self):
-        """Create the folders, except the clone itself (git creates it)."""
+        """Create the folders, except the clone itself (git creates it).
+
+        The sandbox can write in ``scratch/``, so a symbolic link there is removed, never followed.
+        """
+        if self.run_scratch.is_symlink():
+            self.run_scratch.unlink()
         for folder in (self.scratch, self.clones, self.run_scratch, self.clone.parent, self.host_dir):
             folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if folder.is_symlink():
+                raise ValueError(f"A Run folder must not be a symbolic link: {folder}")
 
     def touch(self):
         """Record activity now on the Run's clone and scratch folders (when they exist)."""
         for folder in (self.clone.parent, self.run_scratch):
             try:
-                os.utime(folder)
-            except FileNotFoundError:
+                os.utime(folder, follow_symlinks=False)
+            except OSError:
                 pass
 
 

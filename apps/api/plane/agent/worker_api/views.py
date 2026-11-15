@@ -119,7 +119,6 @@ class WorkerRunClaimEndpoint(WorkerAPIView):
         run = lease.claim_run(self.worker, serializer.validated_data["harnesses"])
         if run is None:
             return Response({"run": None}, status=status.HTTP_200_OK)
-        run = AgentRun.objects.select_related("workspace", "project", "issue").get(pk=run.pk)
         return Response(
             {
                 "run": {

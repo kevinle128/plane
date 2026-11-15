@@ -478,6 +478,8 @@ class ClaudeDriver:
         command = ["claude", *SESSION_FLAGS, *RUN_FLAGS, "--mcp-config", str(mcp_config)]
         if model:
             command += ["--model", model]
+        # A PID left by an earlier turn may name another process in the shared VM: never kill it.
+        Path(pidfile).unlink(missing_ok=True)
         argv = self.sandboxes.exec_argv(sandbox, cwd, command, pidfile=pidfile)
         session = StreamSession(
             self.registry,
@@ -540,34 +542,36 @@ class ClaudeDriver:
         A deadline or start failure ends the step with a failure hint.
         """
         spec = self.probe_spec()
-        try:
-            self.sandboxes.check_signed_in()
-            self.sandboxes.ensure(spec)
-        except SandboxError as error:
-            if error.code == "sandbox_not_signed_in":
-                outcome.blocking_issue = "sandbox_not_signed_in"
-            elif error.code == "sandbox_cli_missing":
-                outcome.blocking_issue = "harness_not_found"
-            outcome.failure_hint = (
-                bounded(f"The probe sandbox is not available: {error.detail}", MAX_HINT_CHARS)
-                if error.code == "sandbox_unavailable"
-                else error.detail
-            )
-            yield None
-            return
-        outcome.location = f"sbx sandbox {spec.name}"
-        try:
-            yield {
-                "sandbox": spec.name,
-                "cwd": str(workspace.cwd),
-                "pid_dir": str(workspace.own_dir),
-                "deadline": deadline,
-                "key_prefix": workspace.own_dir.name,
-            }
-        except (ProbeTimeout, subprocess.TimeoutExpired):
-            outcome.failure_hint = outcome.failure_hint or "The probe did not finish before its deadline."
-        except OSError as error:
-            outcome.failure_hint = f"The sbx command could not run ({type(error).__name__})."
+        # The step holds the probe sandbox shared, so a concurrent check cannot stop or remove it meanwhile.
+        with contextlib.ExitStack() as stack:
+            try:
+                self.sandboxes.check_signed_in()
+                stack.enter_context(self.sandboxes.use(spec))
+            except SandboxError as error:
+                if error.code == "sandbox_not_signed_in":
+                    outcome.blocking_issue = "sandbox_not_signed_in"
+                elif error.code == "sandbox_cli_missing":
+                    outcome.blocking_issue = "harness_not_found"
+                outcome.failure_hint = (
+                    bounded(f"The probe sandbox is not available: {error.detail}", MAX_HINT_CHARS)
+                    if error.code == "sandbox_unavailable"
+                    else error.detail
+                )
+                yield None
+                return
+            outcome.location = f"sbx sandbox {spec.name}"
+            try:
+                yield {
+                    "sandbox": spec.name,
+                    "cwd": str(workspace.cwd),
+                    "pid_dir": str(workspace.own_dir),
+                    "deadline": deadline,
+                    "key_prefix": workspace.own_dir.name,
+                }
+            except (ProbeTimeout, subprocess.TimeoutExpired):
+                outcome.failure_hint = outcome.failure_hint or "The probe did not finish before its deadline."
+            except OSError as error:
+                outcome.failure_hint = f"The sbx command could not run ({type(error).__name__})."
 
     def quick_check(self, workspace, deadline):
         """The Connect check: CLI version, login and model list. The behavior suite does not run."""
@@ -811,6 +815,13 @@ def permission_problem(turn, bash_turn):
         return f"the CLI did not report the {BYPASS_MODE} mode (it reported {turn.permission_mode or 'no mode'})"
     if turn.permission_prompts or bash_turn.permission_prompts:
         return "the CLI sent a permission request although it runs with full permissions"
-    if not bash_turn.tool_ids({"Bash"}) or not bash_turn.succeeded:
+    tool_ids = bash_turn.tool_ids({"Bash"})
+    if not tool_ids or not bash_turn.succeeded:
         return "the Bash command did not run"
+    if any(tool_id in bash_turn.denied_tool_ids for tool_id in tool_ids):
+        return "the Bash command was denied"
+    # A turn can succeed although its command failed (for example a read-only folder): the write must work.
+    results = [bash_turn.tool_results.get(tool_id) for tool_id in tool_ids]
+    if not any(result and not result["is_error"] for result in results):
+        return "the Bash write in the scratch folder did not succeed"
     return None

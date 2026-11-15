@@ -173,7 +173,8 @@ export const MentionsListDropdown = forwardRef(function MentionsListDropdown(pro
             <SuggestionMenuGroup key={section.key}>
               {section.title && <SuggestionMenuLabel>{section.title}</SuggestionMenuLabel>}
               {section.items.map((item, itemIndex) => {
-                const isSelected = sectionIndex === selectedIndex.section && itemIndex === selectedIndex.item;
+                const isSelected =
+                  !item.disabled && sectionIndex === selectedIndex.section && itemIndex === selectedIndex.item;
 
                 return (
                   <SuggestionMenuItem

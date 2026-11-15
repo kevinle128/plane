@@ -212,13 +212,26 @@ function EventRow({
           {renderMarkdown(textOf(event.payload.text))}
         </Row>
       );
-    case "conclusion":
+    case "conclusion": {
+      // A failed Run also ends with a conclusion event; it must not look like a success.
+      const failed = textOf(event.payload.status) === "failed";
       return (
-        <Row glyph={<Glyph icon={TickOutline} className="text-success-primary" />} last={last}>
-          <span className="mb-1 block text-caption-sm-medium text-tertiary">{t("agent_run.timeline.conclusion")}</span>
+        <Row
+          glyph={
+            <Glyph
+              icon={failed ? AlertCircleOutline : TickOutline}
+              className={failed ? "text-danger-primary" : "text-success-primary"}
+            />
+          }
+          last={last}
+        >
+          <span className="mb-1 block text-caption-sm-medium text-tertiary">
+            {t(failed ? "agent_run.status.failed" : "agent_run.timeline.conclusion")}
+          </span>
           {textOf(event.payload.text) && renderMarkdown(textOf(event.payload.text))}
         </Row>
       );
+    }
     case "error":
       return (
         <Row glyph={<Glyph icon={AlertCircleOutline} className="text-danger-primary" />} last={last}>

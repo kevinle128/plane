@@ -205,8 +205,16 @@ def mark_version_unverified(agent, harness_version, failed_check):
         harness = AgentHarness(agent.harness).label
         connection.state = AgentConnectionState.FAILED
         connection.missing_action = failed_check if failed_check in REQUIRED_CHECKS else VERSION_UNVERIFIED
+        version = f" {harness_version}" if harness_version else ""
         connection.failure_hint = (
-            f"{harness} {harness_version} failed the {failed_check} check in a Run. Retry the connection."
+            f"{harness}{version} failed the {failed_check or 'behavior'} check in a Run. Retry the connection."
         )
-        connection.save(update_fields=["state", "missing_action", "failure_hint"], disable_auto_set_user=True)
+        update_fields = ["state", "missing_action", "failure_hint", "reported_models", "verified_at"]
+        if harness_version:
+            connection.harness_version = harness_version
+            update_fields.append("harness_version")
+        # As in ``apply_report``: only a verified Harness shows its models and its verification time.
+        connection.reported_models = []
+        connection.verified_at = None
+        connection.save(update_fields=update_fields, disable_auto_set_user=True)
     return connection

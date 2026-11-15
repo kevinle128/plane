@@ -103,6 +103,20 @@ class TestGitCredentialFetch:
         assert response.data == {"error": "provider_disconnected"}
 
     @pytest.mark.django_db
+    def test_connection_moved_to_another_server_is_refused(self, session_client, worker_client, gitlab_setup):
+        run = create_run(session_client, gitlab_setup)
+        claimed = claim_run(worker_client)
+        AgentGitConnection.objects.filter(workspace=gitlab_setup.workspace).update(
+            base_url="https://git.example.com:8443"
+        )
+
+        response = fetch(worker_client, run.id, claimed["lease_generation"])
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.data == {"error": "repository_unavailable"}
+        assert "password" not in response.data
+
+    @pytest.mark.django_db
     def test_undecryptable_token_sets_reconnect_required(self, session_client, worker_client, gitlab_setup):
         run = create_run(session_client, gitlab_setup)
         claimed = claim_run(worker_client)

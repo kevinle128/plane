@@ -229,6 +229,8 @@ class TestHarnessVersionUnverified:
         assert connection.failure_hint == (
             "Claude Code 2.2.0 failed the progress check in a Run. Retry the connection."
         )
+        assert connection.harness_version == "2.2.0"
+        assert (connection.reported_models, connection.verified_at) == ([], None)
 
     @pytest.mark.django_db
     def test_unknown_check_gives_harness_version_unverified(self, worker_client, leased, run_setup):

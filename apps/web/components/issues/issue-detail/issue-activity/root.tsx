@@ -73,7 +73,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
   const { setValue: setSortOrder, storedValue: sortOrder } = useLocalStorage("activity_sort_order", E_SORT_ORDER.ASC);
 
   const { getProjectById } = useProject();
-  const { fetchRuns } = useAgentRun();
+  const { fetchRuns, getRunsByIssueId } = useAgentRun();
   const {
     fetchComments,
     comment: { getCommentById, getCommentsByIssueId },
@@ -121,22 +121,27 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
+      let active = false;
       try {
         const runs = await fetchRuns(workspaceSlug, projectId, issueId);
         if (cancelled) return;
+        active = runs.some((run) => isAgentRunActive(run.status));
         if (runs.some((run) => run.conclusion_comment_id && !getCommentById(run.conclusion_comment_id)))
           await fetchComments(workspaceSlug, projectId, issueId, "mutate");
-        if (!cancelled && runs.some((run) => isAgentRunActive(run.status))) timer = setTimeout(poll, AGENT_RUN_POLL_MS);
       } catch (error) {
         console.error("Failed to fetch the Runs of the work item:", error);
+        if (cancelled) return;
+        // A transient error must not stop the polling while a known Run is still active.
+        active = (getRunsByIssueId(issueId) ?? []).some((run) => isAgentRunActive(run.status));
       }
+      if (!cancelled && active) timer = setTimeout(poll, AGENT_RUN_POLL_MS);
     };
     void poll();
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [workspaceSlug, projectId, issueId, commentCount, fetchRuns, fetchComments, getCommentById]);
+  }, [workspaceSlug, projectId, issueId, commentCount, fetchRuns, fetchComments, getCommentById, getRunsByIssueId]);
 
   // helper hooks
   const activityOperations = useWorkItemCommentOperations(workspaceSlug, projectId, issueId);

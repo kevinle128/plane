@@ -62,6 +62,8 @@ def load_imported_servers(names, home):
     """The listed server definitions from ``mcpServers`` in ``~/.claude.json``. An unknown name is a config error."""
     if not names:
         return {}
+    if SERVER_NAME in names:
+        raise ConfigError(f"The MCP server name {SERVER_NAME!r} is the Worker's own; it cannot be listed.")
     try:
         document = json.loads((Path(home) / ".claude.json").read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -168,12 +170,12 @@ class PlaneMcpServer:
                     return
                 try:
                     length = int(self.headers.get("Content-Length") or 0)
-                    if length > MAX_REQUEST_BYTES:
-                        raise ValueError("request too large")
+                    if not 0 <= length <= MAX_REQUEST_BYTES:
+                        raise ValueError("invalid request length")
                     request = json.loads(self.rfile.read(length) or b"{}")
                     if not isinstance(request, dict):
                         raise ValueError("not an object")
-                except ValueError:
+                except (ValueError, RecursionError):
                     self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
                     return
                 answer = server.answer(turn, request)
