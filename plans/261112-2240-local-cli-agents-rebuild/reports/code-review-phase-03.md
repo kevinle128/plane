@@ -84,3 +84,42 @@ Branch: feat/local-cli-agents-phase-3 @ 58d8ab3f7d
 ## Verdict
 
 Not ready to merge as is: F1-F5 are real defects (a routine GitLab token expiry leaves a Run hanging; answers can be lost on a transient error; concurrent Runs on one repo can kill each other; Worker disk grows per Run; a lease loss mid-turn leaks the Claude process). All fixes are small and local. F3 needs a user decision (follow §12 cleanup, or amend §12).
+
+## Re-review of the fixes
+
+Reviewer: code-reviewer (fresh context), 2026-11-15 (Asia/Saigon). Scope: `git diff 58d8ab3f7d..HEAD -- apps` (7138ccb5b7, ee7a891833, 5bdb118d73, ec5ea2f210, 5793652ecd and their tests). Not committed.
+
+### Status of the findings
+
+- F1 fixed. `runs.py` `_clone.fetch_token`: a 409 with `lease_superseded`/`run_finished` (`LEASE_CODES`; these are the only codes from `lease.check_lease`, `lease.py:65-67`) is still `LeaseLost`. Any other 409 (`provider_disconnected`, `provider_reconnect_required`) becomes `RunFailure(<code>)`, and the Worker posts a failed result. The `RunFailure` leaves `clone_repository` with no wrapping, because `fetch_token()` is called outside any try (`git_transport.py:271`). Tests: `test_refused_gitlab_credential_fails_the_run_with_the_provider_code`, `test_superseded_lease_on_the_gitlab_credential_posts_no_result`.
+- F2 fixed. `drivers/claude.py:518-521` `except BaseException: session.kill(); raise`. `kill` runs the pidfile kill in the sandbox, then `killpg`, then `registry.release`. It runs inside `Sandboxes.use`, so it takes no sandbox lock. Test `test_lost_lease_during_the_turn_stops_claude_in_the_sandbox` checks the in-sandbox kill, that the registry record is gone, and that the PID is dead.
+- F4 fixed. `SandboxLock` (`sandbox.py`): a turn holds the sandbox shared (`use`) for the version check plus the turn. `remove`/`_create`/`stop` run only in `exclusive()`, which waits for `users == 0` while it holds `check`. No deadlock: `enter` needs `check`, which the exclusive waiter holds, so the user count can only go down. `leave` needs no `check`. Inside a `use`, the turn only calls `ensure` on the probe sandbox, which has another name and another lock (`claude.py:545`), so no thread waits on its own shared hold and no lock cycle exists. `exclusive()` holds the Condition during the sbx call, but no thread can call `enter`/`leave` then (users == 0, `check` held). Starvation is bounded: new Runs on the same repository queue behind the waiter until the live turns end (turn limit), as the module docstring says.
+- F5 fixed. `_post_result` retries a non-409 `PlaneClientError` 3 times (2/5/10 s), on both the success path and the failure path. Network errors are mapped to `PlaneClientError` (`plane_client.py:83-85`), so they are retried too. A retry cannot post twice: if an earlier try was applied, `apply_result` returns early for a finished Run (`conclusion.py:50-51`, before the lease check), which creates no second comment. The retries are bounded (about 17 s plus 4 client timeouts), and the lease renewer keeps running until `finally`.
+- F6 fixed. `git_host_blocked` was added to `GIT_ERROR_CODES` and has a contract test.
+- Q45 cleanup is correct for active Runs. `execute` adds the Run to `_active` before `layout.create()`. `remove_stale_folders` holds `_active_lock` for the whole scan. `touch()` and the discard are atomic under that lock. The cleanup runs on the loop thread before `_run_step`, so a claim cannot interleave with it. `run_folders` matches only UUID-named, non-symlink directories under `sandboxes/*/{clones,scratch}/`. It does not match `sandbox.json`, other scratch entries, or probe folders (`suite-<harness>-<ver>`). Tests in `test_run_cleanup.py` cover these cases.
+
+### New finding
+
+#### R1 (Important) Markdown answers lose all text in angle brackets outside code
+
+- `apps/api/plane/utils/markdown.py:9` sets `create_markdown(escape=False, ...)`, so mistune passes raw HTML through. `conclusion.py:36` then sanitizes with nh3 (`content_validator.py:224-229`), which removes every unknown tag. Any prose like `Promise<void>`, `List<String>`, `Vec<u8>` or `<your-token>` is parsed as an HTML tag and removed with no trace.
+- Verified on a copy (/tmp/p3rr, mistune 3.4.0 + nh3 0.2.18 + the branch's `content_validator.py`/`markdown.py`): `"returns Promise<void> and List<String>; set <your-token> then run"` -> `<p>returns Promise and List; set  then run</p>`. Code spans and code blocks are escaped correctly.
+- Scenario: Claude explains a typed API or a config placeholder in prose. The comment shows a wrong answer (for example "set then run"). Only the event payload keeps the raw text.
+- Fix: `escape=True`. You must also change the two `"alert(1)" not in html` assertions in `test_agent_conclusion.py:65,101`: escaped script text then stays as visible text. It was checked on the copy: Markdown still renders, and `Promise&lt;void&gt;` is kept as text. Raw HTML from the agent (including `<mention-component>`) then shows as text and is not rendered. Add a test with angle-bracket prose.
+
+### Mention elements in conclusion comments
+
+- A raw `<mention-component entity_name="user_mention" entity_identifier="<uuid>">` in the agent's answer is kept. `escape=False` passes it through, and nh3 allows the tag with `id`, `entity_identifier` and `entity_name` (`content_validator.py:74,136`). Verified on the copy. It renders as a mention chip.
+- It does not send a notification. `apply_result` creates the comment with `IssueComment.objects.create` (`conclusion.py:59-65`) and calls no `issue_activity.delay`. Notifications only come from `issue_activity` -> `notification_task.py:256` (`extract_comment_mentions`, `:133-137`), and email only from the logs that task writes (`email_notification_task.py:133`). Plane has no signal on comments or descriptions: the only `@receiver` is `db/models/user.py:299`, there is no `.connect(` signal registration, and `api/apps.py` `ready()` imports only the OpenAPI auth. If an admin later edits the bot comment (`app/views/issue/comment.py:154`), only mentions that are not in the old HTML count as new (`get_new_comment_mentions`). The agent's mentions are in the old HTML, so they do not notify.
+- An `agent_mention` in an answer does not start a Run. `create_runs_for_comment` is called only from the comment create view (`app/views/issue/comment.py:127`).
+- R1's fix (`escape=True`) also stops the chip from rendering.
+
+### Checks run
+
+- Worker: `uvx --from uv==0.12.21 uv run pytest -q -m "not native"`. Exit 0. 275 tests passed by the progress-dot count; this run prints no summary line. One "Exception occurred during processing of request" log line comes from a test HTTP server and is not a failure. An earlier foreground run was killed (exit 137) when the session ended. That was not a test failure.
+- Markdown/sanitizer experiments on a copy at /tmp/p3rr (code block, user/agent mention, javascript: links, img onerror, iframe/svg, table, unclosed tags, angle-bracket prose).
+- API suite not run in this re-review (the test container mounts ./apps/api).
+
+### Verdict
+
+F1, F2, F4, F5 and F6 are fixed and covered by tests. Q45 cleanup never removes the folders of an active Run or any non-Run data. The sandbox lock has no deadlock, and its waits are bounded by the turn limit. Before the PR, fix R1 (`escape=True`, a test with angle-bracket prose, and the two changed assertions). After that, the branch is ready.

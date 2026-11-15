@@ -62,7 +62,7 @@ class TestCompletedResult:
         assert Description.objects.get(pk=comment.description_id).created_by_id == bot_user.id
         html = comment.comment_html
         assert html.startswith(f"<p><strong>Answer from Claude Code (Run {run.short_id})</strong></p>")
-        assert "<script" not in html and "alert(1)" not in html
+        assert "<script" not in html and "&lt;script&gt;" in html
         assert "line two" in html and "<p>Second paragraph</p>" in html
         last = AgentRunEvent.objects.filter(run=run).order_by("-seq").first()
         assert (last.kind, last.source_key) == ("conclusion", "conclusion")
@@ -98,7 +98,20 @@ class TestCompletedResult:
         assert '<pre><code class="language-python">if token:\n    return True\n</code></pre>' in html
         assert 'href="https://docs.plane.so/auth"' in html and ">the docs</a>" in html
         assert "javascript:" not in html
-        assert "<script" not in html and "alert(1)" not in html
+        assert "<script" not in html and "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+    @pytest.mark.django_db
+    def test_angle_brackets_in_the_answer_stay_visible(self, worker_client, leased):
+        run, generation = leased
+        conclusion = "It returns Promise<void> and List<String>; set <your-token> first. Use `Map<K, V>` here."
+
+        post_result(worker_client, run.id, generation, conclusion=conclusion)
+
+        run.refresh_from_db()
+        html = IssueComment.objects.get(pk=run.conclusion_comment_id).comment_html
+        assert "Promise&lt;void&gt;" in html and "List&lt;String&gt;" in html
+        assert "set &lt;your-token&gt; first" in html
+        assert "<code>Map&lt;K, V&gt;</code>" in html
 
     @pytest.mark.django_db
     def test_duplicate_result_creates_one_conclusion(self, worker_client, leased):
