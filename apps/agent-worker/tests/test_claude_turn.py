@@ -597,6 +597,47 @@ def test_mcp_config_replaces_a_fifo_the_sandbox_left_in_its_scratch_folder(world
     assert (run_scratch / "mcp.json").is_file()
 
 
+def test_mcp_config_replaces_a_folder_the_sandbox_left_in_its_scratch_folder(world):
+    w = world()
+    w.verify()
+    run_scratch = run_layout(w.run_root, claim()).run_scratch
+    (run_scratch / "mcp.json" / "inner").mkdir(parents=True, mode=0o700)
+
+    w.executor.execute(claim())
+
+    assert w.plane.result()["status"] == "completed"
+    assert (run_scratch / "mcp.json").is_file()
+
+
+def test_reclaimed_run_replaces_the_clone_an_earlier_claim_left(world):
+    w = world()
+    w.verify()
+    clone = run_layout(w.run_root, claim()).clone
+    clone.mkdir(parents=True, mode=0o700)
+    (clone / "stale.txt").write_text("left by a stopped Worker\n")
+
+    w.executor.execute(claim())
+
+    assert w.plane.result()["status"] == "completed"
+    assert not (clone / "stale.txt").exists() and (clone / "README.md").is_file()
+
+
+def test_shutdown_during_the_version_check_starts_no_turn(world, monkeypatch):
+    w = world()
+    w.verify()
+    check_version = w.executor._check_version
+
+    def check_then_stop(*args):
+        check_version(*args)
+        w.executor.stop()
+
+    monkeypatch.setattr(w.executor, "_check_version", check_then_stop)
+
+    w.executor.execute(claim())
+
+    assert w.turn_calls() == [] and w.plane.results == []
+
+
 def test_run_claimed_during_a_shutdown_starts_no_step_and_posts_nothing(world):
     w = world()
     w.verify()

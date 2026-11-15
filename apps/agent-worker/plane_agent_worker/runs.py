@@ -29,11 +29,11 @@ for Runs with no activity for ``run_folder_days`` and never for a Run this Worke
 is working. A later turn of a cleaned Run clones again.
 """
 
-import contextlib
 import json
 import logging
 import os
 import shutil
+import stat
 import threading
 import time
 
@@ -347,6 +347,7 @@ class RunExecutor:
         turn_index = sink.turn_index
         deadline = Deadline(TURN_LIMIT_SECONDS, cancel)
         self._check_version(driver, spec.name, run_id, layout, turn_index, sink, deadline)
+        self._check_stopping()
 
         try:
             context = self.client.run_context(run_id, generation)
@@ -355,6 +356,7 @@ class RunExecutor:
         payload = context.get("payload") if isinstance(context, dict) else None
         if not isinstance(payload, dict):
             raise RunFailure("worker_error", "Plane did not return the Run context.")
+        self._check_stopping()
 
         handle = self.mcp.open_turn(run_id=run_id, turn_index=turn_index, lease_generation=generation, context=payload)
         try:
@@ -363,8 +365,15 @@ class RunExecutor:
             # never open an entry it made (a FIFO blocks the open, a hard link shares the inode): make a new file.
             folder = os.open(layout.run_scratch, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
             try:
-                with contextlib.suppress(FileNotFoundError):
+                try:
                     os.unlink(mcp_config.name, dir_fd=folder)
+                except FileNotFoundError:
+                    pass
+                except (IsADirectoryError, PermissionError):
+                    # A folder the sandbox made there (EISDIR on Linux, EPERM on macOS): remove it, links not followed.
+                    if not stat.S_ISDIR(os.stat(mcp_config.name, dir_fd=folder, follow_symlinks=False).st_mode):
+                        raise
+                    shutil.rmtree(mcp_config.name, dir_fd=folder)
                 descriptor = os.open(
                     mcp_config.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=folder
                 )
@@ -409,6 +418,11 @@ class RunExecutor:
                     "Reconnect GitLab in the workspace settings, then mention the Agent again.",
                 ) from None
 
+        # A clone left by an earlier claim of this Run (a Worker shutdown or a lost lease) is replaced.
+        if layout.clone.is_symlink():
+            layout.clone.unlink()
+        elif layout.clone.exists():
+            shutil.rmtree(layout.clone)
         try:
             self.clone(
                 clone_url=repository["clone_url"],
