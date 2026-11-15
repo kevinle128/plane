@@ -54,6 +54,23 @@ describe("getNextValidIndex", () => {
       item: 0,
     });
   });
+
+  it("moves past several empty sections in both directions", () => {
+    const sections = [{ items: [item()] }, { items: [] }, { items: [] }, { items: [item()] }];
+    expect(getNextValidIndex({ event: key("ArrowDown"), sections, selectedIndex: { section: 0, item: 0 } })).toEqual({
+      section: 3,
+      item: 0,
+    });
+    expect(getNextValidIndex({ event: key("ArrowUp"), sections, selectedIndex: { section: 3, item: 0 } })).toEqual({
+      section: 0,
+      item: 0,
+    });
+    const filtered = [{ items: [] }, { items: [] }, { items: [item()] }];
+    expect(getNextValidIndex({ event: key("ArrowDown"), sections: filtered, selectedIndex: { section: 0, item: 0 } })).toEqual({
+      section: 2,
+      item: 0,
+    });
+  });
 });
 
 describe("getFirstEnabledIndex", () => {

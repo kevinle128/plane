@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from plane_agent_worker.conformance import suite_cache
+from plane_agent_worker.conformance import SUITE_CHECKS, SuiteResult, suite_cache
+from plane_agent_worker.drivers.base import CheckResult
 from plane_agent_worker.drivers.claude import SUITE_VERSION, ClaudeDriver
 from plane_agent_worker.git_transport import GitTransportError
 from plane_agent_worker.mcp_server import PlaneMcpServer
@@ -578,3 +579,61 @@ def test_turn_sets_no_variable_in_the_sandbox(world, fake_sbx):
     assert "-e" not in turn_exec[: turn_exec.index("claude")]
     names = set((w.private_dir / "harness-env.txt").read_text().split())
     assert "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB" not in names
+
+
+def test_mcp_config_replaces_a_fifo_the_sandbox_left_in_its_scratch_folder(world):
+    w = world()
+    w.verify()
+    run_scratch = run_layout(w.run_root, claim()).run_scratch
+    run_scratch.mkdir(parents=True, mode=0o700)
+    os.mkfifo(run_scratch / "mcp.json")
+
+    thread = threading.Thread(target=w.executor.execute, args=(claim(),), daemon=True)
+    thread.start()
+    thread.join(timeout=60)
+
+    assert not thread.is_alive()
+    assert w.plane.result()["status"] == "completed"
+    assert (run_scratch / "mcp.json").is_file()
+
+
+def test_run_claimed_during_a_shutdown_starts_no_step_and_posts_nothing(world):
+    w = world()
+    w.verify()
+    w.executor.stop()
+
+    w.executor.execute(claim())
+
+    assert w.clone_calls == [] and w.plane.events == [] and w.plane.results == []
+
+
+def test_renewal_stops_at_a_shutdown(world):
+    w = world()
+    renewals = []
+    w.plane.renew_run = lambda run_id, generation: renewals.append(run_id)
+    w.executor.renew_seconds = 0.05
+    w.executor.stop()
+
+    w.executor._renew(RUN_A, 1, threading.Event(), threading.Event(), {"lost": False})
+
+    assert renewals == []
+
+
+def test_suite_out_of_budget_fails_the_run_without_unverifying_the_version(world, monkeypatch):
+    w = world()
+
+    def slow_suite(driver, version, deadline, **kwargs):
+        while not deadline.expired:
+            pass
+        checks = {name: CheckResult(name, True, "") for name in SUITE_CHECKS}
+        checks["follow_up"].set(False, "the resumed session did not recall the first turn")
+        return SuiteResult(checks=checks, ran_now=True)
+
+    monkeypatch.setattr("plane_agent_worker.runs.SUITE_BUDGET_SECONDS", 0.05)
+    monkeypatch.setattr("plane_agent_worker.runs.ensure_verified", slow_suite)
+
+    w.executor.execute(claim())
+
+    result = w.plane.result()
+    assert result["failure_code"] == "sandbox_unavailable"
+    assert "failed_check" not in result

@@ -71,10 +71,11 @@ export const getNextValidIndex = (args: TArgs): TIndex | undefined => {
   const { event, sections, selectedIndex } = args;
   const direction = event.key === "ArrowUp" ? "up" : "down";
   if (!sections.length) return { section: 0, item: 0 };
-  const total = sections.reduce((count, section) => count + (section.items?.length ?? 0), 0);
+  // `step` spends one move on each empty section, so count it as one position.
+  const positions = sections.reduce((count, section) => count + Math.max(1, section.items?.length ?? 0), 0);
 
   let next = step(sections, selectedIndex, direction);
-  for (let tries = 1; tries < total && !isItemEnabled(sections, next); tries++) {
+  for (let tries = 1; tries < positions && !isItemEnabled(sections, next); tries++) {
     next = step(sections, next, direction);
   }
   return isItemEnabled(sections, next) ? next : selectedIndex;

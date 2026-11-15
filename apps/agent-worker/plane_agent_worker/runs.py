@@ -29,6 +29,7 @@ for Runs with no activity for ``run_folder_days`` and never for a Run this Worke
 is working. A later turn of a cleaned Run clones again.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -253,6 +254,9 @@ class RunExecutor:
 
     def _renew(self, run_id, generation, stop, cancel, lease):
         while not stop.wait(self.renew_seconds):
+            if cancel.is_set() or self._stopping.is_set():
+                # A shutdown or a lost lease: stop renewing so Plane can reclaim the lease.
+                return
             try:
                 self.client.renew_run(run_id, generation)
             except Conflict:
@@ -307,9 +311,11 @@ class RunExecutor:
         # The Run root is outside the Plane checkout (checked at Worker start), and so is every Run folder.
         layout.create()
 
+        self._check_stopping()
         sink.add([status_event(turn_index, "cloning", f"Cloning {repository.get('full_name')}")])
         self._clone(run, layout)
 
+        self._check_stopping()
         sink.add([status_event(turn_index, "sandbox_starting", "Starting the sandbox")])
         spec = SandboxSpec(
             name=self.sandboxes.qa_name(layout.key),
@@ -324,11 +330,19 @@ class RunExecutor:
             raise RunFailure(error.code, f"The sandbox is not available: {error.detail}") from None
         if lease["lost"]:
             raise LeaseLost("lease_superseded")
+        if not outcome.succeeded:
+            self._check_stopping()
         sink.flush()
         self._finish(run["id"], run["lease_generation"], outcome)
 
+    def _check_stopping(self):
+        """At Worker shutdown a Run starts no new step and posts nothing more; Plane reclaims its lease."""
+        if self._stopping.is_set():
+            raise RunFailure("worker_stopped", "The Worker stopped during this Run.")
+
     def _turn(self, run, layout, driver, sink, cancel, spec):
         """The version check and the turn, while the Run holds the sandbox. Returns the ``TurnOutcome``."""
+        self._check_stopping()
         run_id, generation = run["id"], run["lease_generation"]
         turn_index = sink.turn_index
         deadline = Deadline(TURN_LIMIT_SECONDS, cancel)
@@ -345,11 +359,14 @@ class RunExecutor:
         handle = self.mcp.open_turn(run_id=run_id, turn_index=turn_index, lease_generation=generation, context=payload)
         try:
             mcp_config = layout.run_scratch / "mcp.json"
-            # The sandbox can write in its scratch folder: never follow a symbolic link it put there.
+            # The sandbox can write in its scratch folder: never follow a symbolic link it put there, and
+            # never open an entry it made (a FIFO blocks the open, a hard link shares the inode): make a new file.
             folder = os.open(layout.run_scratch, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
             try:
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(mcp_config.name, dir_fd=folder)
                 descriptor = os.open(
-                    mcp_config.name, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600, dir_fd=folder
+                    mcp_config.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=folder
                 )
             finally:
                 os.close(folder)
@@ -426,17 +443,19 @@ class RunExecutor:
             raise RunFailure("harness_not_found", "claude --version did not report a version in the sandbox.")
         if suite_cache(self.run_root).get(driver.harness, version, driver.suite_version) is None:
             sink.add([status_event(turn_index, "checking_version", f"Checking Claude Code {version}")])
+        suite_deadline = deadline.within(SUITE_BUDGET_SECONDS)
         suite = ensure_verified(
             driver,
             version,
-            deadline.within(SUITE_BUDGET_SECONDS),
+            suite_deadline,
             run_root=self.run_root,
             token_file=self.token_file,
             plane_checkout=self.plane_checkout,
         )
         if suite.record is None:
             # Only a check that ran and failed marks the version unverified; a suite that could not run
-            # (sandbox, lock wait, version change) fails this Run and leaves the connection alone.
+            # (sandbox, lock wait, version change, budget used up or cancelled) fails this Run and leaves the
+            # connection alone.
             failed = next(
                 (
                     name
@@ -445,7 +464,7 @@ class RunExecutor:
                 ),
                 "",
             )
-            if not suite.ran_now or not failed:
+            if not suite.ran_now or not failed or suite_deadline.expired:
                 hint = suite.failure_hint or next(
                     (suite.checks[name].detail for name in SUITE_CHECKS if not suite.checks[name].passed), ""
                 )
