@@ -216,3 +216,124 @@ def test_unexpected_error_in_a_poll_step_does_not_stop_the_loop(loop_for):
     loop.run_forever(stop, poll_seconds=0)
 
     assert len([call for call in client.calls if call[0] == "claim"]) >= 2
+
+
+class RunClient(FakeClient):
+    def __init__(self, runs=(), claim_error=None):
+        super().__init__()
+        self.runs = list(runs)
+        self.claim_error = claim_error
+
+    def claim_run(self, harnesses):
+        self.calls.append(("claim_run", list(harnesses)))
+        if self.claim_error:
+            raise self.claim_error
+        return self.runs.pop(0) if self.runs else None
+
+
+class BlockingExecutor:
+    """Works each Run until ``release`` is set."""
+
+    def __init__(self):
+        self.release = threading.Event()
+        self.started = []
+        self.lock = threading.Lock()
+
+        self.cleanups = 0
+
+    def execute(self, run):
+        with self.lock:
+            self.started.append(run["id"])
+        self.release.wait(5)
+
+    def remove_stale_folders(self):
+        self.cleanups += 1
+        return 0
+
+
+def run_loop(private_dir, token_file, client, executor, max_runs=2, clock=None):
+    extra = {"clock": clock} if clock else {}
+    return WorkerLoop(
+        **extra,
+        client=client,
+        drivers={"claude_code": FakeDriver()},
+        run_root=private_dir,
+        token_file=token_file,
+        plane_checkout=private_dir / "plane",
+        run_probe=fake_run_probe,
+        run_executor=executor,
+        max_runs=max_runs,
+    )
+
+
+def test_claimed_run_is_worked_on_its_own_thread(private_dir, token_file):
+    executor = BlockingExecutor()
+    client = RunClient(runs=[{"id": "r1"}])
+    loop = run_loop(private_dir, token_file, client, executor)
+
+    assert loop.run_once() is True
+    executor.release.set()
+    loop.wait_for_runs(timeout=5)
+
+    assert executor.started == ["r1"]
+    assert ("claim_run", ["claude_code"]) in client.calls
+
+
+def test_no_run_is_claimed_while_the_worker_is_at_capacity(private_dir, token_file):
+    executor = BlockingExecutor()
+    client = RunClient(runs=[{"id": "r1"}, {"id": "r2"}, {"id": "r3"}])
+    loop = run_loop(private_dir, token_file, client, executor, max_runs=2)
+
+    loop.run_once()
+    loop.run_once()
+    claims_before = len([call for call in client.calls if call[0] == "claim_run"])
+    loop.run_once()
+
+    assert len([call for call in client.calls if call[0] == "claim_run"]) == claims_before == 2
+    executor.release.set()
+    loop.wait_for_runs(timeout=5)
+    assert sorted(executor.started) == ["r1", "r2"]
+
+
+def test_run_claim_error_does_not_stop_the_loop(private_dir, token_file):
+    client = RunClient(claim_error=PlaneClientError(500, "boom"))
+    loop = run_loop(private_dir, token_file, client, BlockingExecutor())
+
+    assert loop.run_once() is False
+
+
+def test_loop_without_a_run_executor_claims_no_run(loop_for):
+    client = RunClient(runs=[{"id": "r1"}])
+    loop = loop_for(client, FakeDriver())
+
+    loop.run_once()
+
+    assert not [call for call in client.calls if call[0] == "claim_run"]
+
+
+def test_run_folders_are_cleaned_at_start_and_once_a_day(private_dir, token_file):
+    executor = BlockingExecutor()
+    now = [1000.0]
+    loop = run_loop(private_dir, token_file, RunClient(), executor, clock=lambda: now[0])
+
+    loop.run_once()
+    now[0] += 23 * 3600
+    loop.run_once()
+    assert executor.cleanups == 1
+
+    now[0] += 2 * 3600
+    loop.run_once()
+    assert executor.cleanups == 2
+
+
+def test_failed_cleanup_does_not_stop_the_poll_step(private_dir, token_file):
+    class FailingCleanup(BlockingExecutor):
+        def remove_stale_folders(self):
+            raise OSError("disk")
+
+    executor = FailingCleanup()
+    loop = run_loop(private_dir, token_file, RunClient(runs=[{"id": "r1"}]), executor)
+
+    assert loop.run_once() is True
+    executor.release.set()
+    loop.wait_for_runs(timeout=5)

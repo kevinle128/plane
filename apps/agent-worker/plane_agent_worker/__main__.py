@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
 import threading
@@ -20,42 +21,87 @@ from pathlib import Path
 
 from plane_agent_worker.config import ConfigError, load_config
 from plane_agent_worker.conformance import TranscriptRecorder, remove_stale_probes, run_probe
-from plane_agent_worker.drivers.claude import ClaudeDriver, claude_config_dir
+from plane_agent_worker.drivers.claude import ClaudeDriver
 from plane_agent_worker.loop import WorkerLoop
+from plane_agent_worker.mcp_server import PlaneMcpServer, load_imported_servers
 from plane_agent_worker.plane_client import PlaneClient
 from plane_agent_worker.process_registry import ProcessRegistry
+from plane_agent_worker.runs import RunExecutor
+from plane_agent_worker.sandbox import Sandboxes
+from plane_agent_worker.workspace import RUN_ID_PATTERN
 
 logger = logging.getLogger("plane_agent_worker")
+# How long a shutdown waits for each Run to stop its turn and clean up.
+SHUTDOWN_WAIT_SECONDS = 60
+
+
+def build_sandboxes(config):
+    return Sandboxes(config.sbx_bin, config.home, memory=config.sandbox_memory)
 
 
 def build_drivers(config, registry, recorder=None):
-    return {"claude_code": ClaudeDriver(executable=config.claude_bin, registry=registry, recorder=recorder)}
+    driver = ClaudeDriver(
+        sandboxes=build_sandboxes(config), run_root=config.run_root, registry=registry, recorder=recorder
+    )
+    return {"claude_code": driver}
 
 
 def clean_up_previous_worker(config, registry):
     """Stop the Harness processes of a previous Worker and remove its probe and session folders."""
-    stopped = registry.reconcile(cleanup_roots=[claude_config_dir(os.environ) / "projects"])
+    stopped = registry.reconcile(cleanup_roots=[config.run_root])
     if stopped:
         logger.info("Stopped %d Harness process group(s) left by a previous Worker", len(stopped))
     removed = remove_stale_probes(config.run_root)
     if removed:
         logger.info("Removed %d probe folder(s) left by a previous Worker", removed)
+    for folder in Path(config.run_root).glob("*"):
+        if RUN_ID_PATTERN.match(folder.name) and folder.is_dir() and not folder.is_symlink():
+            shutil.rmtree(folder, ignore_errors=True)
 
 
 def command_run(config, registry):
     clean_up_previous_worker(config, registry)
-    loop = WorkerLoop(
-        client=PlaneClient(config.api_origin, config.read_token()),
-        drivers=build_drivers(config, registry),
+    try:
+        imported = load_imported_servers(config.import_mcp_servers, config.home)
+    except ConfigError as error:
+        print(f"Configuration error: {error}", file=sys.stderr)
+        return 2
+    client = PlaneClient(config.api_origin, config.read_token())
+    drivers = build_drivers(config, registry)
+    mcp = PlaneMcpServer(port=config.mcp_port)
+    mcp.start()
+    executor = RunExecutor(
+        client=client,
+        drivers=drivers,
+        sandboxes=next(iter(drivers.values())).sandboxes,
+        mcp=mcp,
         run_root=config.run_root,
         token_file=config.token_file,
         plane_checkout=config.plane_checkout,
+        imported_servers=imported,
+        git_allowed_hosts=config.git_allowed_hosts,
+        git_allowed_ips=config.git_allowed_ips,
+        run_folder_days=config.run_folder_days,
+    )
+    loop = WorkerLoop(
+        client=client,
+        drivers=drivers,
+        run_root=config.run_root,
+        token_file=config.token_file,
+        plane_checkout=config.plane_checkout,
+        run_executor=executor,
     )
     stop_event = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda *_: stop_event.set())
-    logger.info("Worker started; polling %s", config.api_origin)
-    loop.run_forever(stop_event, config.poll_seconds)
+    logger.info("Worker started; polling %s; Plane MCP on 127.0.0.1:%s", config.api_origin, mcp.port)
+    try:
+        loop.run_forever(stop_event, config.poll_seconds)
+    finally:
+        # Stop the turns and let each Run stop Claude in its sandbox and remove its folders before the MCP server.
+        executor.stop()
+        loop.wait_for_runs(timeout=SHUTDOWN_WAIT_SECONDS)
+        mcp.stop()
     return 0
 
 

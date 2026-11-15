@@ -15,6 +15,8 @@ A workspace administrator connects GitHub with the device flow and a self-hosted
 
 The file name keeps `github` so that existing links stay valid. The phase covers both providers.
 
+> **2026-11-14, decision Q36 (after merge):** there are no Code jobs, so the policies of 1.6, 1.7, 1.8 and G5 (`AgentGitPolicy`) and the `write_repository` scope check of G1 have no consumer. The merged code does not change now; plan.md Q36 lists the follow-up (hide or remove later). 1.4 AC 2 and G4 AC2 still close in Phase 3 (Run launch); their change-request parts are removed. 1.8 AC 4 and G5 AC4 are removed (only Code jobs read the policy).
+
 ## Context links
 
 - Stories: [epics.md:366-588](../2026-09-28-plane-local-cli-agents-epics/epics.md) (Epic 1, GitHub). GitLab stories G1-G5: [below](#gitlab-stories-and-acceptance-criteria) (plan-level; epics.md has no GitLab story). Scope: [gitlab-scope-decisions.md](./gitlab-scope-decisions.md). Coverage: [story-coverage.md](./story-coverage.md).

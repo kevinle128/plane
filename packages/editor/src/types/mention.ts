@@ -14,6 +14,10 @@ export type TMentionSuggestion = {
   id: string;
   subTitle?: string;
   title: string;
+  /** A disabled suggestion stays visible with its reason but cannot be selected by click or keyboard. */
+  disabled?: boolean;
+  /** Short reason shown next to a disabled suggestion, already translated. */
+  disabledReason?: string;
 };
 
 export type TMentionSection = {

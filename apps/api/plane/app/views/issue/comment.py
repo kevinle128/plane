@@ -9,7 +9,7 @@ import json
 from django.utils import timezone
 from django.db.models import Exists
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 # Third Party imports
 from rest_framework.response import Response
@@ -17,6 +17,7 @@ from rest_framework import status
 
 # Module imports
 from .. import BaseViewSet
+from plane.agent.services.run_creation import AgentUnavailable, create_runs_for_comment
 from plane.app.serializers import IssueCommentSerializer, CommentReactionSerializer
 from plane.app.permissions import allow_permission, issue_hidden_from_guest, ROLE
 from plane.db.models import IssueComment, ProjectMember, CommentReaction, Project, Issue
@@ -119,7 +120,13 @@ class IssueCommentViewSet(BaseViewSet):
         data = {key: request.data[key] for key in COMMENT_WRITABLE_FIELDS if key in request.data}
         serializer = IssueCommentSerializer(data=data)
         if serializer.is_valid():
-            serializer.save(project_id=project_id, issue_id=issue_id, actor=request.user)
+            # The comment and the Runs of the agents it mentions are saved together or not at all.
+            try:
+                with transaction.atomic():
+                    serializer.save(project_id=project_id, issue_id=issue_id, actor=request.user)
+                    create_runs_for_comment(serializer.instance, issue, request.user)
+            except AgentUnavailable as unavailable:
+                return Response(unavailable.body(), status=status.HTTP_400_BAD_REQUEST)
             issue_activity.delay(
                 type="comment.activity.created",
                 requested_data=json.dumps(serializer.data, cls=DjangoJSONEncoder),

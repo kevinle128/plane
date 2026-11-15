@@ -23,6 +23,8 @@ import type { IAgentStore } from "./agent/agent.store";
 import { AgentStore } from "./agent/agent.store";
 import type { IAgentGitStore } from "./agent/git.store";
 import { AgentGitStore } from "./agent/git.store";
+import type { IAgentRunStore } from "./agent/run.store";
+import { AgentRunStore } from "./agent/run.store";
 import type { ITimelineStore } from "./timeline/timeline.store";
 import { TimeLineStore } from "./timeline/timeline.store";
 // stores
@@ -109,6 +111,7 @@ export class CoreRootStore {
   timelineStore: ITimelineStore;
   agentGit: IAgentGitStore;
   agent: IAgentStore;
+  agentRun: IAgentRunStore;
 
   constructor() {
     this.router = new RouterStore();
@@ -143,6 +146,7 @@ export class CoreRootStore {
     this.timelineStore = new TimeLineStore(this);
     this.agentGit = new AgentGitStore();
     this.agent = new AgentStore();
+    this.agentRun = new AgentRunStore();
   }
 
   resetOnSignOut() {
@@ -179,6 +183,7 @@ export class CoreRootStore {
     this.timelineStore = new TimeLineStore(this);
     this.agentGit = new AgentGitStore();
     this.agent = new AgentStore();
+    this.agentRun = new AgentRunStore();
   }
 }
 

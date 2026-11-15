@@ -13,7 +13,13 @@ export interface IAgentStore {
   /** Agents keyed by workspace slug, then Harness. `undefined` until fetched. */
   agentsByWorkspace: Record<string, TAgentsByHarness>;
   getAgent: (workspaceSlug: string, harness: TAgentHarness) => TAgent | undefined;
+  getAgentById: (workspaceSlug: string, agentId: string) => TAgent | undefined;
   fetchAgents: (workspaceSlug: string) => Promise<TAgent[]>;
+  /**
+   * Fetches the Agents of a workspace unless they are loaded or a fetch was already made. A failed fetch
+   * (for example a guest, who cannot list Agents) is not repeated until the page reloads.
+   */
+  fetchAgentsOnce: (workspaceSlug: string) => Promise<void>;
   updateAgent: (workspaceSlug: string, harness: TAgentHarness, data: TAgentUpdate) => Promise<TAgent>;
   connect: (workspaceSlug: string, harness: TAgentHarness) => Promise<TAgent>;
   disconnect: (workspaceSlug: string, harness: TAgentHarness) => Promise<TAgent>;
@@ -22,6 +28,7 @@ export interface IAgentStore {
 export class AgentStore implements IAgentStore {
   agentsByWorkspace: Record<string, TAgentsByHarness> = {};
   service: AgentService;
+  private pendingFetches = new Map<string, Promise<void>>();
 
   constructor() {
     makeObservable(this, {
@@ -36,6 +43,9 @@ export class AgentStore implements IAgentStore {
 
   getAgent = (workspaceSlug: string, harness: TAgentHarness) => this.agentsByWorkspace[workspaceSlug]?.[harness];
 
+  getAgentById = (workspaceSlug: string, agentId: string) =>
+    Object.values(this.agentsByWorkspace[workspaceSlug] ?? {}).find((agent) => agent?.id === agentId);
+
   private setAgent(workspaceSlug: string, agent: TAgent) {
     runInAction(() => {
       this.agentsByWorkspace[workspaceSlug] = withAgent(this.agentsByWorkspace[workspaceSlug], agent);
@@ -48,6 +58,18 @@ export class AgentStore implements IAgentStore {
       this.agentsByWorkspace[workspaceSlug] = agentsByHarness(agents);
     });
     return agents;
+  };
+
+  fetchAgentsOnce = (workspaceSlug: string) => {
+    if (this.agentsByWorkspace[workspaceSlug]) return Promise.resolve();
+    const pending = this.pendingFetches.get(workspaceSlug);
+    if (pending) return pending;
+    const request = (async () => {
+      await this.fetchAgents(workspaceSlug);
+      this.pendingFetches.delete(workspaceSlug);
+    })();
+    this.pendingFetches.set(workspaceSlug, request);
+    return request;
   };
 
   updateAgent = async (workspaceSlug: string, harness: TAgentHarness, data: TAgentUpdate) => {

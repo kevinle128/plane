@@ -30,7 +30,11 @@ class PlaneClientError(Exception):
         self.code = code
 
 
-class ProbeRejected(PlaneClientError):
+class Conflict(PlaneClientError):
+    """Plane refused the request with 409: a newer probe or lease replaced the caller's."""
+
+
+class ProbeRejected(Conflict):
     """Plane refused a probe report with 409, for example because a newer probe replaced it."""
 
 
@@ -50,10 +54,16 @@ class PlaneClient:
         return f"PlaneClient(origin={self.origin!r})"
 
     def _post(self, path, body):
+        return self._request("POST", path, body)
+
+    def _get(self, path):
+        return self._request("GET", path, None)
+
+    def _request(self, method, path, body):
         request = urllib.request.Request(
             f"{self.origin}{API_PREFIX}{path}",
-            data=json.dumps(body).encode(),
-            method="POST",
+            data=None if body is None else json.dumps(body).encode(),
+            method=method,
             headers={
                 "Authorization": f"Bearer {self._token}",
                 "Content-Type": "application/json",
@@ -68,7 +78,7 @@ class PlaneClient:
             error.close()
             code = self._error_code(raw)
             if error.code == 409:
-                raise ProbeRejected(409, code) from None
+                raise (ProbeRejected if path.startswith("/probes/") else Conflict)(409, code) from None
             raise PlaneClientError(error.code, code) from None
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             reason = getattr(error, "reason", error)
@@ -107,3 +117,47 @@ class PlaneClient:
 
     def report_probe(self, probe_id, report):
         return self._post(f"/probes/{quote(str(probe_id), safe='')}/report/", report)
+
+    # Runs ----------------------------------------------------------------------
+
+    @staticmethod
+    def _run_path(run_id, action):
+        return f"/runs/{quote(str(run_id), safe='')}/{action}/"
+
+    def claim_run(self, harnesses):
+        body = self._post("/runs/claim/", {"harnesses": list(harnesses)})
+        run = body.get("run") if isinstance(body, dict) else None
+        return run if isinstance(run, dict) else None
+
+    def renew_run(self, run_id, lease_generation):
+        return self._post(self._run_path(run_id, "renew"), {"lease_generation": lease_generation})
+
+    def report_clone(self, run_id, lease_generation, *, ok, clone_path=None, error_code=None, error_detail=None):
+        body = {"lease_generation": lease_generation, "ok": ok}
+        if ok:
+            body["clone_path"] = clone_path
+        else:
+            body.update(error_code=error_code, error_detail=error_detail or "")
+        return self._post(self._run_path(run_id, "clone"), body)
+
+    def git_credential(self, run_id, lease_generation):
+        """The fetch token of a GitLab Run. The response is never logged."""
+        body = self._post(
+            self._run_path(run_id, "git-credential"), {"lease_generation": lease_generation, "purpose": "fetch"}
+        )
+        password = body.get("password") if isinstance(body, dict) else None
+        if not isinstance(password, str) or not password:
+            raise PlaneClientError(200, "no credential in the response")
+        return password
+
+    def run_context(self, run_id, lease_generation):
+        return self._get(f"{self._run_path(run_id, 'context')}?lease_generation={int(lease_generation)}")
+
+    def post_events(self, run_id, lease_generation, turn_index, events):
+        body = {"lease_generation": lease_generation, "turn_index": turn_index, "events": list(events)}
+        answer = self._post(self._run_path(run_id, "events"), body)
+        stored = answer.get("events") if isinstance(answer, dict) else None
+        return stored if isinstance(stored, list) else []
+
+    def post_result(self, run_id, lease_generation, result):
+        return self._post(self._run_path(run_id, "result"), {"lease_generation": lease_generation, **result})

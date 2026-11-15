@@ -28,13 +28,15 @@ type TCommentCreate = {
   activityOperations: TCommentsOperations;
   projectId?: string;
   onSubmitCallback?: (elementId: string) => void;
+  /** Suggest workspace Agents in the `@` menu of the composer. */
+  enableAgentMentions?: boolean;
 };
 
 // services
 const fileService = new FileService();
 
 export const CommentCreate = observer(function CommentCreate(props: TCommentCreate) {
-  const { workspaceSlug, entityId, activityOperations, projectId, onSubmitCallback } = props;
+  const { workspaceSlug, entityId, activityOperations, projectId, onSubmitCallback, enableAgentMentions } = props;
   // translation
   const { t } = useTranslation();
   // states
@@ -62,7 +64,9 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
   const onSubmit = async (formData: Partial<TIssueComment>) => {
     try {
       const comment = await activityOperations.createComment(formData);
-      if (comment?.id) onSubmitCallback?.(comment.id);
+      // The comment was not saved (the error toast is shown): keep the draft so the member can change it.
+      if (!comment?.id) return;
+      onSubmitCallback?.(comment.id);
       if (uploadedAssetIds.length > 0) {
         if (projectId) {
           await fileService.updateBulkProjectAssetsUploadStatus(workspaceSlug, projectId.toString(), entityId, {
@@ -77,12 +81,11 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
       }
     } catch (error) {
       console.error(error);
-    } finally {
-      reset({
-        comment_html: "<p></p>",
-      });
-      editorRef.current?.clearEditor();
     }
+    reset({
+      comment_html: "<p></p>",
+    });
+    editorRef.current?.clearEditor();
   };
 
   const commentHTML = watch("comment_html");
@@ -146,6 +149,7 @@ export const CommentCreate = observer(function CommentCreate(props: TCommentCrea
                     value={"<p></p>"}
                     workspaceSlug={workspaceSlug}
                     projectId={projectId}
+                    enableAgentMentions={enableAgentMentions}
                     onEnterKeyPress={(e) => {
                       if (!isEmpty && !isSubmitting) {
                         handleSubmit(onSubmit)(e);

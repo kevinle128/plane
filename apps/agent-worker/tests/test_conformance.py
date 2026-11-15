@@ -25,8 +25,8 @@ class RecordingDriver:
 def test_folder_error_before_the_probe_gives_a_failed_report(private_dir, token_file):
     run_root = private_dir / "runs"
     run_root.mkdir(mode=0o700)
-    # A file where the probes directory must be: creating the probe folder fails with an OSError.
-    (run_root / "probes").write_text("not a directory")
+    # A file where the sandboxes directory must be: creating the probe folder fails with an OSError.
+    (run_root / "sandboxes").write_text("not a directory")
     driver = RecordingDriver()
 
     report = run_probe(
@@ -39,7 +39,7 @@ def test_folder_error_before_the_probe_gives_a_failed_report(private_dir, token_
 
 
 def test_stale_probe_folders_are_removed_at_start(private_dir):
-    probes = private_dir / "runs" / "probes"
+    probes = private_dir / "runs" / "sandboxes" / "probe-claude_code" / "scratch"
     (probes / "p1-1" / "workspace").mkdir(parents=True)
     (probes / "p2-3").mkdir()
     (private_dir / "runs" / "keep").mkdir()

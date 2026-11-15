@@ -6,10 +6,9 @@
 
 A driver proves its Harness on the installed version before Plane shows it as
 connected: authentication, a model report, one resumed follow-up, progress
-events, interruption, permission enforcement (each write path the Harness offers
-is denied by the boundary the Run uses) and recovery after the Harness process
-is killed. It reports the
-native capabilities (midturn input, native resume, permission prompt) apart from
+events, interruption, permissions (the Harness runs with full permissions inside
+its sandbox and sends no permission request) and recovery after the Harness
+process is killed. It reports the native capabilities (midturn input, native resume, permission prompt) apart from
 the checks, because Plane offers its own queue and stop path where a native
 control is missing.
 """
@@ -68,12 +67,11 @@ class ProbeOutcome:
 
 @dataclass(frozen=True)
 class ProbeWorkspace:
-    """Directories of one probe. ``cwd`` is the Harness working directory and stays read-only for it."""
+    """Directories of one probe in the scratch folder of the probe sandbox. ``cwd`` is the Harness working directory."""
 
     run_root: Path
     own_dir: Path
     cwd: Path
-    tmp: Path
     token_file: Path
     plane_checkout: Path
 

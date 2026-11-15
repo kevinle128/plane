@@ -45,7 +45,10 @@ CAPABILITY_FLAGS = ("midturn_input", "native_resume", "permission_prompt")
 MINIMUM_PROBE_SECONDS = 60
 
 # Problems that stop the probe before any check can run.
-BLOCKING_ISSUES = ("harness_not_found", "unsupported_version")
+BLOCKING_ISSUES = ("harness_not_found", "unsupported_version", "sandbox_not_signed_in")
+
+# Missing action when a Run reports that its CLI version failed a check that is not a known check.
+VERSION_UNVERIFIED = "harness_version_unverified"
 
 
 class ProbeConflict(Exception):
@@ -185,4 +188,33 @@ def apply_report(worker, probe_id, report):
             Agent.objects.filter(pk=connection.agent_id).exclude(selected_model="").exclude(
                 selected_model__in=reported
             ).update(selected_model="")
+    return connection
+
+
+def mark_version_unverified(agent, harness_version, failed_check):
+    """A Run found that the installed CLI version fails the behavior suite.
+
+    A ``connected`` connection becomes ``failed`` with that check as missing
+    action. A ``connecting`` connection is left alone: its probe reports the
+    current result itself.
+    """
+    with transaction.atomic():
+        connection = AgentConnection.objects.select_for_update().get(agent=agent)
+        if connection.state != AgentConnectionState.CONNECTED:
+            return connection
+        harness = AgentHarness(agent.harness).label
+        connection.state = AgentConnectionState.FAILED
+        connection.missing_action = failed_check if failed_check in REQUIRED_CHECKS else VERSION_UNVERIFIED
+        version = f" {harness_version}" if harness_version else ""
+        connection.failure_hint = (
+            f"{harness}{version} failed the {failed_check or 'behavior'} check in a Run. Retry the connection."
+        )
+        update_fields = ["state", "missing_action", "failure_hint", "reported_models", "verified_at"]
+        if harness_version:
+            connection.harness_version = harness_version
+            update_fields.append("harness_version")
+        # As in ``apply_report``: only a verified Harness shows its models and its verification time.
+        connection.reported_models = []
+        connection.verified_at = None
+        connection.save(update_fields=update_fields, disable_auto_set_user=True)
     return connection

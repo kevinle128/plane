@@ -17,14 +17,16 @@ import { useAdditionalEditorMention } from "@/hooks/use-additional-editor-mentio
 
 type TArgs = {
   enableAdvancedMentions?: boolean;
+  enableAgentMentions?: boolean;
   searchEntity: (payload: TSearchEntityRequestPayload) => Promise<TSearchResponse>;
 };
 
 export const useEditorMention = (args: TArgs) => {
-  const { enableAdvancedMentions = false, searchEntity } = args;
+  const { enableAdvancedMentions = false, enableAgentMentions = false, searchEntity } = args;
   // additional mentions
   const { editorMentionTypes, updateAdditionalSections } = useAdditionalEditorMention({
     enableAdvancedMentions,
+    enableAgentMentions,
   });
   // fetch mentions handler
   const fetchMentions = useCallback(

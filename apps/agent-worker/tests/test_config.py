@@ -12,7 +12,8 @@ from plane_agent_worker.config import ConfigError, load_config
 def env_for(private_dir, token_file, **overrides):
     checkout = private_dir / "plane"
     checkout.mkdir(exist_ok=True)
-    (private_dir / "home").mkdir(exist_ok=True)
+    (private_dir / "home" / ".claude").mkdir(parents=True, exist_ok=True)
+    (private_dir / "home" / ".claude" / "settings.json").write_text("{}")
     env = {
         "HOME": str(private_dir / "home"),
         "PLANE_AGENT_WORKER_API_ORIGIN": "http://localhost:8000",
@@ -154,6 +155,90 @@ def test_missing_or_unusable_home_is_rejected(private_dir, token_file, home):
     else:
         env["HOME"] = home
 
-    # Claude Code reads its login and settings from the home directory, so the Worker stops at start.
+    # The sandboxes mount the Claude settings from the home directory, so the Worker stops at start.
     with pytest.raises(ConfigError, match="HOME"):
         load_config(env)
+
+
+def test_missing_host_claude_settings_is_rejected(private_dir, token_file):
+    env = env_for(private_dir, token_file)
+    (private_dir / "home" / ".claude" / "settings.json").unlink()
+
+    with pytest.raises(ConfigError, match="settings.json"):
+        load_config(env)
+
+
+def test_sbx_path_and_sandbox_memory_are_read(private_dir, token_file):
+    config = load_config(
+        env_for(
+            private_dir, token_file, PLANE_AGENT_WORKER_SBX_BIN="/opt/homebrew/bin/sbx", PLANE_AGENT_SANDBOX_MEMORY="6g"
+        )
+    )
+
+    assert config.sbx_bin == "/opt/homebrew/bin/sbx"
+    assert config.sandbox_memory == "6g"
+    assert config.home == private_dir / "home"
+
+
+def test_sbx_path_defaults_to_the_path_lookup(private_dir, token_file):
+    bin_dir = private_dir / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "sbx").write_text("#!/bin/sh\n")
+    (bin_dir / "sbx").chmod(0o700)
+
+    config = load_config(env_for(private_dir, token_file, PATH=str(bin_dir)))
+
+    assert config.sbx_bin == str(bin_dir / "sbx")
+    assert config.sandbox_memory is None
+
+
+@pytest.mark.parametrize("value", ["lots", "4", "4tb", "-1g"])
+def test_invalid_sandbox_memory_is_rejected(private_dir, token_file, value):
+    with pytest.raises(ConfigError, match="PLANE_AGENT_SANDBOX_MEMORY"):
+        load_config(env_for(private_dir, token_file, PLANE_AGENT_SANDBOX_MEMORY=value))
+
+
+def test_run_settings_have_defaults(private_dir, token_file):
+    config = load_config(env_for(private_dir, token_file))
+
+    assert config.mcp_port == 7450
+    assert config.import_mcp_servers == ()
+    assert config.git_allowed_hosts == frozenset()
+    assert config.git_allowed_ips == ()
+    assert config.run_folder_days == 7
+
+
+def test_run_settings_are_read(private_dir, token_file):
+    config = load_config(
+        env_for(
+            private_dir,
+            token_file,
+            PLANE_AGENT_MCP_PORT="7999",
+            PLANE_AGENT_IMPORT_MCP_SERVERS=" archon, docs ,",
+            AGENT_GIT_ALLOWED_HOSTS="Git.Internal.test, gitlab.lan",
+            AGENT_GIT_ALLOWED_IPS="10.0.0.0/8, 192.168.1.5",
+            PLANE_AGENT_WORKER_RUN_FOLDER_DAYS="30",
+        )
+    )
+
+    assert config.mcp_port == 7999
+    assert config.import_mcp_servers == ("archon", "docs")
+    assert config.git_allowed_hosts == frozenset({"git.internal.test", "gitlab.lan"})
+    assert [str(network) for network in config.git_allowed_ips] == ["10.0.0.0/8", "192.168.1.5/32"]
+    assert config.run_folder_days == 30
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("PLANE_AGENT_MCP_PORT", "0"),
+        ("PLANE_AGENT_MCP_PORT", "http"),
+        ("AGENT_GIT_ALLOWED_IPS", "10.0.0.300"),
+        ("PLANE_AGENT_WORKER_RUN_FOLDER_DAYS", "0"),
+        ("PLANE_AGENT_WORKER_RUN_FOLDER_DAYS", "1.5"),
+        ("PLANE_AGENT_WORKER_RUN_FOLDER_DAYS", "week"),
+    ],
+)
+def test_invalid_run_settings_are_rejected(private_dir, token_file, name, value):
+    with pytest.raises(ConfigError, match=name):
+        load_config(env_for(private_dir, token_file, **{name: value}))

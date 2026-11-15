@@ -27,6 +27,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 # Module imports
+from plane.agent.services.run_creation import mention_candidates
 from plane.app.views.base import BaseAPIView
 from plane.app.permissions import ROLE, WorkspaceUserPermission
 from plane.db.models import (
@@ -400,6 +401,10 @@ class SearchEndpoint(BaseAPIView):
                     )
 
                     response_data["user_mention"] = list(users[:count])
+
+                elif query_type == "agent_mention":
+                    workspace = Workspace.objects.get(slug=slug)
+                    response_data["agent_mention"] = mention_candidates(workspace, project_id, query)
 
                 elif query_type == "project":
                     fields = ["name", "identifier"]

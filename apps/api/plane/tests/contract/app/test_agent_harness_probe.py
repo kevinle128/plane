@@ -373,6 +373,26 @@ class TestProbeReport:
         assert connection["missing_action"] == "unsupported_version"
 
     @pytest.mark.django_db
+    def test_missing_sandbox_sign_in_is_the_missing_action(self, session_client, worker_client, workspace):
+        probe = connect_and_claim(session_client, worker_client, workspace)
+        report = probe_report(
+            probe["generation"],
+            harness_version="",
+            checks=[],
+            models=[],
+            suite=None,
+            blocking_issue="sandbox_not_signed_in",
+            failure_hint="Run sbx login on the Worker machine.",
+        )
+
+        response = worker_client.post(report_url(probe["id"]), report, format="json")
+
+        assert response.status_code == 200
+        connection = agent_state(session_client, workspace)["connection"]
+        assert connection["state"] == "failed"
+        assert connection["missing_action"] == "sandbox_not_signed_in"
+
+    @pytest.mark.django_db
     def test_old_generation_report_returns_409(self, session_client, worker_client, workspace):
         probe = connect_and_claim(session_client, worker_client, workspace)
         connect(session_client, workspace)

@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import type { TAgentMentionSearchResponse } from "./agent";
 import type { ICycle } from "./cycle";
 import type { TIssue } from "./issues/issue";
 import type { IModule } from "./module";
@@ -12,7 +13,7 @@ import type { IProject } from "./project";
 import type { IUser } from "./users";
 import type { IWorkspace } from "./workspace";
 
-export type TSearchEntities = "user_mention" | "issue" | "project" | "cycle" | "module" | "page";
+export type TSearchEntities = "user_mention" | "agent_mention" | "issue" | "project" | "cycle" | "module" | "page";
 
 export type TUserSearchResponse = {
   member__avatar_url: IUser["avatar_url"];
@@ -72,6 +73,7 @@ export type TSearchResponse = {
   page?: TPageSearchResponse[];
   project?: TProjectSearchResponse[];
   user_mention?: TUserSearchResponse[];
+  agent_mention?: TAgentMentionSearchResponse[];
 };
 
 export type TSearchEntityRequestPayload = {

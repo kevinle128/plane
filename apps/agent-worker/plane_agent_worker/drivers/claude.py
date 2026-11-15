@@ -4,38 +4,33 @@
 
 """Claude Code driver: connection probe over the stream-JSON control protocol.
 
-Claude runs as it is installed on the Mini: it reads its own settings (for
-example the login, an API key or a gateway in ``~/.claude/settings.json``) and
-loads the user's hooks and MCP servers. The Worker adds its boundary settings
-with ``--settings`` (see ``claude_boundary``: built-in sandbox for Bash,
-bare-name deny rules that remove the file tools). That file ranks above the
-user, project and local settings, and deny rules win over allow rules from any
-scope. The credential scrub keeps credentials out of the processes Claude
-starts. Permission prompts come to the Worker over stdio
-(``--permission-prompt-tool stdio``). The Worker denies them, except a prompt
-for the Bash write in the permission check: Claude Code 2.1.289 asks before a
-write to a path the sandbox denies, and the allowed command still runs in the
-sandbox, which must deny the write.
+Every Claude process runs inside the probe sandbox of the Worker (``sandbox.py``)
+with full permissions (``--dangerously-skip-permissions``); the sandbox microVM and
+its mounts are the boundary. Claude reads the host ``~/.claude/settings.json``
+through a read-only mount (``--settings``), so the user's gateway and token apply,
+and loads no MCP server (``--strict-mcp-config`` without a config file).
+Permission prompts would come to the Worker over stdio
+(``--permission-prompt-tool stdio``); under full permissions none must arrive.
 
-Quick check (each Connect): ``--version``, ``auth status`` (JSON) and one
-``initialize`` request in a one-shot process (stdin closes after the request)
-that returns the model list. No prompt is sent. When that request fails, the
-Connect reports the CLI aliases ``opus``, ``sonnet`` and ``haiku`` with source
-``fallback``; its model report check then comes from the suite.
+Quick check (each Connect): Docker sign-in (``sbx ls``), the probe sandbox, then
+inside it ``--version``, ``auth status`` (JSON) and one ``initialize`` request in a
+one-shot process (stdin closes after the request) that returns the model list. No
+prompt is sent. When that request fails, the Connect reports the CLI aliases
+``opus``, ``sonnet`` and ``haiku`` with source ``fallback``; its model report check
+then comes from the suite.
 
-Behavior suite (once per CLI version, see ``conformance.ensure_verified``;
-verified with Claude Code 2.1.289):
+Behavior suite (once per CLI version, see ``conformance.ensure_verified``):
 1. ``--version`` and the model list again, so the result belongs to one version.
-2. Session A: a turn with partial-message events (progress), whose ``init``
-   message must not list Write, Edit or NotebookEdit although ``--tools`` asks
-   for Write, and a Bash write in the working directory that the built-in
-   sandbox must deny (permission); and a long turn that
-   receives ``interrupt``, then a next turn in the same process (interruption).
-   The driver reports ``midturn_input`` as False and does not measure it: Send
-   now for Claude stops the turn and sends the message as the next turn.
+2. Session A: a turn with partial-message events (progress); a Bash write in the
+   working directory that must run without a permission request, in a session
+   whose ``init`` message reports ``bypassPermissions`` (permission); and a long
+   turn that receives ``interrupt``, then a next turn in the same process
+   (interruption). The driver reports ``midturn_input`` as False and does not
+   measure it: Send now for Claude stops the turn and sends the message as the
+   next turn.
 3. Session B resumes the session and recalls a code word (follow-up, native resume).
-4. Session C resumes, is killed during a turn; session D resumes and recalls the
-   code word again (recovery).
+4. Session C resumes and is killed during a turn (a kill of its pidfile inside the
+   sandbox); session D resumes and recalls the code word again (recovery).
 """
 
 import contextlib
@@ -46,7 +41,6 @@ import os
 import queue
 import re
 import secrets
-import shutil
 import signal
 import subprocess
 import threading
@@ -59,16 +53,23 @@ from plane_agent_worker.drivers.base import (
     WAIT_SLICE_SECONDS,
     ProbeOutcome,
     ProbeTimeout,
-    ProbeWorkspace,
     bounded,
 )
-from plane_agent_worker.drivers.claude_boundary import boundary_settings, write_boundary_settings
+from plane_agent_worker.sandbox import (
+    SANDBOX_ENV,
+    VM_SETTINGS,
+    VM_USER_CLAUDE,
+    SandboxError,
+    SandboxSpec,
+    probe_scratch,
+    user_config_mounts,
+)
 
 HARNESS = "claude_code"
 # The version of the behavior suite. A passing suite result is cached per (Harness, CLI version,
 # suite version). Change it when the checks, the session flags or the boundary change; a unit test
-# pins ``suite_fingerprint()`` for each version.
-SUITE_VERSION = 2
+# pins ``suite_fingerprint()`` for each version. Version 3 runs inside the probe sandbox.
+SUITE_VERSION = 3
 SUPPORTED_MAJOR_VERSION = 2
 VERSION_PATTERN = re.compile(r"^\s*(\d+)\.(\d+)\.(\d+)")
 MODEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:\[\]/-]{0,127}$")
@@ -102,62 +103,25 @@ SESSION_FLAGS = (
     "stdio",
 )
 
-# Only these variables reach the Harness. The Worker token file path, outer agent
-# session variables and unrelated credentials never do.
-ENV_ALLOWLIST = (
-    "HOME",
-    "USER",
-    "LOGNAME",
-    "PATH",
-    "LANG",
-    "LC_ALL",
-    "LC_CTYPE",
-    "TERM",
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_BASE_URL",
-    "CLAUDE_CODE_OAUTH_TOKEN",
-    "CLAUDE_CONFIG_DIR",
+# Every probe process: full permissions inside the sandbox, the host settings from the read-only
+# mount, and no MCP server.
+PROBE_FLAGS = ("--dangerously-skip-permissions", "--settings", VM_SETTINGS, "--strict-mcp-config")
+# A Run turn also loads all host skills and the turn's MCP config, and nothing else.
+RUN_FLAGS = (
+    "--dangerously-skip-permissions",
+    "--settings",
+    VM_SETTINGS,
+    "--add-dir",
+    VM_USER_CLAUDE,
+    "--strict-mcp-config",
 )
-
+BYPASS_MODE = "bypassPermissions"
+# A wrong gateway token makes Claude retry for about 3 minutes before it reports 401, so a turn that
+# sends no model output within this time fails with a gateway hint.
+FIRST_OUTPUT_SECONDS = 30
+OUTPUT_TYPES = frozenset({"stream_event", "assistant", "result"})
 BASH_PROBE_FILE = "plane-sandbox-probe.txt"
-FILE_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
-SANDBOX_DENIAL = "operation not permitted"
 COUNT_PROMPT = "Count from 1 to 400, one number per line, with no other text."
-
-
-# Set for every Claude process. The scrub removes credentials from the environment of the processes
-# Claude starts (Bash commands, hooks, MCP servers); Claude keeps them for its own API calls.
-FIXED_ENV = {"CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"}
-
-
-def harness_env(base_env, tmp):
-    env = {name: base_env[name] for name in ENV_ALLOWLIST if base_env.get(name)}
-    env.update(FIXED_ENV)
-    env["TMPDIR"] = f"{tmp}/"
-    # Claude Code keeps its own temporary files under this directory instead of the shared /tmp.
-    env["CLAUDE_CODE_TMPDIR"] = str(tmp)
-    return env
-
-
-def display_path(path, home):
-    """``path`` with the home directory shown as ``~``, so the report does not name the operator account."""
-    if home:
-        home = os.path.realpath(os.path.expanduser(home))
-        real = os.path.realpath(path)
-        if real == home or real.startswith(home + os.sep):
-            return "~" + real[len(home) :]
-    return str(path)
-
-
-def claude_config_dir(env):
-    configured = env.get("CLAUDE_CONFIG_DIR")
-    return Path(configured) if configured else Path(env.get("HOME", "~")).expanduser() / ".claude"
-
-
-def session_dir_name(cwd):
-    """Claude Code stores the sessions of a working directory under this name in its projects directory."""
-    return re.sub(r"[^A-Za-z0-9]", "-", str(cwd))
 
 
 def parse_models(raw_models):
@@ -186,10 +150,12 @@ def parse_models(raw_models):
 class StreamSession:
     """One Claude process in stream-JSON mode. Output is read on a thread so every wait has a deadline."""
 
-    def __init__(self, registry, key, argv, env, cwd, recorder=None, cleanup_paths=()):
+    def __init__(self, registry, key, argv, env, cwd, recorder=None, cleanup_paths=(), stop_inside=None):
         self.registry = registry
         self.key = key
         self.recorder = recorder
+        # Stops the process inside the sandbox; a signal to the host client does not reach it.
+        self.stop_inside = stop_inside
         self.lines = queue.Queue()
         self.stderr_tail = ""
         self.process = registry.spawn(
@@ -271,7 +237,9 @@ class StreamSession:
             pass
 
     def kill(self):
-        """Kill the whole group at once, as a crash would."""
+        """Kill the process at once, as a crash would: inside the sandbox first, then the host client."""
+        if self.stop_inside:
+            self.stop_inside()
         try:
             os.killpg(self.process.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
@@ -286,8 +254,31 @@ class StreamSession:
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            pass
+            if self.stop_inside:
+                self.stop_inside()
         self.registry.release(self.key, self.process)
+
+
+class TurnOutcome:
+    """How a Run turn ended."""
+
+    def __init__(self):
+        self.result = None
+        self.session_id = ""
+        self.output_started = False
+        self.timed_out = False
+        self.no_output = False
+        self.ended = False
+        self.stderr_tail = ""
+
+    @property
+    def succeeded(self):
+        return bool(self.result) and self.result.get("subtype") == "success" and not self.result.get("is_error")
+
+    @property
+    def text(self):
+        value = (self.result or {}).get("result")
+        return value if isinstance(value, str) else ""
 
 
 class Turn:
@@ -299,8 +290,9 @@ class Turn:
         self.tool_uses = {}
         self.tool_results = {}
         self.ended = False
-        # The tools that the ``init`` message of this turn lists; ``None`` when no ``init`` arrived.
+        # The tools and the permission mode of the ``init`` message; ``None`` when no ``init`` arrived.
         self.tools = None
+        self.permission_mode = None
 
     @property
     def succeeded(self):
@@ -352,8 +344,10 @@ def read_turn(session, deadline, on_message=None, allow_tools=frozenset()):
             turn.ended = True
             return turn
         kind = message.get("type")
-        if kind == "system" and message.get("subtype") == "init" and isinstance(message.get("tools"), list):
-            turn.tools = [tool for tool in message["tools"] if isinstance(tool, str)]
+        if kind == "system" and message.get("subtype") == "init":
+            if isinstance(message.get("tools"), list):
+                turn.tools = [tool for tool in message["tools"] if isinstance(tool, str)]
+            turn.permission_mode = message.get("permissionMode")
         elif kind == "stream_event":
             turn.stream_events += 1
         elif kind == "user" and message.get("isReplay"):
@@ -391,26 +385,12 @@ def read_turn(session, deadline, on_message=None, allow_tools=frozenset()):
 
 
 def suite_fingerprint():
-    """A hash of what the behavior suite proves: the checks, the session flags, the environment and the boundary.
-
-    The boundary settings are built for fixed paths that do not exist, so the hash is the same
-    on every host.
-    """
-    root = Path("/plane-suite-fingerprint")
-    own_dir = root / "runs" / "probes" / "probe"
-    workspace = ProbeWorkspace(
-        run_root=root / "runs",
-        own_dir=own_dir,
-        cwd=own_dir / "workspace",
-        tmp=own_dir / "tmp",
-        token_file=root / "token",
-        plane_checkout=root / "plane",
-    )
+    """A hash of what the behavior suite proves: the checks, the session flags and the sandbox environment."""
     document = {
         "checks": list(REQUIRED_CHECKS),
         "session_flags": list(SESSION_FLAGS),
-        "environment": {"allowlist": list(ENV_ALLOWLIST), "fixed": FIXED_ENV},
-        "boundary": boundary_settings(workspace, root / "home" / ".claude", root / "home"),
+        "probe_flags": list(PROBE_FLAGS),
+        "sandbox_env": SANDBOX_ENV,
     }
     return hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
 
@@ -419,23 +399,18 @@ class ClaudeDriver:
     harness = HARNESS
     suite_version = SUITE_VERSION
 
-    def __init__(self, executable, registry, base_env=None, recorder=None):
-        self.executable = executable
+    def __init__(self, sandboxes, run_root, registry, recorder=None):
+        self.sandboxes = sandboxes
+        self.run_root = run_root
         self.registry = registry
-        self.base_env = dict(os.environ if base_env is None else base_env)
         self.recorder = recorder
 
     # Commands -----------------------------------------------------------------
 
-    def _resolve_executable(self):
-        if self.executable:
-            path = Path(self.executable)
-            return str(path) if path.is_file() and os.access(path, os.X_OK) else None
-        return shutil.which("claude", path=self.base_env.get("PATH"))
-
-    def _run(self, argv, context, name, timeout=COMMAND_TIMEOUT_SECONDS):
-        """Run a short command in its own recorded process group; the whole group stops when it ends."""
+    def _run(self, args, context, name, timeout=COMMAND_TIMEOUT_SECONDS):
+        """Run one short ``claude`` command in the sandbox, in its own recorded host process group."""
         key = f"{context['key_prefix']}-{name}"
+        argv = self.sandboxes.exec_argv(context["sandbox"], context["cwd"], ["claude", *args], interactive=False)
         process = self.registry.spawn(
             key,
             argv,
@@ -443,9 +418,8 @@ class ClaudeDriver:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env=context["env"],
+            env=self.sandboxes.client_env,
             cwd=context["cwd"],
-            cleanup_paths=context["cleanup_paths"],
         )
         try:
             stdout, stderr = process.communicate(timeout=min(timeout, max(1.0, context["deadline"].remaining())))
@@ -454,49 +428,150 @@ class ClaudeDriver:
         return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
 
     def _session(self, context, name, extra_args=()):
-        argv = [context["executable"], *SESSION_FLAGS, "--settings", context["settings_file"], *extra_args]
+        sandbox = context["sandbox"]
+        pidfile = Path(context["pid_dir"]) / f"{name}.pid"
+        command = ["claude", *SESSION_FLAGS, *PROBE_FLAGS, *extra_args]
+        argv = self.sandboxes.exec_argv(sandbox, context["cwd"], command, pidfile=pidfile)
         key = f"{context['key_prefix']}-{name}"
         return StreamSession(
-            self.registry, key, argv, context["env"], context["cwd"], self.recorder, context["cleanup_paths"]
+            self.registry,
+            key,
+            argv,
+            self.sandboxes.client_env,
+            context["cwd"],
+            self.recorder,
+            stop_inside=lambda: self.sandboxes.kill(sandbox, pidfile),
         )
+
+    # Run turns ----------------------------------------------------------------
+
+    def cli_version(self, key, sandbox, cwd, deadline):
+        """``claude --version`` inside ``sandbox``, or ``None`` when it does not report one."""
+        context = {"sandbox": sandbox, "cwd": str(cwd), "deadline": deadline, "key_prefix": key}
+        result = self._run(["--version"], context, "version")
+        match = VERSION_PATTERN.match(result.stdout or "")
+        if result.returncode != 0 or not match:
+            logger.warning("claude --version failed in %s: %s", sandbox, bounded(result.stderr, MAX_HINT_CHARS))
+            return None
+        return ".".join(match.groups())
+
+    def run_turn(
+        self,
+        *,
+        key,
+        sandbox,
+        cwd,
+        host_dir,
+        pidfile,
+        prompt,
+        mcp_config,
+        model,
+        deadline,
+        on_message,
+        first_output_seconds=FIRST_OUTPUT_SECONDS,
+    ):
+        """Run one Q&A turn in ``sandbox`` with ``cwd`` as working directory. Returns a ``TurnOutcome``.
+
+        ``on_message`` gets every stream message. The turn ends at its ``result`` message, when the
+        process ends, when no model output arrives in ``FIRST_OUTPUT_SECONDS`` or at ``deadline``.
+        """
+        command = ["claude", *SESSION_FLAGS, *RUN_FLAGS, "--mcp-config", str(mcp_config)]
+        if model:
+            command += ["--model", model]
+        # A PID left by an earlier turn may name another process in the shared VM: never kill it.
+        Path(pidfile).unlink(missing_ok=True)
+        argv = self.sandboxes.exec_argv(sandbox, cwd, command, pidfile=pidfile)
+        session = StreamSession(
+            self.registry,
+            key,
+            argv,
+            self.sandboxes.client_env,
+            str(host_dir),
+            self.recorder,
+            stop_inside=lambda: self.sandboxes.kill(sandbox, pidfile),
+        )
+        outcome = TurnOutcome()
+        try:
+            session.send_user(prompt)
+            first = deadline.within(first_output_seconds)
+            while outcome.result is None:
+                message = session.next_message(deadline if outcome.output_started else first)
+                if message is None:
+                    outcome.ended = True
+                    break
+                kind = message.get("type")
+                if kind in OUTPUT_TYPES:
+                    outcome.output_started = True
+                if kind == "system" and message.get("subtype") == "init":
+                    outcome.session_id = message.get("session_id") or outcome.session_id
+                if kind == "control_request" and (message.get("request") or {}).get("subtype") == "can_use_tool":
+                    # Full permissions: a permission request is not expected; deny it.
+                    answer = {"behavior": "deny", "message": "Plane runs this turn with full permissions only."}
+                    response = {"subtype": "success", "request_id": message.get("request_id"), "response": answer}
+                    session.send({"type": "control_response", "response": response})
+                on_message(message)
+                if kind == "result":
+                    outcome.result = message
+        except ProbeTimeout:
+            outcome.timed_out = True
+            outcome.no_output = not outcome.output_started
+            session.kill()
+            return outcome
+        except BaseException:
+            # The caller stops the turn (for example after a lost lease): Claude must not keep running in the VM.
+            session.kill()
+            raise
+        finally:
+            outcome.stderr_tail = session.stderr_tail
+        session.close()
+        return outcome
 
     # Probe --------------------------------------------------------------------
 
+    def probe_spec(self):
+        return SandboxSpec(
+            name=self.sandboxes.probe_name(self.harness),
+            primary=probe_scratch(self.run_root, self.harness),
+            mounts=user_config_mounts(self.sandboxes.home),
+        )
+
     @contextlib.contextmanager
     def _harness_context(self, workspace, deadline, outcome):
-        """The command context of one probe step in ``workspace``, or ``None`` when the CLI is missing.
+        """The command context of one probe step in ``workspace``, or ``None`` when the sandbox is not usable.
 
-        A deadline or start failure ends the step with a failure hint. The Claude session folder of the
-        working directory is removed when the step ends.
+        A deadline or start failure ends the step with a failure hint.
         """
-        executable = self._resolve_executable()
-        if executable is None:
-            outcome.blocking_issue = "harness_not_found"
-            outcome.failure_hint = "The claude command was not found on the Mini."
-            yield None
-            return
-        env = harness_env(self.base_env, workspace.tmp)
-        outcome.location = display_path(executable, env.get("HOME"))
-
-        config_dir = claude_config_dir(env)
-        session_dir = config_dir / "projects" / session_dir_name(os.path.realpath(workspace.cwd))
-        try:
-            yield {
-                "executable": executable,
-                "env": env,
-                "cwd": str(workspace.cwd),
-                "deadline": deadline,
-                "key_prefix": workspace.own_dir.name,
-                "settings_file": str(write_boundary_settings(workspace, config_dir, env.get("HOME", "~"))),
-                # A Worker that stops during the probe removes this folder at its next start.
-                "cleanup_paths": [str(session_dir)],
-            }
-        except (ProbeTimeout, subprocess.TimeoutExpired):
-            outcome.failure_hint = outcome.failure_hint or "The probe did not finish before its deadline."
-        except OSError as error:
-            outcome.failure_hint = f"The claude command could not run ({type(error).__name__})."
-        finally:
-            shutil.rmtree(session_dir, ignore_errors=True)
+        spec = self.probe_spec()
+        # The step holds the probe sandbox shared, so a concurrent check cannot stop or remove it meanwhile.
+        with contextlib.ExitStack() as stack:
+            try:
+                self.sandboxes.check_signed_in()
+                stack.enter_context(self.sandboxes.use(spec))
+            except SandboxError as error:
+                if error.code == "sandbox_not_signed_in":
+                    outcome.blocking_issue = "sandbox_not_signed_in"
+                elif error.code == "sandbox_cli_missing":
+                    outcome.blocking_issue = "harness_not_found"
+                outcome.failure_hint = (
+                    bounded(f"The probe sandbox is not available: {error.detail}", MAX_HINT_CHARS)
+                    if error.code == "sandbox_unavailable"
+                    else error.detail
+                )
+                yield None
+                return
+            outcome.location = f"sbx sandbox {spec.name}"
+            try:
+                yield {
+                    "sandbox": spec.name,
+                    "cwd": str(workspace.cwd),
+                    "pid_dir": str(workspace.own_dir),
+                    "deadline": deadline,
+                    "key_prefix": workspace.own_dir.name,
+                }
+            except (ProbeTimeout, subprocess.TimeoutExpired):
+                outcome.failure_hint = outcome.failure_hint or "The probe did not finish before its deadline."
+            except OSError as error:
+                outcome.failure_hint = f"The sbx command could not run ({type(error).__name__})."
 
     def quick_check(self, workspace, deadline):
         """The Connect check: CLI version, login and model list. The behavior suite does not run."""
@@ -525,13 +600,13 @@ class ClaudeDriver:
         return outcome
 
     def _check_version(self, context, outcome):
-        result = self._run([context["executable"], "--version"], context, "version")
+        result = self._run(["--version"], context, "version")
         match = VERSION_PATTERN.match(result.stdout or "")
         if result.returncode != 0 or not match:
             # The CLI output can name local paths; it stays in the Worker log.
             logger.warning("claude --version failed: %s", bounded(result.stderr or result.stdout, MAX_HINT_CHARS))
             outcome.blocking_issue = "harness_not_found"
-            outcome.failure_hint = "claude --version did not report a version. See the Worker log on the Mini."
+            outcome.failure_hint = "claude --version did not report a version in the sandbox. See the Worker log."
             return False
         outcome.harness_version = ".".join(match.groups())
         if int(match.group(1)) != SUPPORTED_MAJOR_VERSION:
@@ -545,7 +620,7 @@ class ClaudeDriver:
 
     def _check_authentication(self, context, outcome):
         check = outcome.checks["authentication"]
-        result = self._run([context["executable"], "auth", "status"], context, "auth")
+        result = self._run(["--settings", VM_SETTINGS, "auth", "status"], context, "auth")
         try:
             status = json.loads(result.stdout or "{}")
         except ValueError:
@@ -554,7 +629,10 @@ class ClaudeDriver:
             check.set(True)
             return True
         check.set(False, "claude auth status: not logged in")
-        outcome.failure_hint = "Claude Code is not logged in on the Mini. Sign in with claude, then retry."
+        outcome.failure_hint = (
+            "Claude Code in the sandbox is not logged in. Check the gateway URL and token in ~/.claude/settings.json "
+            "on the Worker machine, then retry."
+        )
         for name, other in outcome.checks.items():
             if name != "authentication":
                 other.set(False, "not run: authentication failed")
@@ -616,8 +694,7 @@ class ClaudeDriver:
 
     def _session_a(self, context, outcome, workspace, code_word, model_args):
         deadline = context["deadline"]
-        # Write is asked for, so the check proves that the deny rule removes it.
-        session = self._session(context, "session-a", ("--tools", "Bash,Write", *model_args))
+        session = self._session(context, "session-a", ("--tools", "Bash", *model_args))
         session_id = None
         prompted = False
         try:
@@ -631,16 +708,15 @@ class ClaudeDriver:
             if turn.result:
                 session_id = turn.result.get("session_id")
 
-            # Permission: the deny rules remove the file tools, and the sandbox denies the Bash write.
+            # Permission: full permissions inside the sandbox. A write in the working directory (the
+            # writable scratch folder) runs without a permission request.
             session.send_user(
                 f"Use the Bash tool to run this command: echo probe > {BASH_PROBE_FILE}\n"
                 "Run it once, exactly as written. Do not ask questions."
             )
-            # Claude Code asks before a write to a path that the sandbox denies. The Worker allows that
-            # Bash call: the command still runs in the sandbox, which must deny the write.
-            bash_turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS), allow_tools=frozenset({"Bash"}))
-            prompted = bool(bash_turn.permission_prompts)
-            problem = file_tools_problem(turn) or bash_write_problem(bash_turn, workspace.cwd)
+            bash_turn = read_turn(session, deadline.within(TURN_TIMEOUT_SECONDS))
+            prompted = bool(turn.permission_prompts or bash_turn.permission_prompts)
+            problem = permission_problem(turn, bash_turn)
             outcome.checks["permission"].set(problem is None, problem or "")
 
             self._check_interruption(session, outcome, deadline)
@@ -733,26 +809,19 @@ class ClaudeDriver:
         outcome.checks["recovery"].set(recovered, "" if recovered else "the session did not resume after a crash")
 
 
-def file_tools_problem(turn):
-    """Why the file tools were not proven removed by the deny rules, or ``None`` when they were."""
-    if turn.tools is None:
-        return "The CLI did not list its tools, so the file tools were not proven denied"
-    offered = sorted(FILE_TOOLS & set(turn.tools))
-    if offered:
-        return f"{', '.join(offered)} was offered although a permission rule denies it"
-    return None
-
-
-def bash_write_problem(turn, cwd):
-    """Why the Bash write was not proven denied by the built-in sandbox, or ``None`` when it was."""
-    tool_ids = turn.tool_ids({"Bash"})
-    if not tool_ids:
-        return "Bash was not attempted, so the sandbox was not proven"
-    if any(tool_id in turn.denied_tool_ids for tool_id in tool_ids):
-        return "Bash was denied by a permission rule before the sandbox could deny the write"
-    results = [turn.tool_results.get(tool_id) for tool_id in tool_ids]
-    if (Path(cwd) / BASH_PROBE_FILE).exists() or not all(
-        result and result["is_error"] and SANDBOX_DENIAL in result["text"].lower() for result in results
-    ):
-        return "Bash wrote in the working directory; the sandbox did not deny the write"
+def permission_problem(turn, bash_turn):
+    """Why full permissions were not proven, or ``None`` when they were."""
+    if turn.permission_mode != BYPASS_MODE:
+        return f"the CLI did not report the {BYPASS_MODE} mode (it reported {turn.permission_mode or 'no mode'})"
+    if turn.permission_prompts or bash_turn.permission_prompts:
+        return "the CLI sent a permission request although it runs with full permissions"
+    tool_ids = bash_turn.tool_ids({"Bash"})
+    if not tool_ids or not bash_turn.succeeded:
+        return "the Bash command did not run"
+    if any(tool_id in bash_turn.denied_tool_ids for tool_id in tool_ids):
+        return "the Bash command was denied"
+    # A turn can succeed although its command failed (for example a read-only folder): the write must work.
+    results = [bash_turn.tool_results.get(tool_id) for tool_id in tool_ids]
+    if not any(result and not result["is_error"] for result in results):
+        return "the Bash write in the scratch folder did not succeed"
     return None

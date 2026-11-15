@@ -16,6 +16,7 @@ from plane.tests.agent_git_fixtures import (  # noqa: F401
     member_client,
 )
 from plane.tests.agent_settings_fixtures import agent_worker, worker_client  # noqa: F401
+from plane.tests.agent_run_fixtures import run_setup  # noqa: F401
 
 from plane.db.models import User, Workspace, WorkspaceMember
 from plane.db.models.api import APIToken

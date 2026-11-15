@@ -129,7 +129,8 @@ def create_payload(notification_data):
 
 def process_mention(mention_component):
     soup = BeautifulSoup(mention_component, "html.parser")
-    mentions = soup.find_all("mention-component")
+    # Only user mentions name a user; an agent mention keeps its tag.
+    mentions = soup.find_all("mention-component", attrs={"entity_name": "user_mention"})
     for mention in mentions:
         user_id = mention["entity_identifier"]
         user = User.objects.get(pk=user_id)
